@@ -9,7 +9,7 @@ Last updated: 2026-10-08 (Asia/Karachi)
 - Respond in Roman Urdu / English.
 - Maintain this file after each meaningful investigation, decision, approved change and verification. Never record credentials or personal data.
 - No dependency installation, paid calls, destructive operations, production database changes, deployment, commits or pushes without applicable authorization.
-- This log is being added to the Orbit review branch with the first identity change. The user's Windows checkout has not been changed.
+- This log has been added to the Orbit review branch with the first identity change. The user's Windows checkout has not been changed.
 
 ## Product requirements discussed
 
@@ -118,5 +118,11 @@ Last updated: 2026-10-08 (Asia/Karachi)
 - Next: explain strengthening the Orbit actor-authentication boundary, including the change and benefit, before requesting the next specific approval.
 
 
-| 2026-10-08 | User authorized N01 implementation and repository addition | Scope limited to identity forwarding and its setup/tests/log. |
-| 2026-10-08 | N01 implemented and offline checks completed | 17 focused checks and 7 syntax checks passed; live/full-suite verification pending. |
+## Repository publication
+
+- User authorized N01 implementation and repository addition with 'carry on working aur isko add bhi kardena'.
+- Repository branch: codex/strengthen-neuralops-identities.
+- Implementation commit: 6cc9bfd54a4f0efa56ac1f7967079df412cc726c (11 changed files).
+- Draft review PR: https://github.com/z-sops/jarvis/pull/1.
+- project-update.md is committed on that branch. Main has not been merged or changed by this work; the Windows checkout has not been updated.
+- A follow-up log-only commit records this publication. All source verification results remain as listed above; no live deployment or worker setup was performed.
