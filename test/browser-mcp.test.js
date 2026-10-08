@@ -5,7 +5,7 @@ const http = require('http');
 const { createMcpServer } = require('../lib/browser-mcp');
 const { createActorAuth } = require('../lib/gateway-auth');
 
-const AUTH = createActorAuth({ key: 'a'.repeat(64), isActiveActor: id => ['alex', 'bob', 'bridge-check'].includes(id) });
+const AUTH = createActorAuth({ key: 'a'.repeat(64), isActiveActor: id => ['alex', 'bob', 'bridge-check'].includes(id), generationFor: () => 'http-fixture-run' });
 const TOKEN = AUTH.tokenForActor('bob');
 function fakeManager(log) {
   const snap = { url: 'https://example.com/', title: 'Example', text: 'Hello', textFrom: 0, textTo: 5, textTotal: 5, elements: [{ ref: 'e1', role: 'link', name: 'More', extra: '' }], moreElements: 0, belowFold: 0, scrollY: 0, scrollMax: 0, screens: 1, viewH: 800, alerts: [], dialogs: 0 };

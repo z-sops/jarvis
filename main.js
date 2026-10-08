@@ -27,6 +27,7 @@ const store = createStore(path.join(app.getPath('userData'), 'settings.json'));
 const home = new Home(store.get().homeDir);
 const bus = new EventEmitter();
 const pending = new Map();
+const runs = require('./lib/job-runs').createJobRuns();
 
 const send = (type, payload) => { if (win && !win.isDestroyed()) win.webContents.send('bus', { type, payload }); };
 for (const t of ['tool', 'agent:state', 'agent:created', 'agent:updated', 'job:created', 'job:progress', 'comms:event', 'ui:show', 'tag', 'anomaly']) bus.on(t, p => send(t, p));
@@ -41,7 +42,7 @@ bus.on('job:done', ({ agent, job }) => {
 });
 
 function showWindow() { if (!win) return; if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
-function ask(req) {
+function askUser(req) {
   return new Promise(resolve => {
     const id = Math.random().toString(36).slice(2, 10);
     pending.set(id, resolve);
@@ -51,7 +52,14 @@ function ask(req) {
   });
 }
 
-const runtime = {};
+async function ask(req) {
+  runs.assertCurrent();
+  const answer = await askUser(req);
+  runs.assertCurrent();
+  return answer;
+}
+
+const runtime = { runs };
 const tools = createTools({ home, getCfg: store.get, gemini, bus, ask, runtime, openExternal: u => shell.openExternal(u) });
 const hermes = new HermesEngine({ home, getCfg: store.get });
 const opencode = new OpenCodeEngine({ home, getCfg: store.get });
@@ -60,11 +68,11 @@ const panels = require('./lib/panels');
 const usage = panels.makeUsage({ home });
 const audit = panels.makeAudit({ home, bus });
 gemini.setUsageHook(u => usage.add(u));
-const workers = createWorkers({ home, getCfg: store.get, gemini, tools, bus, hermes, usage, opencode });
+const workers = createWorkers({ home, getCfg: store.get, gemini, tools, bus, hermes, usage, opencode, runs });
 Object.assign(runtime, { dispatch: workers.dispatch, cancel: workers.cancel, stateOf: workers.stateOf });
 const chat = panels.chatGuard(bus);
 // Orbit Browser: Orbit's own private browser (isolated sessions). Laila uses it through tools, the crew through a local MCP server.
-const orbitBrowser = require('./lib/browser-panel').create({ electron: { BrowserWindow, session, ipcMain }, home, getCfg: store.get, store, bus, ask, send,
+const orbitBrowser = require('./lib/browser-panel').create({ electron: { BrowserWindow, session, ipcMain }, home, getCfg: store.get, store, bus, ask, send, runs,
   label: a => (a === 'commander' ? (store.get().aiName || 'Commander AI') : (home.getAgent(a)?.name || a)), onNeedsUser: () => showWindow() });
 const connectorsStore = new (require('./lib/connectors').Connectors)({ home, allowInsecureLocal: !!process.env.BRIDGE_SHOTS });   // http://localhost is allowed only in the test mode
 orbitBrowser.setConnectors(connectorsStore);
@@ -74,7 +82,7 @@ const { Hub } = require('./lib/hub'), { Gateway } = require('./lib/gateway');
 const { FilesProvider, checkRoots } = require('./lib/fsmcp');
 const fsOpts = { home, userData: app.getPath('userData'), userProfile: require('os').homedir(), defaultRoots: [home.p('workspace')] };
 const makeFiles = c => { const chk = checkRoots(c.roots, fsOpts); if (!chk.ok) throw new Error(chk.error); return new FilesProvider({ roots: chk.roots, forbid: [home.p('connectors'), home.p('browser'), home.p('hermes'), app.getPath('userData')], backupDir: home.p('backups', 'files'), trash: f => shell.trashItem(f) }); };
-const gateway = new Gateway({ connectors: connectorsStore, hub: new Hub({ ask, actorName: a => orbitBrowser.manager.actorName(a) }), bus, actorName: a => orbitBrowser.manager.actorName(a),
+const gateway = new Gateway({ runs, connectors: connectorsStore, hub: new Hub({ ask, actorName: a => orbitBrowser.manager.actorName(a) }), bus, actorName: a => orbitBrowser.manager.actorName(a),
   providers: { files: makeFiles, library: () => new (require('./lib/library-provider').LibraryProvider)({ home }), leads: () => new (require('./lib/leads-provider').LeadsProvider)({ home }) },
   native: { web_search: a => tools.exec('web_search', a, 'commander'), look_at_screen: a => require('./lib/screen').describe(a, { getCfg: store.get, gemini, bus }) } });
 orbitBrowser.setGateway(gateway); runtime.gateway = gateway; runtime.store = store;

@@ -148,3 +148,11 @@ On the first Orbit restart with this change, a fresh private `browser/.actor-tok
 This protects the HTTP actor boundary; it is not filesystem isolation. A worker with unrestricted access to another profile or the private key can still steal credentials. Windows ACLs, real Hermes environment interpolation and the full Electron/HTTP flow need verification. Removed worker IDs reject future requests; re-creating the same ID under the same key reuses its token. In-flight actions are not cancelled by identity removal.
 
 Focused offline verification: `node --test --test-isolation=none test/gateway-auth.test.js test/neuralops-identity.test.js test/neuralops-connector.test.js`. The gateway tests use in-memory HTTP/profile harnesses. Real socket regressions are added to `test/browser-mcp.test.js` but were not executed under the audit restrictions.
+
+## Run-scoped worker gateway access
+
+Each started Orbit job gets a persisted `runId`. The main process binds worker MCP credentials and asynchronous tool requests to that execution generation. Credentials expire on cancellation, completion or failure, and change for the next job. Old requests waiting for a body or a user decision cannot inherit the next job's access. Progress/text/checkpoint callbacks from stopped executions are ignored. Hermes reuses its existing profile-signature mechanism to refresh the token on the next job; this can restart that worker's server.
+
+This is an execution-lifetime guard for Orbit-mediated calls, not a complete NeuralOps task-authorization integration or an OS sandbox. It cannot undo an already dispatched action or contain external engines' direct filesystem/shell tools. Queues and recovery remain as before. `bridge-check` stays discovery-only; internal Laila/user controls do not require a worker job.
+
+Offline checks: `node --test test/job-runs.test.js test/gateway-auth.test.js test/neuralops-identity.test.js`. These use memory transports and engine doubles. Full-suite, Windows, real HTTP and real Hermes/OpenCode validation remain pending; no dependency installs or model calls were made for this change.

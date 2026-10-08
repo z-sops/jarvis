@@ -21,7 +21,7 @@ function memoryFs() {
   };
 }
 async function serverRig() {
-  const actors = new Set(['alex', 'bob', 'bridge-check']), auth = createActorAuth({ key: 'a'.repeat(64), isActiveActor: id => actors.has(id) });
+  const actors = new Set(['alex', 'bob', 'bridge-check']), auth = createActorAuth({ key: 'a'.repeat(64), isActiveActor: id => actors.has(id), generationFor: () => 'fixture-run' });
   let handler; const fakeHttp = { createServer: fn => { handler = fn; return { on() {}, listen: (port, host, fn) => fn(), address: () => ({ port: 3039 }), close() {} }; } };
   const calls = [], browserCalls = [];
   const BT = { TOOLS: [{ name: 'browser_open' }], mcpTools: () => [{ name: 'browser_open' }], execute: async (manager, actor, name) => { browserCalls.push({ actor, name }); return { text: 'ok' }; } };
@@ -39,8 +39,8 @@ async function serverRig() {
 }
 const tool = name => ({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: { actor: 'commander', from: 'bob' } } });
 
-test('tokens are stable per actor/key but cannot be reused for another actor or derived from an old shared token', () => {
-  const active = new Set(['alex', 'bob', 'commander', 'jarvis']), auth = createActorAuth({ key: 'a'.repeat(64), isActiveActor: id => active.has(id) });
+test('tokens are stable within an explicit generation but cannot be reused for another actor or derived from an old shared token', () => {
+  const active = new Set(['alex', 'bob', 'commander', 'jarvis']), auth = createActorAuth({ key: 'a'.repeat(64), isActiveActor: id => active.has(id), generationFor: () => 'fixture-run' });
   assert.equal(auth.tokenForActor('alex'), auth.tokenForActor('alex')); assert.notEqual(auth.tokenForActor('alex'), auth.tokenForActor('bob'));
   assert.equal(auth.authenticate('bob', auth.tokenForActor('alex')), false); assert.equal(auth.authenticate('alex', 'a'.repeat(64)), false);
   assert.equal(auth.tokenForActor('commander'), null); assert.equal(auth.tokenForActor('jarvis'), null); assert.equal(auth.tokenForActor('unknown'), null); assert.equal(auth.tokenForActor('a/b'), null);
@@ -99,11 +99,15 @@ test('profile setup gives each worker only its own token and never reuses/expose
   class Manager extends EventEmitter { dispose() {} }
   let options;
   const panel = load('lib/browser-panel.js', { fs: io, './browser': { BrowserManager: Manager }, './browser-mcp': { createMcpServer: opts => { options = opts; return { port: 3039, url: id => 'http://127.0.0.1:3039/mcp/' + id, stop() {} }; } }, './gateway-auth': { ...actualAuth, loadActorKey: file => actualAuth.loadActorKey(file, io) } });
-  const browser = panel.create({ electron: {}, home, getCfg: () => ({}), store: {}, bus: { on() {}, emit() {} }, send() {}, label: id => id });
+  const runs = require('../lib/job-runs').createJobRuns();
+  const firstRun = runs.begin('alex', 'job-a', new AbortController().signal); runs.begin('bob', 'job-b', new AbortController().signal);
+  const browser = panel.create({ runs, electron: {}, home, getCfg: () => ({}), store: {}, bus: { on() {}, emit() {} }, send() {}, label: id => id });
   try {
     const a = browser.crewYaml({ id: 'alex' }), b = browser.crewYaml({ id: 'bob' }), master = io.files.get('/home/browser/.actor-token-key');
     assert.match(a.top, /Bearer \$\{ORBIT_GATEWAY_ACTOR_TOKEN\}/); assert.notEqual(a.env[0], b.env[0]); assert.ok(!JSON.stringify(a).includes(master)); assert.ok(!JSON.stringify(a).includes('OLD_SHARED_TOKEN'));
     const tok = a.env[0].split('=')[1]; assert.equal(options.authenticate('alex', tok), true); assert.equal(options.authenticate('bob', tok), false);
+    runs.end(firstRun); assert.equal(options.authenticate('alex', tok), false); assert.throws(() => browser.crewYaml({ id: 'alex' }), /inactive/);
+    runs.begin('alex', 'job-next', new AbortController().signal); const next = browser.crewYaml({ id: 'alex' }); assert.notEqual(next.env[0], a.env[0]); assert.equal(options.authenticate('alex', tok), false);
     const probe = browser.crewYaml({ id: 'bridge-check' }, { force: true }); assert.ok(probe.env[0]); assert.equal((await options.extra.list('bridge-check')).length, 0);
     assert.throws(() => browser.crewYaml({ id: 'commander' }), /reserved/); assert.throws(() => browser.crewYaml({ id: 'unknown' }), /unknown/);
     roster.delete('alex'); assert.equal(options.authenticate('alex', tok), false); assert.throws(() => browser.crewYaml({ id: 'alex' }), /unknown/);
