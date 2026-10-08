@@ -487,3 +487,11 @@ Zee asked for his crew to be able to run on OpenCode (opencode.ai), the open-sou
 - Existing connectors and per-tool permission levels remain in effect. No automatic authority grants or external NeuralOps registration calls are made.
 - Focused verification is offline and in-memory: no paid model calls, installed dependencies, temporary test files, sockets or spawned worker processes. The full suite and Windows/real-service verification remain pending under the user's test restrictions. Do not claim those checks passed.
 
+
+## Actor-bound gateway strengthening — F02
+
+- User authorized this specific change with “go ahead” after the shared-token impersonation gap and benefit were explained.
+- `lib/gateway-auth.js` generates a fresh private actor key, never from the old shared browser token. Each active worker receives an HMAC token bound to its exact ID; commander/jarvis and unknown identities fail closed.
+- `lib/browser-panel.js` places only that worker's token in its Hermes profile environment. `lib/browser-mcp.js` requires actor authentication, removes the default commander route and makes bridge-check discovery-only. Main-process Laila calls remain internal.
+- Keep host/Origin defenses and existing permission checks. This is not OS/filesystem sandboxing: unrestricted profile/private-key reads still enable credential theft. Same-ID recreation reuses a token; identity removal does not cancel in-flight actions.
+- 24 focused in-memory checks and five changed/new JS syntax checks passed. Real HTTP socket regressions are included but not run; full suite, real Hermes and Windows ACL verification remain pending. Update project-update.md for further work.

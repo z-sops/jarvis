@@ -77,7 +77,7 @@ Last updated: 2026-10-08 (Asia/Karachi)
 - User agreed to strengthening rather than replacing the system.
 - After the concrete N01 proposal, the user said 'carry on working aur isko add bhi kardena', authorizing this implementation and adding the log to the repository on a review branch.
 - User authorized creation and ongoing maintenance of project-update.md.
-- N01 downstream identity forwarding is implemented and covered by focused offline checks. This does not establish full end-to-end identity isolation: Orbit's existing shared gateway bearer/actor URL authentication remains an independent audit finding (F02). No real-service, Windows or full-suite pass is claimed.
+- N01 downstream identity forwarding is implemented and covered by focused offline checks. This does not establish full end-to-end identity isolation: F02 was subsequently authorized and strengthened as recorded below; filesystem isolation and live verification remain separate boundaries. No real-service, Windows or full-suite pass is claimed.
 
 ## Change history
 
@@ -112,10 +112,10 @@ Last updated: 2026-10-08 (Asia/Karachi)
 
 ## Remaining boundaries and next proposals
 
-- F02: the upstream Orbit MCP door still uses a shared bearer plus caller-selectable actor URL; this patch does not make that ingress authentication identity-bound. Thus downstream actor forwarding is strengthened, but malicious-worker impersonation is not yet fully solved.
+- F02: actor-bound gateway authentication is now implemented with focused in-memory verification. Credential theft through unrestricted local filesystem access remains outside this change.
 - N02-N06 remain proposed, not implemented: mandatory NeuralOps gating, approval gate expiry/consumption, journal failure propagation, evidence integration and actual economy telemetry.
 - OpenCode and built-in workers gain no new connector access in this change.
-- Next: explain strengthening the Orbit actor-authentication boundary, including the change and benefit, before requesting the next specific approval.
+- Next proposal: strengthen NeuralOps approval expiry/consumption checks (N03); explain the specific change and benefit and obtain approval before implementation.
 
 
 ## Repository publication
@@ -126,3 +126,17 @@ Last updated: 2026-10-08 (Asia/Karachi)
 - Draft review PR: https://github.com/z-sops/jarvis/pull/1.
 - project-update.md is committed on that branch. Main has not been merged or changed by this work; the Windows checkout has not been updated.
 - A follow-up log-only commit records this publication. All source verification results remain as listed above; no live deployment or worker setup was performed.
+
+## Implementation record — F02 (2026-10-08)
+
+- User authorized the concrete worker-bound gateway token proposal with “go ahead”. Preserved the existing architecture and main-process Laila path.
+- Added lib/gateway-auth.js: a fresh 32-byte private key, exclusive creation with mode 0600, fail-closed corrupt/unreadable key handling, exact active-worker checks and per-actor HMAC tokens with constant-time comparison. The old shared browser token is never used as key material.
+- Updated lib/browser-mcp.js: actor-bound bearer authentication, no default commander route, reserved/unknown actor rejection and a discovery-only bridge-check identity. Existing Host/Origin protections remain. URL, header and tool-body spoofing cannot select another authenticated actor.
+- Updated lib/browser-panel.js: per-worker token in the Hermes profile environment, private key absent from generated profiles; existing signatures refresh changed profiles. Probe discovery omits connector tools and all probe tool calls are rejected.
+- Added test/gateway-auth.test.js to the default test script; updated existing real HTTP browser-mcp tests, README.md and AGENTS.md. No new dependencies.
+- Verification: 24 focused checks passed (gateway auth 7 + identity/connector 17), 0 failures/skips; five changed/new JavaScript files passed node --check. Gateway/profile checks used memory-only HTTP and filesystem substitutes.
+- Initial combined run had one test-harness assertion failure comparing an empty array across VM realms. Corrected that assertion to compare length; final 24 checks passed. No product failure was waived.
+- No paid calls, dependency installs, real sockets, child workers, production database changes or deployment. Real HTTP tests, full suite, Electron UI, live NeuralOps/Hermes transport and Windows ACLs remain unverified.
+- Activation requires updating the Windows checkout, stopping existing jobs and restarting Orbit; none of those actions have been performed here. Existing NeuralOps broker/delegate mappings from N01 still need configuration and live whoami verification.
+- Boundary: workers with unrestricted local filesystem access can steal another profile token or the master key. Same-ID recreation reuses its token under the same key; removal refuses future requests but does not cancel in-flight actions. This change does not claim OS sandbox isolation.
+- Publication target: existing review branch codex/strengthen-neuralops-identities and draft PR https://github.com/z-sops/jarvis/pull/1; main remains unchanged. Publication confirmation follows after successful branch update.

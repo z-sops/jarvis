@@ -138,3 +138,13 @@ Implementation uses the existing NeuralOps broker/delegate protocol (`X-Agent-Id
 
 Focused offline checks: `node --test --test-isolation=none test/neuralops-identity.test.js test/neuralops-connector.test.js` (Node 24). These use an in-memory MCP client substitute and DOM harness, not a running NeuralOps/Hermes server. See `project-update.md` for results and remaining verification.
 
+
+## Worker-bound Orbit gateway access
+
+Each Hermes worker now receives a token valid only for its own `/mcp/<worker-id>` address. The old shared browser token, commander/jarvis addresses and unknown workers are refused. Laila's internal main-process gateway calls are unchanged. The crew access check can initialize and discover browser tools but cannot execute browser or connector actions.
+
+On the first Orbit restart with this change, a fresh private `browser/.actor-token-key` is created independently of the old shared token. Hermes profiles receive only their individual token through `ORBIT_GATEWAY_ACTOR_TOKEN` in their profile environment; configuration signatures refresh profiles for the next job. Stop existing jobs and restart Orbit before verification. A corrupt or unreadable private key fails startup rather than silently replacing identity credentials.
+
+This protects the HTTP actor boundary; it is not filesystem isolation. A worker with unrestricted access to another profile or the private key can still steal credentials. Windows ACLs, real Hermes environment interpolation and the full Electron/HTTP flow need verification. Removed worker IDs reject future requests; re-creating the same ID under the same key reuses its token. In-flight actions are not cancelled by identity removal.
+
+Focused offline verification: `node --test --test-isolation=none test/gateway-auth.test.js test/neuralops-identity.test.js test/neuralops-connector.test.js`. The gateway tests use in-memory HTTP/profile harnesses. Real socket regressions are added to `test/browser-mcp.test.js` but were not executed under the audit restrictions.
