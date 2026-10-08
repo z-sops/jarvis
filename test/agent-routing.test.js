@@ -34,7 +34,7 @@ test('an agent with no override uses the crew default engine (builtin)', async (
   const job = home.createJob(agent.id, 'hello');
   await workers.run(agent, job);
   const got = home.findJob(job.id);
-  assert.equal(got.status, 'done', got.error);
+  assert.equal(got.status, 'review', got.error);
   assert.match(got.result, /^builtin: hello/);
 });
 
@@ -51,8 +51,8 @@ test('two agents run two different OpenCode models at the same time, each scoped
   await Promise.all([workers.run(alexAgent, jobAlex), workers.run(bobAgent, jobBob)]);
 
   const resAlex = home.findJob(jobAlex.id), resBob = home.findJob(jobBob.id);
-  assert.equal(resAlex.status, 'done', resAlex.error);
-  assert.equal(resBob.status, 'done', resBob.error);
+  assert.equal(resAlex.status, 'review', resAlex.error);
+  assert.equal(resBob.status, 'review', resBob.error);
   assert.equal(resAlex.engine, 'opencode'); assert.equal(resBob.engine, 'opencode');
   assert.match(resAlex.result, /model custom\/kimi-k2/);
   assert.match(resBob.result, /model custom\/deepseek-v4-pro/);

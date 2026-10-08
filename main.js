@@ -30,15 +30,20 @@ const pending = new Map();
 const runs = require('./lib/job-runs').createJobRuns();
 
 const send = (type, payload) => { if (win && !win.isDestroyed()) win.webContents.send('bus', { type, payload }); };
-for (const t of ['tool', 'agent:state', 'agent:created', 'agent:updated', 'job:created', 'job:progress', 'comms:event', 'ui:show', 'tag', 'anomaly']) bus.on(t, p => send(t, p));
+for (const t of ['tool', 'agent:state', 'agent:created', 'agent:updated', 'job:created', 'job:progress', 'job:reviewed', 'comms:event', 'ui:show', 'tag', 'anomaly']) bus.on(t, p => send(t, p));
 bus.on('job:done', ({ agent, job }) => {
   send('job:done', { agent, job });
   if (job.status === 'cancelled') return; // the user stopped it: no failure report
-  const ok = job.status === 'done';
+  const reviewReady = job.status === 'review';
+  const ok = job.status === 'done' || reviewReady;
   const secs = job.startedAt && job.finishedAt ? Math.max(0, Math.round((Date.parse(job.finishedAt) - Date.parse(job.startedAt)) / 1000)) : null;
-  const text = `[CREW REPORT] ${agent.name} ${ok ? 'finished' : 'failed'} job ${job.id}${secs != null ? ` after ${secs} seconds` : ''}. Task: "${job.task}". ${ok ? 'Result: ' + String(job.result || '').slice(0, 1500) : 'Error: ' + job.error}`;
-  send('report', { text, agent: agent.name, ok, secs });
-  if (!win?.isVisible() && Notification.isSupported()) new Notification({ title: `${agent.name} ${ok ? 'finished a job' : 'hit a problem'}`, body: job.task.slice(0, 100) }).show();
+  const text = `[CREW REPORT] ${agent.name} ${reviewReady ? 'submitted a report for human review' : ok ? 'finished' : 'failed'} job ${job.id}${secs != null ? ` after ${secs} seconds` : ''}. Task: "${job.task}". ${ok ? 'Result: ' + String(job.result || '').slice(0, 1500) : 'Error: ' + job.error}${reviewReady ? ' This report is not accepted completion. Open Office to inspect and accept or reject it. File checks do not prove correctness.' : ''}`;
+  send('report', { text, agent: agent.name, ok, secs, reviewReady });
+  if (!win?.isVisible() && Notification.isSupported()) new Notification({ title: `${agent.name} ${reviewReady ? 'has a report to review' : ok ? 'finished a job' : 'hit a problem'}`, body: job.task.slice(0, 100) }).show();
+});
+bus.on('job:storage-error', ({ agent, jobId, error }) => {
+  send('report', { text: `[CREW REPORT] ${agent.name}: job ${jobId} has an unknown stored outcome. ${error}`, agent: agent.name, ok: false });
+  audit.add({ kind: 'job', event: 'storage_error', agent: agent.name, detail: error });
 });
 
 function showWindow() { if (!win) return; if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
@@ -166,12 +171,14 @@ const publicCfg = () => ({ ...store.get(), voices: VOICES });
 ipcMain.handle('config:get', () => publicCfg());
 ipcMain.handle('config:save', (_e, patch) => {
   const before = store.get();
+  if (patch && patch.homeDir && patch.homeDir !== before.homeDir && workers.hasPending()) throw new Error('Stop or finish crew jobs before changing the home folder.');
   const cfg = store.set(patch);
-  if (cfg.homeDir !== before.homeDir) { home.root = cfg.homeDir; home.ensure(); }
+  if (cfg.homeDir !== before.homeDir) { home.root = cfg.homeDir; home.ensure(); home.recoverJobs(); }
   applyLoginItem();
   return { ...cfg, voices: VOICES };
 });
 ipcMain.handle('config:commission', (_e, c) => {
+  if (workers.hasPending()) throw new Error('Stop or finish crew jobs before commissioning a different home folder.');
   const clean = {
     aiName: String(c.aiName || '').trim().slice(0, 24), gender: c.gender === 'male' ? 'male' : 'female', voice: c.voice, lang: ['mix', 'en', 'ur'].includes(c.lang) ? c.lang : 'mix',
     userName: String(c.userName || '').trim().slice(0, 40), userTitle: String(c.userTitle || 'Commander').trim().slice(0, 24) || 'Commander',
@@ -202,11 +209,14 @@ ipcMain.handle('live:context', () => {
 ipcMain.handle('tool:exec', (_e, name, args) => tools.exec(String(name), args || {}, 'commander'));
 ipcMain.handle('agents:list', () => home.listAgents().map(a => ({ ...a, ...workers.stateOf(a.id) })));
 ipcMain.handle('agents:create', (_e, a) => tools.exec('create_agent', a, 'commander'));
+// These decisions exist only on the trusted application UI bridge, never in model tool declarations.
+require('./lib/job-control').registerJobControls({ ipcMain, workers,
+  isTrusted: e => !!win && !win.isDestroyed() && e.sender === win.webContents && e.senderFrame === win.webContents.mainFrame });
 ipcMain.handle('agents:inspect', (_e, id) => {
   const isC = id === COMMANDER; const agent = isC ? { id: COMMANDER, name: store.get().aiName, role: 'Chief of staff' } : home.getAgent(id);
   if (!agent) return null;
   const rd = f => { try { return fs.readFileSync(path.join(home.agentDir(agent.id), f), 'utf8'); } catch { return ''; } };
-  return { agent, folder: home.agentDir(agent.id), soul: rd('brain/soul.md'), skills: home.readSkills(agent.id).map(s => s.name), jobs: home.listJobs(agent.id, 5).map(j => ({ id: j.id, status: j.status, task: j.task, result: j.result })), memory: home.readMemory(agent.id, 600) };
+  return { agent, folder: home.agentDir(agent.id), soul: rd('brain/soul.md'), skills: home.readSkills(agent.id).map(s => s.name), jobsError: home.recoveryFaults.get(agent.id), jobs: home.listJobs(agent.id, 20).map(j => ({ id: j.id, status: j.status, task: j.task, result: j.result, error: j.error, recoveryNeeded: j.recoveryNeeded, expectedOutputs: j.expectedOutputs, verification: j.verification, completionKind: j.completionKind, acceptedAt: j.acceptedAt })), memory: home.readMemory(agent.id, 600) };
 });
 ipcMain.handle('agents:update', (_e, id, patch) => { try { return { ok: true, agent: home.updateAgent(id, patch || {}) }; } catch (e) { return { ok: false, error: e.message }; } });
 ipcMain.handle('hermes:check', async (_e, opts) => { try { return { steps: await hermes.check(opts || {}) }; } catch (e) { return { steps: [{ name: 'Check', ok: false, detail: e.message }] }; } });
@@ -289,7 +299,7 @@ app.whenReady().then(() => {
     STARTUP.mark('Electron is ready');
     session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'media' || perm === 'audioCapture'));
     session.defaultSession.setPermissionCheckHandler((_wc, perm) => perm === 'media' || perm === 'audioCapture');
-    if (store.get().commissioned) home.ensure();
+    if (store.get().commissioned) { home.ensure(); const recovered = home.recoverJobs(); if (recovered.length) audit.add({ kind: 'job', event: 'restart_recovery', detail: `${recovered.length} job record(s) recovered. No jobs were automatically replayed.` }); }
     STARTUP.mark('home folder checked');
     createWindow(); STARTUP.mark('window created'); win.webContents.once('did-finish-load', () => { STARTUP.mark('page loaded (all its scripts were read)'); flushStartup(); });
     if (!SHOTS) {
@@ -304,7 +314,7 @@ app.whenReady().then(() => {
     }
     if (SHOTS) win.webContents.once('did-finish-load', () => require('./scripts/shots.js')(win, app, { store, home }));
   });
-  app.on('before-quit', () => { quitting = true; hermes.stopAll(); comms.stop(); try { orbitBrowser.dispose(); } catch {} try { gateway.closeAll(); } catch {} try { sysPanel.stop(); } catch {} });
+  app.on('before-quit', () => { quitting = true; workers.cancelAll(); hermes.stopAll(); comms.stop(); try { orbitBrowser.dispose(); } catch {} try { gateway.closeAll(); } catch {} try { sysPanel.stop(); } catch {} });
   app.on('will-quit', () => globalShortcut.unregisterAll());
   require('./lib/diag').install({ app, getDir: () => path.join(store.get().homeDir, 'logs') });
   app.on('window-all-closed', () => { if (SHOTS) app.quit(); /* otherwise stay alive in the tray */ });

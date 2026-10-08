@@ -108,7 +108,7 @@ test('workers route jobs to OpenCode when the engine is opencode', async () => {
   const job = home.createJob(agent.id, 'Create proof.txt');
   await workers.run(agent, job);
   const got = home.findJob(job.id);
-  assert.equal(got.status, 'done', got.error); assert.equal(got.engine, 'opencode'); assert.match(got.result, /Done:/);
+  assert.equal(got.status, 'review', got.error); assert.equal(got.engine, 'opencode'); assert.match(got.result, /Done:/);
   assert.ok(seen.includes('opencode:running')); assert.ok(states.includes('working')); assert.equal(states[states.length - 1], 'idle');
   assert.ok(fs.existsSync(path.join(home.p('workspace', 'bilal'), 'proof.txt')));
 });

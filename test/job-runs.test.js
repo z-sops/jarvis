@@ -86,7 +86,7 @@ test('real worker lifecycle persists runId, revokes access on stop and ignores o
   old.options.onProgress({ tool: 'old', status: 'running' }); old.options.onText('old report'); old.options.onUsage({ prompt_tokens: 100 });
   assert.equal(r.events.length, n); assert.equal(r.notes.length, trailCount); assert.equal(r.workers.stateOf('alex').jobId, 'b');
   assert.notEqual(r.jobs.get('a').runId, r.jobs.get('b').runId);
-  r.engines[1].resolve('new report'); await second; assert.equal(r.jobs.get('b').status, 'done'); assert.equal(r.runs.generationFor('alex'), null);
+  r.engines[1].resolve('new report'); await second; assert.equal(r.jobs.get('b').status, 'review'); assert.equal(r.runs.generationFor('alex'), null);
 });
 test('built-in callbacks and tool closures cannot write checkpoints or run tools after cancellation', async () => {
   const r = workersRig('builtin'), p = r.workers.run(r.agent, r.job('a')), old = r.engines[0].options;

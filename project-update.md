@@ -5,11 +5,13 @@ Last updated: 2026-10-09 (Asia/Karachi)
 ## Working agreement
 
 - Strengthen the existing Orbit and NeuralOps systems; preserve the product vision and reuse existing capabilities.
-- Explain each gap, proposed adjustment, benefit, impact and verification before implementation. Obtain specific approval before applying that change.
+- Latest authorization (2026-10-08 UTC): user requested autonomous strengthening and code changes while away, without per-change permission, followed by Playwright testing. Record each gap, adjustment, benefit and verification. Earlier pause/read-only/per-change approvals are historical and superseded for this Jarvis work; no ZCode source files are to be copied into Jarvis.
 - Respond in Roman Urdu / English.
 - Maintain this file after each meaningful investigation, decision, approved change and verification. Never record credentials or personal data.
 - No dependency installation, paid calls, destructive operations, production database changes, deployment, commits or pushes without applicable authorization.
 - This log has been added to the Orbit review branch with the first identity change. The user's Windows checkout has not been changed.
+
+- Current autonomous scope: publish reviewable changes to the existing draft Jarvis PR branch. No main merge, deployment, paid/live provider calls or production data changes. Dependency installation was automatically rejected in this session; it remains blocked pending explicit install authorization.
 
 ## Product requirements discussed
 
@@ -281,3 +283,54 @@ Last updated: 2026-10-09 (Asia/Karachi)
 - Limits: revocation cannot undo already dispatched actions or cancel external engines' direct shell/file capabilities. Pending permission cards keep their existing timeout, but a late answer cannot run the stopped job. Shared browser sessions, durable queue/restart reconciliation, artifact acceptance, mandatory NeuralOps task-owner/evidence/argument-bound authorization, worktree isolation, structured delegation, skills selection and provider-aware compaction remain separate work. No claim of complete N02 or universal sandboxing.
 - Documentation: README.md, AGENTS.md and this record updated; new regression added to package test script. Publication target is the existing draft Jarvis PR #1; no main merge, deployment or Windows update.
 - Publication confirmed: run-lifetime implementation committed as a2776dd0a3896abf03ce28d26188d1ba57a88498 on codex/strengthen-neuralops-identities, and existing draft https://github.com/z-sops/jarvis/pull/1 updated to describe final scope. Source/tests/docs are reviewable there; main remains unmerged and the Windows checkout is untouched. A compatibility refinement allows unscoped legacy tool fixtures without a runtime registry; the 10 run-lifetime cases and tools syntax were rerun and passed afterwards.
+
+## Autonomous strengthening and automated UI verification — 2026-10-08 UTC
+
+### Authorization, source integrity and reference coverage
+
+- User authorized autonomous changes and requested Playwright automated testing. Existing Electron/Node/CommonJS product architecture preserved. No ZCode source files transplanted into Jarvis, no NeuralOps source changes this turn, no main merge/deployment or Windows checkout modification.
+- Jarvis source restored from existing draft branch head a7489242bd8c16a84d1b44d36182075574604240: 193 selected text files, five PDF test fixtures, five font files and .gitignore. Every restored file's Git blob hash was checked against the pinned tree before editing. Existing branch identity/generation protections were retained.
+- ZCode complete tree inventory: pinned fd313ae3d32db243e61af26fc0be4501584d4690, 3,428 entries and 299 directories, not truncated. Separate reference snapshot has 1,950 selected text files, 38,974,406 bytes and 935,545 lines, all blob-hash verified with zero missing/mismatched selected files. Folder/source/import indexes cover the selected files. 492 frontend test files, 17 Rust integration files and 241 Rust files with inline test annotations are file counts, not executed test-case counts.
+- Deep source tracing focused on ACP delegation/tool ownership, task state/worktree/review/preflight, compaction, browser origins/consent, token/CORS and keyring paths. All folders were inventoried; every source line was not semantically reviewed. ZCode tests were not executed and its code was not modified.
+- Adapted mechanisms in original Jarvis JavaScript: atomic state/history snapshots, generation-aware state updates, replay-safe recovery and separate report/review/acceptance. Per-task worktrees, strict task-scoped NeuralOps gates and provider continuity remain future work.
+
+### Changes and their benefit
+
+| Gap | Implemented adjustment | Benefit and limit |
+| --- | --- | --- |
+| Job JSON overwrite could leave partial records; IDs could collide; older jobs were omitted by lookup limits | New lib/job-storage.js: UUID job IDs, validated record identity/path, same-directory private temporary write, file fsync and atomic rename; state plus bounded 100-event history saved together; run/status comparison guards; direct ID lookup | Durable single-main-process job records and traceable transitions. Not a multi-process database or tamperproof ledger; directory fsync is best-effort on Windows. |
+| Restart left running/queued jobs ambiguous; automatic replay could repeat side effects | Home.recoverJobs marks running jobs interrupted and queued jobs as requiring explicit retry; retry intent/link recovery; malformed/unreadable/unwritable storage blocks affected worker without crashing startup | Restart does not silently rerun a model or external action. Explicit retry still requires inspecting outputs because remote outcomes may be unknown. |
+| A worker's final text was treated as completed work | Nonempty reports now settle at review; empty reports fail. UI-only trusted-main-frame accept/reject controls; acceptance metadata persisted. Laila/worker tools cannot accept a job | Human report review is distinct from machine verification. Direct host tools still have same-user filesystem access, so stored acceptance is not tamperproof against such tools. |
+| Claimed output files were not checked | Optional expected workspace-relative output files, at most 20; reject traversal/absolute paths; bounded regular nonempty file checks with symlink rejection, 8 MB limit and SHA-256 evidence; recheck at acceptance and flag changed fingerprints | Missing/empty/changed outputs block acceptance. File existence/hash does not prove quality, tests, provenance or that a pre-existing file was created by this job; no OS isolation guarantee. |
+| Failed jobs lacked durable retry lineage and could double-dispatch on retry clicks | Persist retrying intent before child creation, retryOf/retryJobId linkage, expected-output preservation, inspect-before-repeat recovery prompt and interrupted retry reconciliation | Distinct, auditable retry jobs; no duplicate from repeated UI retry. Cancellation remains engine-dependent for an already dispatched action. |
+| Storage/listener failures could imply a false successful outcome | Block further worker dispatch on unsaved outcomes, emit job:storage-error; secondary memory/event-listener errors cannot replace a durably saved review result; free run ownership on settlement/setup failure | Clear unknown-outcome handling and fewer false completion reports. Repair/restart is required for unhealthy storage. |
+| Quota or lost remote response could replay a whole action | Hermes per-minute quota no longer auto-reposts the entire goal; connector callTool no longer auto-retries after invocation; recheck cancellation/run ownership after connection waits | Avoids automatic duplicate side effects. Failures may still have happened after remote actions; service/output inspection is required before retry. |
+| Office could erase a typed job during background refresh | Latest-render guard and per-worker form drafts; Give a job form, output expectations, accept/reject/retry controls, legacy unverified labels, recovery state and inline blocked-acceptance errors | User can submit/review work explicitly and keeps their draft across asynchronous refresh. Drafts are renderer-local rather than durable across app restart. |
+| PDF tests used a require-resolved package path but ESM import could not resolve that same package | Import the resolved PDFJS legacy module through a file URL; restore exact existing PDF fixtures; update stale tool/completion test expectations | Actual PDF text/Library fixture tests execute under the available runtime. Locked PDFJS version was not installed/tested. |
+
+- Required output paths are included in built-in, Hermes and OpenCode task prompts and built-in checkpoint goals; report/continue keeps them in resume notes.
+- Startup performs reconciliation without replay. Changing home folder or commissioning while jobs are pending is blocked. Quit requests worker cancellation; no guarantee that a non-cooperative external engine stops immediately.
+- Windows drive and UNC component parsing has a pure win32 regression, but actual Windows file/rename behavior has not been exercised.
+- README.md, AGENTS.md, package test commands and ignored UI-result directory updated. New scripts/playwright-smoke.js provides reproducible renderer/backend smoke checks using already available Playwright/Chromium, not a new package dependency.
+- Playwright found a real Office repaint/form-state failure during the first run. The refresh/draft implementation was fixed and an explicit regression was added before the final passing run.
+- Prior section describing automatic Hermes quota whole-goal retry is superseded by this safer explicit-retry behavior.
+
+### Verification evidence and exact scope
+
+- Initial local baseline: 307 tests, 289 pass, 11 fail, seven skip. Failures were two stale Laila tool expectations and nine missing-fixture/module-resolution PDF failures. Existing fixtures were restored with exact hashes and the PDF import issue was fixed; failures were not hidden by skipping those tests.
+- Final npm test: **329 tests, 322 pass, zero fail, seven skip**, 26.802 seconds. Includes **22 new job recovery/review/storage/output/control regressions**, plus existing routing, identity, run-lifetime, crew, permissions, Library/PDF and other offline coverage.
+- Seven skips: three real Hermes integration checks and four official MCP SDK transport integration checks. They did not pass and remain unverified. PDF/Library fixture coverage used preinstalled pdfjs-dist 5.6.205; the project's locked 6.3.289 version remains unverified.
+- **22 touched/new JavaScript syntax checks and package.json parsing passed.**
+- Final Playwright: **15 checks passed**, four fixture engine calls, zero renderer exceptions/console errors. Tested actual renderer HTML/JS/CSS/fonts and actual preload API against real Home, Workers, job controls and panel/backend modules in an isolated temporary home. Electron window/IPC transport and provider engines were fixtures; external network was blocked.
+- Playwright coverage: returning-user boot; all seven screens; recovered jobs without replay; legacy unverified labels; missing-output acceptance blocking; report-only human acceptance remains unverified; rejection persistence; retry linkage and duplicate prevention; form dispatch/output check/acceptance; unsafe output rejection before job creation; draft preservation during refresh; report markup rendered as text; Stop cancellation; accepted state after reload; no renderer exceptions or console errors.
+- Existing Chromium 153.0.8010.0 and Playwright/runtime modules were reused. No dependency download/install, live model/provider calls or production database writes were used for successful verification.
+- Local evidence: verified-tests.log, verified-playwright.log and playwright-results/results.json; browser trace and screenshot are temporary test artifacts, not committed source. New smoke runner is committed so checks can be repeated.
+- Dependency attempt: automatic approval review rejected npm ci because it would install/download dependencies and replace the local dependency tree without explicit installation authorization under the audit restriction. The rejection was not bypassed or retried through another installation route. Exact locked dependencies, actual Electron startup and official SDK integration are blocked until installation is explicitly authorized.
+
+### Remaining gaps — do not classify these as fixed
+
+- Mandatory NeuralOps task-owner/action/evidence/argument-bound authorization across every execution channel is incomplete. Existing identity and run-lifetime controls are a foundation, not complete managed guidance.
+- Per-task Git worktrees/file ownership conflict prevention is not implemented; workers can still target shared external paths. Workspace evidence checks are not shell containment or an OS sandbox.
+- Dynamic skills selection, structured worker handoffs/dependencies, independent contradictory-result/semantic artifact checking, provider-switch continuity/compaction and full routing health/observatory requirements need further traced implementation and verification.
+- Actual Electron/Windows execution, live Hermes/OpenCode/provider/model switching, live NeuralOps and real MCP SDK transports remain unverified. No claim that the entire audit or product is fully fixed.
+- Publication target: existing draft https://github.com/z-sops/jarvis/pull/1 and codex/strengthen-neuralops-identities. No merge or deployment. Review branch source/tests/docs include this log; changes take effect only after the correct checkout is updated and Orbit restarts.

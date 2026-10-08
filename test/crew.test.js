@@ -34,11 +34,11 @@ test('jobs for one agent wait in line, the caller is told how many are ahead, an
   assert.equal(r.workers.cancel('bob'), 0, 'nothing left to cancel'); assert.equal(r.workers.cancel('nobody'), 0);
 });
 
-test('a per-minute token quota is waited out once, then the job carries on', async () => {
+test('a per-minute quota does not automatically replay a remote job with an uncertain action history', async () => {
   let n = 0; const err = new Error('Gemini HTTP 429 (RESOURCE_EXHAUSTED): You exceeded your current quota.\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 250000, model: gemini-3.5-flash-lite');
   const r = rig({ quotaWaitMs: 5 }, { runTask: async () => { if (++n === 1) throw err; return 'finished after the wait'; } });
   const job = r.workers.dispatch('bob', 'x'); await until(() => r.done.length === 1);
-  assert.equal(n, 2); assert.equal(r.done[0].status, 'done'); assert.equal(r.done[0].result, 'finished after the wait'); assert.ok(r.progress.some(l => /waiting .*per-minute quota/.test(l)));
+  assert.equal(n, 1); assert.equal(r.done[0].status, 'failed'); assert.match(r.done[0].error, /did not automatically replay/); assert.equal(r.done[0].result, undefined);
   assert.equal(minuteQuota(err.message), true);
 });
 

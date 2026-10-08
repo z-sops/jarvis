@@ -156,3 +156,18 @@ Each started Orbit job gets a persisted `runId`. The main process binds worker M
 This is an execution-lifetime guard for Orbit-mediated calls, not a complete NeuralOps task-authorization integration or an OS sandbox. It cannot undo an already dispatched action or contain external engines' direct filesystem/shell tools. Queues and recovery remain as before. `bridge-check` stays discovery-only; internal Laila/user controls do not require a worker job.
 
 Offline checks: `node --test test/job-runs.test.js test/gateway-auth.test.js test/neuralops-identity.test.js`. These use memory transports and engine doubles. Full-suite, Windows, real HTTP and real Hermes/OpenCode validation remain pending; no dependency installs or model calls were made for this change.
+
+
+### Job recovery and result review
+
+Worker reports now appear as **Ready for review** in Office. Inspect the report and outputs, then choose **Accept result** or **Reject result**. Acceptance of a report without requested output files is a human decision, not automatic verification. Older completed records are labelled unverified.
+
+The **Give a job** form optionally accepts output file paths, one per line, relative to that worker's workspace. Orbit checks that those files exist, are non-empty regular files under the configured path, fit the 8 MB per-file checking limit, and records SHA-256 fingerprints. Changed files are checked again at acceptance. These checks do not replace code review or tests of correctness.
+
+After a restart, unfinished jobs are shown as interrupted or recovered queue entries. Orbit never silently replays them. Inspect existing outputs and use **Retry job** when appropriate. Retry links the original record and retains requested output requirements. Damaged job storage blocks its worker until repaired and Orbit restarts.
+
+A dropped connector response or a quota interruption can occur after an action already happened. Orbit therefore does not automatically repost those calls/jobs; the reported outcome may be unknown.
+
+### Offline UI regression check
+
+`npm run test:ui` uses an already installed Playwright/Chromium to exercise the real renderer and preload API against real job/panel backends in a temporary home. Providers and Electron window APIs are fixtures; no API keys or live services are used. Results, screenshots and a trace are written to `test-results/playwright` (ignored by git), or `ORBIT_UI_RESULTS`. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` for an existing browser binary. This check does not verify Electron process isolation, Windows process management or real model providers.

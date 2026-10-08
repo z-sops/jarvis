@@ -62,7 +62,7 @@
     else if (type === 'agent:created' || type === 'agent:updated') loadAgents();
     else if (type === 'job:progress') { if (p && p.agent) { note(p.agent.id, p.tool, p.label); if (!state.sel) crewListSoon(); } }
     else if (type === 'tool') { if (p.status === 'start') { if (p.actor === 'commander') { state.cmd.bubble = NICE[p.name] || p.name; state.cmd.until = now() + 5; } else note(p.actor, p.name); } }
-    else if (type === 'job:done') { const o = state.agents.get(p.agent.id); if (o) { o.label = ''; o.flash = { text: p.job.status === 'done' ? 'Done' : p.job.status === 'cancelled' ? 'Stopped' : 'Problem', tone: p.job.status === 'done' ? 'ok' : 'bad', until: now() + 5 }; } loadFiles(); if (state.sel === p.agent.id) paintSide(); }
+    else if (type === 'job:done' || type === 'job:reviewed') { const o = state.agents.get(p.agent.id); if (o) { o.label = ''; o.flash = { text: p.job.status === 'review' ? 'Review' : p.job.status === 'done' ? 'Accepted' : p.job.status === 'cancelled' ? 'Stopped' : 'Problem', tone: p.job.status === 'done' || p.job.status === 'review' ? 'ok' : 'bad', until: now() + 5 }; } loadFiles(); if (state.sel === p.agent.id) paintSide(); }
     else if (type === 'ws:changed') loadFiles();
   });
   setInterval(() => { const s = ((document.getElementById('hud-status') || {}).textContent || '').toLowerCase(); state.cmd.mode = /speak/.test(s) ? 'speaking' : /listen/.test(s) ? 'listening' : /work|think/.test(s) ? 'working' : 'idle'; }, 400);
@@ -165,12 +165,39 @@
   /* ---------- the side panel ---------- */
   const dot = st => h('i', { class: 'of-dot ' + st });
   const jobTone = s => (s === 'done' ? 'ok' : s === 'failed' ? 'bad' : s === 'cancelled' ? 'warn' : 'run');
+  const jobLabel = j => j.status === 'review' ? 'Ready for review' : j.status === 'done' ? (j.acceptedAt ? 'Accepted by you' : 'Legacy completion (unverified)') : j.status === 'interrupted' ? 'Interrupted — inspect before retry' : j.status === 'queued' && j.recoveryNeeded ? 'Recovered queue — awaiting retry' : j.status;
+  function jobCard(j) {
+    const message = h('small', { role: 'status' });
+    const act = (label, method) => h('button', { class: 'mini', type: 'button', onclick: async e => {
+      const button = e.currentTarget; button.disabled = true; message.textContent = 'Saving…';
+      try { const r = await method(); if (!r || !r.ok) throw new Error(r && r.error || 'The job action failed.'); await paintSide(); }
+      catch (err) { message.textContent = err.message || String(err); button.disabled = false; }
+    } }, label);
+    const actions = [];
+    if (bridge.jobs && j.status === 'review') actions.push(act('Accept result', () => bridge.jobs.review(j.id, 'accept')), act('Reject result', () => bridge.jobs.review(j.id, 'reject')));
+    if (bridge.jobs && (['interrupted', 'failed', 'cancelled', 'rejected'].includes(j.status) || j.status === 'queued' && j.recoveryNeeded)) actions.push(act('Retry job', () => {
+      if (!window.confirm('Retry this job? Inspect existing files first. An earlier external action may already have happened.')) return Promise.resolve({ ok: true });
+      return bridge.jobs.retry(j.id);
+    }));
+    const v = j.verification;
+    const evidenceText = v ? v.status === 'files_checked' ? (j.status === 'done' ? 'Requested files checked and accepted by you. Correctness was decided in human review.' : 'Requested files checked. Review their correctness before accepting.') : v.status === 'failed' ? 'Output checks failed: ' + v.issues.map(i => (i.path ? i.path + ': ' : '') + i.reason).join(' ') : j.status === 'done' ? 'You accepted the report. No automatic artifact checks were requested.' : 'Worker report is unverified. Review before accepting.' : '';
+    return h('details', { class: 'of-job', 'data-job-id': j.id },
+      h('summary', {}, dot(jobTone(j.status)), h('span', {}, clip(String(j.task || ''), 70))),
+      h('p', { class: 'of-job-state' }, jobLabel(j)),
+      h('p', {}, j.result ? clip(String(j.result), 700) : j.status === 'running' ? 'Still working on it.' : j.status === 'queued' ? 'Waiting in line.' : 'No report.'),
+      j.error ? h('p', {}, j.error) : null, evidenceText ? h('p', {}, evidenceText) : null,
+      v && v.artifacts.length ? h('ul', {}, v.artifacts.map(a => h('li', {}, `${a.path} · ${a.bytes} bytes · SHA-256 ${a.sha256.slice(0, 12)}…`))) : null,
+      h('div', { class: 'of-actions' }, actions), message);
+  }
   function paintStats() { const list = [...state.agents.values()], working = list.filter(o => o.state === 'working').length; stats.textContent = ''; stats.append(h('span', {}, h('b', {}, String(list.length)), ' crew'), h('span', {}, h('b', { class: working ? 'hot' : '' }, String(working)), ' working'), h('span', {}, h('b', {}, String(state.total)), ' files')); }
   function select(id) { state.sel = id; paintSide(); }
+  let sideVersion = 0;
+  const jobDrafts = new Map();
   async function paintSide() {
+    const version = ++sideVersion;
     if (!state.sel) return paintCrewList();
     const id = state.sel, o = state.agents.get(id), isC = id === COMMANDER; let r = null; try { r = await bridge.agents.inspect(isC ? COMMANDER : id); } catch { /* the list below still works */ }
-    if (state.sel !== id) return; if (!r && !o && !isC) { state.sel = null; return paintCrewList(); }
+    if (state.sel !== id || version !== sideVersion) return; if (!r && !o && !isC) { state.sel = null; return paintCrewList(); }
     const name = isC ? state.aiName : (o && o.name) || (r && r.agent.name), role = isC ? 'Chief of staff' : (o && o.role) || (r && r.agent.role) || '', color = isC ? '#FFB23E' : (o && o.color) || '#6fe3e0', working = isC ? state.cmd.mode !== 'idle' : o && o.state === 'working';
     const now1 = isC ? (state.cmd.until > now() ? state.cmd.bubble : state.cmd.mode === 'idle' ? 'Standing by' : state.cmd.mode) : working ? (o.label || o.task || 'Working\u2026') : 'Resting';
     const files = (state.files.get(id) || []).slice(0, 6), jobs = (r && r.jobs) || [];
@@ -205,6 +232,7 @@
           h('p', { class: 'of-dim' }, `${ua.req} request${ua.req === 1 ? '' : 's'}, ${ua.runs} run${ua.runs === 1 ? '' : 's'} \u00B7 ${(ua.inTok + ua.outTok).toLocaleString()} tokens \u00B7 ~$${ua.cost.toFixed(3)}`));
       } catch { /* usage is a convenience, never block the panel for it */ }
     }
+    if (state.sel !== id || version !== sideVersion) return;
     side.replaceChildren(...[
       h('div', { class: 'of-head' }, h('div', { class: 'of-avatar', style: `border-color:${color};color:${color}` }, name[0].toUpperCase()), h('div', { class: 'of-who' }, h('b', {}, name), h('span', {}, role)), h('button', { class: 'of-x', type: 'button', 'aria-label': 'Close', onclick: () => select(null) }, '\u00D7')),
       h('div', { class: 'of-now ' + (working ? 'on' : '') }, dot(working ? 'run' : 'idle'), h('span', {}, now1)),
@@ -212,11 +240,25 @@
         isC ? h('button', { class: 'mini danger', type: 'button', onclick: async () => { await bridge.stop.all(); paintSide(); } }, 'Stop everything')
             : h('button', { class: 'mini danger', type: 'button', disabled: !working && !jobs.some(j => j.status === 'queued' || j.status === 'running'), onclick: async () => { await bridge.stop.agent(id); setTimeout(paintSide, 400); } }, 'Stop this job'),
         h('button', { class: 'mini', type: 'button', onclick: () => window.__ws && __ws.focus(isC ? '' : id) }, 'Workspace'), r && r.folder ? h('button', { class: 'mini', type: 'button', onclick: () => bridge.showInFolder(r.folder) }, 'Folder') : null),
-      isC ? null : sec('Jobs', jobs.length ? jobs.slice(0, 5).map(j => h('details', { class: 'of-job' }, h('summary', {}, dot(jobTone(j.status)), h('span', {}, clip(String(j.task || ''), 70))), h('p', {}, j.result ? clip(String(j.result), 700) : j.status === 'running' ? 'Still working on it.' : j.status === 'queued' ? 'Waiting in line.' : 'No report.'))) : h('p', { class: 'of-dim' }, 'No jobs yet.')),
+      isC ? null : sec('Jobs', r && r.jobsError ? h('p', { role: 'alert' }, r.jobsError) : null, jobs.length ? jobs.slice(0, 20).map(jobCard) : h('p', { class: 'of-dim' }, 'No jobs yet.')),
       sec(`Files (${(state.files.get(id) || []).length})`, files.length ? files.map(f => h('button', { class: 'of-file', type: 'button', title: f.rel, onclick: () => window.__ws && __ws.open(f.rel) }, h('span', {}, f.name), h('em', {}, f.size < 1024 ? f.size + ' B' : (f.size / 1024).toFixed(f.size < 10240 ? 1 : 0) + ' KB'))) : h('p', { class: 'of-dim' }, isC ? 'Files saved straight into the workspace.' : 'Nothing saved yet.')),
       r && r.skills && r.skills.length ? sec('Skills', h('div', { class: 'of-chips' }, ...r.skills.slice(0, 12).map(s => h('span', {}, s)))) : null,
       r && r.soul ? sec('Character', h('p', { class: 'of-dim' }, clip(r.soul.replace(/^#.*\n+/, '').split('\n').filter(Boolean).slice(0, 4).join(' '), 260))) : null].filter(Boolean));
     if (engineRow) side.appendChild(engineRow);
+    if (!isC && bridge.jobs) {
+      const task = h('textarea', { 'aria-label': 'New job task', placeholder: 'Describe the job' });
+      const expected = h('textarea', { 'aria-label': 'Expected output files', placeholder: 'Optional: workspace-relative output files, one per line' });
+      const draft = jobDrafts.get(id); task.value = draft?.task || ''; expected.value = draft?.expected || '';
+      const saveDraft = () => jobDrafts.set(id, { task: task.value, expected: expected.value });
+      task.addEventListener('input', saveDraft); expected.addEventListener('input', saveDraft);
+      const out = h('small', { role: 'status' });
+      side.appendChild(sec('Give a job', task, expected, h('button', { class: 'mini', type: 'button', onclick: async e => {
+        if (!task.value.trim()) { out.textContent = 'Describe the job first.'; return; }
+        const button = e.currentTarget; button.disabled = true; out.textContent = 'Queueing…';
+        try { const result = await bridge.jobs.dispatch(id, task.value.trim(), expected.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean)); if (!result || !result.ok) throw new Error(result && result.error || 'Could not queue the job.'); jobDrafts.delete(id); await paintSide(); }
+        catch (err) { out.textContent = err.message || String(err); button.disabled = false; }
+      } }, 'Queue job'), out));
+    }
     if (!isC) {
       const cb = h('input', { type: 'checkbox', style: 'width:auto;margin:0' }); cb.checked = !(r && r.agent && r.agent.allowCode === false);
       const codeOut = h('small', {});

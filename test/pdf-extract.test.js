@@ -39,7 +39,7 @@ test('the cmaps and fonts paths end with a real forward slash, never the OS sepa
 test('a Windows-style path still works: a backslash anywhere earlier in the path is fine, only the trailing character matters', { skip }, async () => {
   // pdfjs-dist demanded the STRING end with '/'; it does not care whether backslashes appear earlier in the path
   // (an ordinary Windows folder like "G:\jarvis-claude\bridge-os\node_modules\pdfjs-dist\cmaps\" is what actually failed).
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs'); const root = path.dirname(require.resolve('pdfjs-dist/package.json'));
+  const root = path.dirname(require.resolve('pdfjs-dist/package.json')); const pdfjs = await import(require('url').pathToFileURL(path.join(root, 'legacy/build/pdf.mjs')).href);
   const winLikeCmaps = root.split(path.sep).join('\\') + '\\cmaps/', winLikeFonts = root.split(path.sep).join('\\') + '\\standard_fonts/';
   const task = pdfjs.getDocument({ data: new Uint8Array(fx('plain.pdf')), isEvalSupported: false, disableFontFace: true, useWorkerFetch: false, disableWorker: true, cMapUrl: winLikeCmaps, cMapPacked: true, standardFontDataUrl: winLikeFonts });
   const doc = await task.promise; assert.equal(doc.numPages, 2); await task.destroy();

@@ -71,7 +71,7 @@ test('workers route jobs to Hermes when the engine is hermes', { skip: !has && '
     const done = new Promise(res => bus.once('job:done', res));
     workers.dispatch(agent.id, 'Create proof.txt in your workspace.');
     const { job } = await done;
-    assert.equal(job.status, 'done', job.error); assert.equal(job.engine, 'hermes'); assert.match(job.result, /proof\.txt/);
+    assert.equal(job.status, 'review', job.error); assert.equal(job.engine, 'hermes'); assert.match(job.result, /proof\.txt/);
     assert.ok(seen.includes('terminal:running')); assert.ok(states.includes('working')); assert.equal(states[states.length - 1], 'idle');
     assert.ok(fs.existsSync(path.join(home.p('workspace', 'bilal'), 'proof.txt')));
   } finally { engine.stopAll(); mock.kill(); }

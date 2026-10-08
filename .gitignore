@@ -30,3 +30,4 @@ bridge-update-*
 *.zip
 *.bak
 .bridge-backup/
+test-results/
