@@ -43,6 +43,24 @@
     for (const t of c.tools) tools.append(h('div', { class: 'cn-trow' }, h('div', { class: 'cn-tname' }, h('b', {}, t.name, ' ', h('i', { class: t.read ? '' : 'w' }, t.read ? 'reads' : 'changes')), t.desc ? h('small', {}, t.desc) : null), levelSelect(t.level, async e => { const r = await bridge.connectors.level(c.id, t.name, e.target.value); if (r.ok) { const i = S.list.findIndex(x => x.id === c.id); S.list[i] = r.connector; paint(); } })));
     const all = c.agents === 'all'; agents.append(h('label', {}, h('input', { type: 'checkbox', checked: all, onchange: e => { bridge.connectors.update(c.id, { agents: e.target.checked ? 'all' : [] }).then(refresh); } }), 'Everyone in the crew'));
     for (const a of S.crew) agents.append(h('label', {}, h('input', { type: 'checkbox', disabled: all, checked: all || (Array.isArray(c.agents) && c.agents.includes(a.id)), onchange: () => { const ids = [...agents.querySelectorAll('input[data-agent]')].filter(i => i.checked).map(i => i.dataset.agent); bridge.connectors.update(c.id, { agents: ids }).then(refresh); }, 'data-agent': a.id }), a.name));
+    if (c.catalogId === 'neuralops') {
+      const mappings = c.neuralopsIdentities || {}, rows = [{ id: 'commander', name: 'Laila (assistant)' }, ...S.crew.filter(a => a.id !== 'commander')];
+      const inputs = [], status = h('div', { class: 'cn-status', role: 'status', 'aria-live': 'polite' });
+      agents.append(h('div', { style: 'width:100%' }, h('b', {}, 'Worker identities'), h('p', {}, 'Give each worker a different AI identity registered in NeuralOps. The saved token must belong to their broker, and each identity must name that broker as its delegate. Blank workers cannot use NeuralOps. Test checks tool discovery only; it does not verify these identities.')));
+      for (const a of rows) {
+        const input = h('input', { type: 'text', value: mappings[a.id] || '', placeholder: 'agent.alex', maxlength: 69, spellcheck: 'false', autocomplete: 'off', 'aria-label': 'NeuralOps identity for ' + a.name });
+        inputs.push({ actor: a.id, input }); agents.append(h('label', { class: 'cn-row', style: 'width:100%' }, a.name, input));
+      }
+      const save = h('button', { class: 'cn-btn', type: 'button' }, 'Save worker identities');
+      save.onclick = async () => {
+        const identities = {}; for (const row of inputs) identities[row.actor] = row.input.value.trim();
+        save.disabled = true; status.className = 'cn-status'; status.textContent = 'Saving identities...';
+        try { const r = await bridge.connectors.update(c.id, { neuralopsIdentities: identities }); if (!r.ok) { status.className = 'cn-status bad'; status.textContent = r.error; return; } await refresh(); }
+        catch { status.className = 'cn-status bad'; status.textContent = 'The identities could not be saved. Try again.'; }
+        finally { save.disabled = false; }
+      };
+      agents.append(save, status);
+    }
     const roots = c.native === 'files' ? h('div', { class: 'cn-agents cn-roots' }, h('b', { style: 'font:600 12px var(--m);color:var(--dim);width:100%' }, 'Folders the crew may use'), c.roots.map(r => h('div', { class: 'cn-root' }, h('span', {}, r), c.roots.length > 1 ? h('button', { class: 'cn-btn danger', type: 'button', title: 'Stop using this folder', onclick: async () => { const x = await bridge.connectors.roots(c.id, c.roots.filter(y => y !== r)); if (!x.ok) alert(x.error); refresh(); } }, 'Remove') : null)),
       h('button', { class: 'cn-btn', type: 'button', onclick: async () => { const pk = await bridge.connectors.pickFolder(); if (!pk.ok || !pk.path) return; const x = await bridge.connectors.roots(c.id, [...c.roots, pk.path]); if (!x.ok) alert(x.error); refresh(); } }, 'Add a folder\u2026')) : null;
     const auto = c.catalogId === 'neuralops' || /127\.0\.0\.1:3031\/mcp/.test(String(c.url || '')); const modeSel = h('select', { class: 'cn-btn', 'aria-label': 'Access', style: auto ? 'display:none' : '', onchange: async e => { const m = e.target.value; if (m === 'read-write' && !confirm(`Let the crew TRY to change things in ${c.name}?\n\nEvery change will ask you first, each time. Reading stays free.\n\nRead only blocks all changes.`)) { e.target.value = c.mode; return; } await bridge.connectors.update(c.id, { mode: m }); await runTest(c, st); } },
@@ -91,3 +109,4 @@
   bridge.onBus(({ type, payload }) => { if (type === 'connector:activity') { S.feed.push(payload); if (S.feed.length > 80) S.feed.shift(); if (document.body.dataset.view === 'connectors') paintFeed(); } });
   window.__connectors = { enter: refresh, leave: close, state: () => S };
 })();
+

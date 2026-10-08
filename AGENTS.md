@@ -478,3 +478,12 @@ Zee asked for his crew to be able to run on OpenCode (opencode.ai), the open-sou
 - Tested with a fake `opencode` launcher (`test/fake-opencode.js`, same pattern as the fake Hermes used by the supervisor tests) so `test/opencode.test.js` needs no real OpenCode install and no network: `providerSetup` mapping, `detect()`, a full `runTask` that proves the job is scoped to the agent's own workspace folder and that the right model reached the config, a failing job, `check({smoke:true})`, and the `workers` routing test.
 - Also fixed, while in `apply.js`: a scripted update's own internal test run used to time out at 180s once the suite grew large, and a timed-out run was wrongly printed as `1 failed` even though nothing had actually failed. The timeout is now 600s, and a run that still gets killed mid-way says so plainly instead of claiming a failure.
 - Not done yet, needs a real OpenCode install to verify end-to-end on Zee's machine: a live `opencode run` against a real provider (gemini/custom key). The fake-launcher tests prove the wiring; they cannot prove OpenCode's real CLI behaves exactly like the fake, since this was built from OpenCode's published docs rather than against the real binary.
+
+# Current strengthening work — 2026-10-08
+
+- The user authorized the Orbit-to-NeuralOps worker identity change and adding `project-update.md` to the repository. Keep this log updated after investigations, decisions, changes and verification.
+- Preserve the existing product and architecture. Explain each subsequent gap/change/benefit before applying it; do not treat this authorization as approval of all audit findings.
+- NeuralOps now requires explicit, unique AI worker mappings in the Orbit connector. The broker token stays in the main process; each mapped identity is bound to its own upstream connection and `X-Agent-Id` header. Missing mappings fail closed. Human identities cannot be assigned to AI workers.
+- Existing connectors and per-tool permission levels remain in effect. No automatic authority grants or external NeuralOps registration calls are made.
+- Focused verification is offline and in-memory: no paid model calls, installed dependencies, temporary test files, sockets or spawned worker processes. The full suite and Windows/real-service verification remain pending under the user's test restrictions. Do not claim those checks passed.
+

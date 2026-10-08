@@ -122,3 +122,19 @@ npm run dist        # Windows installer in dist/
 3. Browser control for agents.
 4. WhatsApp and Telegram bridge.
 5. Richer crew deck (furniture, speech bubbles, more rooms).
+
+# NeuralOps worker identity setup
+
+Orbit now sends a separate NeuralOps AI identity for each worker. Existing NeuralOps connections need an explicit mapping before workers can use them; an unmapped worker is blocked rather than recorded under a shared identity.
+
+1. In NeuralOps secure mode, use its administrator workflow to register a service identity such as `agent.orbit-broker` with `access: "broker"` and model `Custom`. Keep its token private.
+2. Register distinct AI identities, for example `agent.laila`, `agent.alex` and `agent.bob`. Each must set `delegate: "agent.orbit-broker"`. Preserve their intended roles, reporting lines and authority; this change does not grant extra rights. Existing identities can have their delegate assigned through NeuralOps administration.
+3. In Orbit, open Connectors > NeuralOps > Change token and save the broker token. Under Who can use it, map Laila and each worker to the matching AI identity and press Save worker identities. Display names are not used to infer identity. Blank mappings block access; duplicate identities and `human.*` mappings are rejected.
+4. Start with a harmless `neuralops_whoami` call through each worker's connector. Confirm that Laila, Alex and Bob are different identities before doing real work. NeuralOps remains responsible for rejecting revoked identities or unauthorized delegation.
+
+The connector Test button checks connection/tool discovery only. It does not prove worker mappings, task execution or completion verification. Human approval identities remain in NeuralOps' human workflow; Orbit cannot assign a human identity to an AI worker. Orbit's existing per-tool permission hub still applies.
+
+Implementation uses the existing NeuralOps broker/delegate protocol (`X-Agent-Id`) and a separate upstream connection for each mapped identity. No new dependency or NeuralOps server change is required. This does not yet make NeuralOps clearance mandatory for every Orbit tool path, synchronize every Orbit job with a NeuralOps task, or give OpenCode/built-in workers new connector access.
+
+Focused offline checks: `node --test --test-isolation=none test/neuralops-identity.test.js test/neuralops-connector.test.js` (Node 24). These use an in-memory MCP client substitute and DOM harness, not a running NeuralOps/Hermes server. See `project-update.md` for results and remaining verification.
+
