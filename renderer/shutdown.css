@@ -1,0 +1,26 @@
+/* ---- Power-down sequence (quitting Orbit) ---- */
+#shutdown { position: fixed; inset: 0; z-index: 9000; display: none; align-items: center; justify-content: center; background: radial-gradient(900px 520px at 50% 46%, rgba(8, 16, 26, .93), rgba(2, 4, 8, .985)); color: var(--ceramic); font-family: var(--m); }
+#shutdown.on { display: flex; animation: sdin .5s ease both; }
+@keyframes sdin { from { opacity: 0; } to { opacity: 1; } }
+#shutdown::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .02) 0 1px, transparent 1px 3px); }
+.sd-box { position: relative; z-index: 1; width: min(660px, 88vw); display: flex; flex-direction: column; gap: 14px; }
+.sd-title { text-align: center; font-size: 12px; letter-spacing: .34em; text-transform: uppercase; color: rgb(var(--am)); }
+.sd-num { font: 700 88px/1 var(--f); letter-spacing: .06em; color: rgb(var(--cy)); text-shadow: 0 0 24px rgba(var(--cy), .55); text-align: center; padding: 8px 0; }
+.sd-text { font-size: 13.5px; line-height: 1.7; color: var(--dim); text-align: center; }
+.sd-row { display: flex; gap: 10px; justify-content: center; margin-top: 4px; }
+.sd-btn { border: 1px solid var(--line-2); background: rgba(6, 10, 16, .85); color: var(--ceramic); font: 600 12px var(--m); letter-spacing: .1em; text-transform: uppercase; padding: 9px 16px; border-radius: 3px; cursor: pointer; }
+.sd-btn:hover { border-color: rgba(var(--cy), .7); color: rgb(var(--cy)); } .sd-btn.go { border-color: rgb(var(--am)); color: rgb(var(--am)); } .sd-btn.go:hover { background: rgba(var(--am), .12); }
+.sd-list { display: flex; flex-direction: column; gap: 9px; margin: 6px 0 4px; }
+.sd-line { display: flex; align-items: baseline; gap: 10px; font-size: 14px; letter-spacing: .04em; opacity: 0; animation: sdline .35s ease forwards; }
+@keyframes sdline { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+.sd-line i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: rgb(var(--am)); box-shadow: 0 0 8px rgba(var(--am), .8); align-self: center; animation: sdblink .5s infinite alternate; }
+.sd-line.ok i { background: rgb(var(--cy)); box-shadow: 0 0 8px rgba(var(--cy), .8); animation: none; } .sd-line.bad i { background: #ff5d6c; box-shadow: 0 0 8px rgba(255, 93, 108, .8); animation: none; }
+@keyframes sdblink { to { opacity: .25; } }
+.sd-line b { font-weight: 600; text-transform: uppercase; letter-spacing: .14em; font-size: 12.5px; }
+.sd-line span { color: var(--dimmer); font-size: 12.5px; } .sd-line em { margin-left: auto; font-style: normal; font-size: 12px; letter-spacing: .16em; color: rgb(var(--am)); } .sd-line.ok em { color: rgb(var(--cy)); } .sd-line.bad em { color: #ff5d6c; }
+.sd-bar { height: 3px; background: rgba(255, 255, 255, .07); border-radius: 2px; overflow: hidden; } .sd-bar i { display: block; height: 100%; width: 0; background: rgb(var(--cy)); box-shadow: 0 0 10px rgba(var(--cy), .8); transition: width .5s ease; }
+.sd-final { font: 700 38px var(--f); letter-spacing: .42em; text-align: center; color: rgb(var(--cy)); text-shadow: 0 0 26px rgba(var(--cy), .6); padding: 14px 0 2px; animation: sdin 1s ease both; }
+.sd-skip { align-self: center; background: transparent; border: 0; color: var(--dimmer); font: 11.5px var(--m); cursor: pointer; text-decoration: underline; } .sd-skip:hover { color: var(--ceramic); }
+#shutdown.collapse { animation: sdcrt .75s cubic-bezier(.7, 0, .3, 1) forwards; }
+@keyframes sdcrt { 0% { transform: scale(1, 1); filter: brightness(1); } 55% { transform: scale(1, .006); filter: brightness(3); } 85% { transform: scale(.02, .006); filter: brightness(4); opacity: 1; } 100% { transform: scale(0, 0); opacity: 0; } }
+body.phase-shutdown #scene, body.phase-shutdown #town, body.phase-shutdown #presence { transition: filter 2.5s ease; filter: brightness(.35) saturate(.5); }

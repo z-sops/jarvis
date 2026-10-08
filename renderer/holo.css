@@ -1,0 +1,113 @@
+/* ---- Holographic look: a calm, professional glass interface (the classic cockpit look stays available in Settings) ---- */
+body[data-look="holo"] {
+  --cy: 104, 208, 255; --am: 255, 190, 92; --cyan: rgb(104, 208, 255);
+  --void: #05080e; --panel: #0a121c; --panel-2: #0e1826; --line: rgba(150, 200, 255, .10); --line-2: rgba(150, 200, 255, .18);
+  --ceramic: #e6ecf5; --dim: #9aa9bd; --dimmer: #66778d; --chamfer: none;
+  --f: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Noto Naskh Arabic", sans-serif; --m: "Cascadia Mono", "Plex Mono", Consolas, ui-monospace, monospace;
+}
+/* the world behind: a still, deep gradient with a faint grid instead of the cockpit and the planet */
+body[data-look="holo"].phase-bridge { background: radial-gradient(1100px 620px at 50% -8%, rgba(38, 112, 170, .28), transparent 62%), radial-gradient(900px 560px at 100% 110%, rgba(70, 70, 170, .18), transparent 60%), radial-gradient(700px 500px at 0% 105%, rgba(20, 130, 150, .12), transparent 60%), #05080e; }
+body[data-look="holo"].phase-bridge::before { content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none; background-image: radial-gradient(rgba(150, 205, 255, .075) 1px, transparent 1.2px); background-size: 30px 30px; -webkit-mask-image: radial-gradient(ellipse at 50% 30%, #000 20%, transparent 80%); mask-image: radial-gradient(ellipse at 50% 30%, #000 20%, transparent 80%); }
+body[data-look="holo"].phase-bridge #scene, body[data-look="holo"].phase-bridge #hull, body[data-look="holo"].phase-bridge #hull-fx, body[data-look="holo"].phase-bridge #hud, body[data-look="holo"].phase-bridge .glass, body[data-look="holo"].phase-bridge .deck-fx { opacity: 0 !important; visibility: hidden; transition: opacity .9s, visibility 0s .9s; pointer-events: none; }
+
+/* top bar */
+body[data-look="holo"].phase-bridge #topbar { background: rgba(6, 10, 16, .72); border-bottom: 1px solid var(--line); }
+body[data-look="holo"] #topbar::after { display: none; }
+body[data-look="holo"] .tb-name { letter-spacing: 0; text-transform: none; font-size: 14.5px; font-weight: 600; }
+body[data-look="holo"] .met { display: none; }
+body[data-look="holo"] .tb-tab { font: 500 13.5px var(--f); letter-spacing: 0; text-transform: none; padding: 6px 14px; margin: 0 2px; border-radius: 8px; color: var(--dim); }
+body[data-look="holo"] .tb-tab:hover { color: var(--ceramic); background: rgba(150, 200, 255, .07); }
+body[data-look="holo"] .tb-tab[aria-current="true"] { color: #fff; background: rgba(var(--cy), .16); }
+body[data-look="holo"] .tb-tab[aria-current="true"]::after { display: none; }
+body[data-look="holo"] .pill { border-radius: 99px; background: rgba(150, 200, 255, .06); }
+
+/* layout: crew on the left, the conversation in the middle (big), status on the right */
+body[data-look="holo"].phase-bridge #bridge { display: grid; grid-template-columns: 290px minmax(0, 1fr) 330px; grid-template-rows: 172px minmax(0, 1fr); grid-template-areas: "crew window sys" "crew comms sys"; gap: 14px; padding: 54px 18px 18px; box-sizing: border-box; }
+body[data-look="holo"] #window { position: relative; top: auto; left: auto; right: auto; height: auto; grid-area: window; opacity: 1; display: flex; align-items: center; border-radius: 18px; border: 1px solid var(--line-2); background: linear-gradient(90deg, rgba(var(--cy), .08), rgba(10, 18, 30, .55) 46%, rgba(10, 18, 30, .55)); overflow: hidden; }
+body[data-look="holo"] #console { position: static; display: contents; }
+body[data-look="holo"] .panel.crew { grid-area: crew; } body[data-look="holo"] .panel.comms { grid-area: comms; } body[data-look="holo"] .panel.sys { grid-area: sys; }
+body[data-look="holo"] .panel { background: linear-gradient(180deg, rgba(18, 30, 46, .82), rgba(9, 15, 24, .9)); border: 1px solid var(--line-2); border-radius: 18px; clip-path: none !important; box-shadow: 0 18px 50px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .05); }
+body[data-look="holo"] .panel::before, body[data-look="holo"] .panel::after { display: none; }
+body[data-look="holo"] .panel.comms { border-radius: 18px; }
+
+/* the assistant header: the orb, the name, what it is doing */
+body[data-look="holo"] #presence { left: 88px !important; top: 50% !important; width: 158px !important; height: 158px !important; max-height: none; }
+body[data-look="holo"] .hud { top: 50%; transform: translateY(-50%); text-shadow: none; }
+body[data-look="holo"] .hud-l { left: 186px; } body[data-look="holo"] .hud-r { right: 26px; }
+body[data-look="holo"] .hud b { font-size: 26px; font-weight: 600; text-transform: capitalize; letter-spacing: 0; }
+body[data-look="holo"] .hud span { font: 500 14px var(--f); color: rgb(var(--cy)); }
+body[data-look="holo"] #hud-clock { font: 500 14px var(--f); color: var(--dim) !important; opacity: 1; }
+body[data-look="holo"] .cue { bottom: 10px; border-radius: 12px; }
+
+/* panel headings: plain, not shouting */
+body[data-look="holo"] .ph { padding: 14px 18px 8px; }
+body[data-look="holo"] .ph h2 { letter-spacing: 0; text-transform: none; font: 600 15px var(--f); color: var(--ceramic); }
+body[data-look="holo"] .ph h2::before { display: none; }
+body[data-look="holo"] .ph h3 { font: 500 12.5px var(--f); letter-spacing: 0; text-transform: none; color: var(--dim); }
+body[data-look="holo"] .ph-note { font-size: 12.5px; }
+body[data-look="holo"] .mini { border-radius: 8px; padding: 5px 12px; font: 500 12.5px var(--f); letter-spacing: 0; text-transform: none; border-color: var(--line-2); background: rgba(150, 200, 255, .05); }
+body[data-look="holo"] .mini:hover { border-color: rgba(var(--cy), .6); color: #fff; background: rgba(var(--cy), .12); }
+
+/* the conversation: roomy, readable */
+body[data-look="holo"] .log { padding: 6px 22px 14px; gap: 12px; }
+body[data-look="holo"] .msg { max-width: min(80%, 820px); padding: 11px 16px 12px; border-radius: 16px; font-size: 15.5px; line-height: 1.55; }
+body[data-look="holo"] .msg small { font: 600 11.5px var(--f); letter-spacing: 0; text-transform: none; color: var(--dim); margin-bottom: 3px; }
+body[data-look="holo"] .msg.ai { background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .09); border-bottom-left-radius: 5px; }
+body[data-look="holo"] .msg.user { background: rgba(var(--cy), .15); border: 1px solid rgba(var(--cy), .32); border-bottom-right-radius: 5px; }
+body[data-look="holo"] .msg.sys { font-size: 12.5px; }
+body[data-look="holo"] .entry { padding: 14px 18px 18px; border-top: 1px solid var(--line); gap: 10px; }
+body[data-look="holo"] .entry input { min-height: 48px; font-size: 15.5px; border-radius: 26px; padding: 12px 20px; background: rgba(4, 8, 14, .8); border-color: var(--line-2); }
+body[data-look="holo"] .entry input:focus { border-color: rgba(var(--cy), .6); box-shadow: 0 0 0 3px rgba(var(--cy), .12); outline: none; }
+body[data-look="holo"] .mic, body[data-look="holo"] .send { width: 48px; height: 48px; }
+
+/* crew list (replaces the little floor plan on the home screen) */
+body[data-look="holo"] .deck, body[data-look="holo"] .panel.crew .inspect { display: none !important; }
+#crew-list { display: none; }
+body[data-look="holo"] #crew-list { display: flex; flex-direction: column; gap: 6px; padding: 4px 12px 14px; overflow-y: auto; flex: 1; min-height: 0; scrollbar-width: thin; }
+.cl-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid transparent; cursor: pointer; text-align: left; background: transparent; color: var(--ceramic); font-family: inherit; width: 100%; }
+.cl-item:hover { background: rgba(150, 200, 255, .07); border-color: var(--line); }
+.cl-av { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font: 600 15px var(--f); color: #06101a; background: rgb(var(--c, 104, 208, 255)); box-shadow: 0 0 0 3px rgba(var(--c, 104, 208, 255), .18); position: relative; }
+.cl-item.working .cl-av::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid rgba(255, 190, 92, .8); border-top-color: transparent; animation: clspin 1.1s linear infinite; }
+@keyframes clspin { to { transform: rotate(360deg); } }
+.cl-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; } .cl-txt b { font: 600 14.5px var(--f); } .cl-txt small { font: 12.5px var(--f); color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-st { flex: none; font: 500 12px var(--f); color: var(--dimmer); display: flex; align-items: center; gap: 6px; } .cl-st::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--dimmer); } .cl-item.working .cl-st { color: rgb(255, 190, 92); } .cl-item.working .cl-st::before { background: rgb(255, 190, 92); box-shadow: 0 0 8px rgba(255, 190, 92, .8); } .cl-item.live .cl-st { color: rgb(var(--cy)); } .cl-item.live .cl-st::before { background: rgb(var(--cy)); box-shadow: 0 0 8px rgba(var(--cy), .8); }
+.cl-empty { padding: 10px 14px; color: var(--dimmer); font: 13px/1.6 var(--f); }
+
+/* status panel */
+body[data-look="holo"] .tiers b { letter-spacing: 0; text-transform: none; font: 600 13px var(--f); display: block; color: var(--ceramic); margin-bottom: 1px; }
+body[data-look="holo"] .tiers i { box-shadow: none; border-radius: 50%; }
+body[data-look="holo"] .tiers li { font-size: 12.5px; }
+body[data-look="holo"] .activity li { font: 12.5px var(--f); } body[data-look="holo"] .activity li::before { content: none; }
+body[data-look="holo"] .sys-actions { padding: 10px 14px 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* the other screens: same calm shapes and type */
+body[data-look="holo"] .cn-sec > h3, body[data-look="holo"] .bw-side h3 { text-transform: none; letter-spacing: 0; font: 600 13px var(--f); color: var(--dim); }
+body[data-look="holo"] .cn-card, body[data-look="holo"] .bw-main, body[data-look="holo"] .bw-side { border-radius: 16px; }
+body[data-look="holo"] .cn-badge, body[data-look="holo"] .bw-take { letter-spacing: 0; text-transform: none; }
+body[data-look="holo"] .cn-btn, body[data-look="holo"] .bw-btn { border-radius: 8px; font-family: var(--f); font-weight: 500; }
+
+@media (max-width: 1500px) { body[data-look="holo"].phase-bridge #bridge { grid-template-columns: 250px minmax(0, 1fr) 280px; } body[data-look="holo"] .cl-st { display: none; } }
+@media (max-height: 830px) { body[data-look="holo"].phase-bridge #bridge { grid-template-rows: 132px minmax(0, 1fr); padding-top: 50px; gap: 12px; } body[data-look="holo"] #presence { left: 70px !important; width: 124px !important; height: 124px !important; } body[data-look="holo"] .hud-l { left: 148px; } body[data-look="holo"] .hud b { font-size: 23px; } body[data-look="holo"] .msg { font-size: 15px; } }
+@media (max-width: 1180px) { body[data-look="holo"].phase-bridge #bridge { grid-template-columns: 0 minmax(0, 1fr) 300px; grid-template-areas: "window window sys" "comms comms sys"; } body[data-look="holo"] .panel.crew { display: none; } }
+@media (max-width: 900px) { body[data-look="holo"].phase-bridge #bridge { grid-template-columns: minmax(0, 1fr); grid-template-rows: 150px minmax(0, 1fr); grid-template-areas: "window" "comms"; } body[data-look="holo"] .panel.sys { display: none; } }
+@media (prefers-reduced-motion: reduce) { .cl-item.working .cl-av::after { animation: none; } }
+
+/* details that the cockpit look decorated (its rules use !important, so these do too) */
+body[data-look="holo"] .msg { border-radius: 16px !important; border-color: rgba(255, 255, 255, .09) !important; animation: msgin .3s ease; }
+body[data-look="holo"] .msg::before, body[data-look="holo"] .msg.sys p::before { display: none !important; content: none !important; }
+body[data-look="holo"] .msg.ai { background: rgba(255, 255, 255, .05) !important; border-bottom-left-radius: 5px !important; }
+body[data-look="holo"] .msg.user { background: rgba(var(--cy), .16) !important; border-color: rgba(var(--cy), .34) !important; border-bottom-right-radius: 5px !important; }
+body[data-look="holo"] .msg.sys { background: none !important; border: 0 !important; }
+body[data-look="holo"] .msg p { color: var(--ceramic); }
+body[data-look="holo"] .msg small { font: 600 11.5px var(--f) !important; letter-spacing: 0 !important; text-transform: none !important; color: var(--dim) !important; opacity: 1 !important; }
+body[data-look="holo"] .ph h2::after { display: none !important; }
+body[data-look="holo"] .hud-l, body[data-look="holo"] .hud-r { border: 0 !important; box-shadow: none !important; padding: 0 !important; }
+body[data-look="holo"] .hud b { text-shadow: none !important; letter-spacing: 0 !important; }
+body[data-look="holo"] .hud span { text-transform: none !important; letter-spacing: 0 !important; text-shadow: none !important; font-size: 14px !important; }
+body[data-look="holo"] .entry input { border-radius: 26px !important; box-shadow: none !important; }
+body[data-look="holo"] .entry input:focus { box-shadow: 0 0 0 3px rgba(var(--cy), .14) !important; }
+body[data-look="holo"] .micbar { font: 12px var(--f); text-transform: none; letter-spacing: 0; padding: 4px 22px 0; opacity: .9; }
+body[data-look="holo"] .micbar button, body[data-look="holo"] .micbar select { border-radius: 8px; font: 500 12px var(--f); text-transform: none; letter-spacing: 0; }
+body[data-look="holo"] .ph .mini { white-space: nowrap; padding: 5px 10px; font-size: 12px; }
+@media (min-width: 1501px) { body[data-look="holo"].phase-bridge #bridge { grid-template-columns: 300px minmax(0, 1fr) 330px; } }
+body[data-look="holo"] .panel.crew .ph { flex-wrap: wrap; row-gap: 8px; }

@@ -1,0 +1,42 @@
+/* ---- Browser screen: Orbit's own browser, live ---- */
+#browser { display: none; position: fixed; top: 40px; left: 0; right: 0; bottom: 0; z-index: 55; padding: 12px 16px 14px; background: rgba(4, 6, 11, .94); backdrop-filter: blur(6px); }
+body[data-view="browser"] #browser { display: block; }
+.bw-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 12px; height: 100%; min-height: 0; }
+.bw-main, .bw-side { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: linear-gradient(180deg, #0b121c, var(--panel)); border: 1px solid var(--line-2); clip-path: var(--chamfer); }
+.bw-bar { display: flex; align-items: center; gap: 6px; padding: 10px 12px 6px; flex: none; }
+.bw-ctx, .bw-set select { background: var(--void); border: 1px solid var(--line-2); border-radius: 4px; color: var(--ceramic); font: 12px var(--m); padding: 7px 8px; outline: none; max-width: 190px; }
+.bw-ctx:focus, .bw-set select:focus, .bw-url:focus { border-color: rgba(var(--cy), .6); }
+.bw-btn { flex: none; min-width: 32px; height: 32px; padding: 0 10px; background: transparent; border: 1px solid var(--line-2); border-radius: 4px; color: var(--dim); font: 600 13px var(--m); cursor: pointer; }
+.bw-btn:hover:not(:disabled) { color: var(--ceramic); border-color: rgba(var(--cy), .5); } .bw-btn:disabled { opacity: .35; cursor: default; }
+.bw-url { flex: 1; min-width: 0; height: 32px; padding: 0 12px; background: var(--void); border: 1px solid var(--line-2); border-radius: 4px; color: var(--ceramic); font: 13px var(--m); outline: none; }
+.bw-take { letter-spacing: .1em; text-transform: uppercase; font-size: 11.5px; } .bw-take.on { color: #06101a; background: rgb(var(--am)); border-color: rgb(var(--am)); box-shadow: 0 0 12px rgba(var(--am), .5); }
+.bw-tabs { display: flex; gap: 4px; padding: 0 12px 8px; overflow-x: auto; flex: none; scrollbar-width: thin; }
+.bw-tab { display: flex; align-items: center; gap: 6px; flex: none; max-width: 210px; padding: 5px 6px 5px 10px; background: rgba(255, 255, 255, .03); border: 1px solid var(--line-2); border-radius: 4px; color: var(--dim); font: 12px var(--m); cursor: pointer; }
+.bw-tab.cur { color: var(--ceramic); border-color: rgba(var(--cy), .55); background: rgba(var(--cy), .08); }
+.bw-tab span.t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .bw-tab i.who { font-style: normal; font-size: 10px; letter-spacing: .06em; color: rgb(var(--am)); text-transform: uppercase; }
+.bw-tab button { border: 0; background: transparent; color: var(--dimmer); font-size: 14px; line-height: 1; cursor: pointer; padding: 0 3px; } .bw-tab button:hover { color: #fff; }
+.bw-tab.load::before { content: ""; width: 8px; height: 8px; border-radius: 50%; border: 2px solid rgba(var(--cy), .25); border-top-color: rgb(var(--cy)); animation: bwspin .8s linear infinite; }
+@keyframes bwspin { to { transform: rotate(360deg); } }
+.bw-follow { flex: none; font-size: 11px; height: 28px; align-self: center; }
+.bw-stage { position: relative; flex: 1; min-height: 0; margin: 0 12px; background: #04070c; border: 1px solid var(--line-2); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.bw-canvas { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; outline: none; background: #fff; }
+.bw-stage.ctl .bw-canvas { cursor: default; box-shadow: 0 0 0 2px rgb(var(--am)); }
+.bw-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 30px; text-align: center; color: var(--dim); font-size: 14px; background: #04070c; }
+.bw-empty b { color: var(--ceramic); font-size: 16px; } .bw-empty span { color: var(--dimmer); font: 12px var(--m); max-width: 460px; line-height: 1.6; }
+.bw-banner { position: absolute; left: 10px; right: 10px; top: 10px; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 4px; background: rgba(6, 10, 16, .92); border: 1px solid rgba(var(--cy), .45); color: var(--ceramic); font-size: 13px; box-shadow: 0 6px 22px rgba(0, 0, 0, .5); }
+.bw-banner.need { border-color: rgb(var(--am)); background: rgba(38, 24, 4, .94); } .bw-banner.need b { color: rgb(var(--am)); }
+.bw-banner .sp { flex: 1; min-width: 0; } .bw-banner[hidden], .bw-empty[hidden], .bw-veil[hidden] { display: none; }
+.bw-veil { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); padding: 5px 12px; border-radius: 12px; background: rgba(6, 10, 16, .85); color: var(--dim); font: 11.5px var(--m); pointer-events: none; border: 1px solid var(--line-2); }
+.bw-foot { padding: 8px 14px 10px; font: 11.5px var(--m); color: var(--dimmer); flex: none; }
+.bw-side { overflow: auto; padding: 14px 14px 16px; gap: 12px; scrollbar-width: thin; }
+.bw-side h3 { margin: 0 0 6px; font: 600 11.5px var(--m); letter-spacing: .16em; text-transform: uppercase; color: var(--dim); }
+.bw-act { display: flex; flex-direction: column; gap: 3px; max-height: 300px; overflow: auto; scrollbar-width: thin; }
+.bw-a { display: grid; grid-template-columns: 46px 1fr; gap: 0 8px; padding: 5px 7px; border-left: 2px solid var(--line-2); font-size: 12.5px; color: var(--ceramic); }
+.bw-a.ok { border-left-color: rgba(var(--cy), .6); } .bw-a.asked, .bw-a.human { border-left-color: rgb(var(--am)); } .bw-a.denied, .bw-a.error { border-left-color: #ff5d6c; }
+.bw-a time { font: 11px var(--m); color: var(--dimmer); } .bw-a b { font-weight: 600; } .bw-a small { display: block; color: var(--dimmer); font: 11px var(--m); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; grid-column: 2; }
+.bw-none { color: var(--dimmer); font: 12px var(--m); padding: 4px 2px; }
+.bw-set { display: flex; flex-direction: column; gap: 9px; font-size: 12.5px; color: var(--dim); } .bw-set label { display: flex; flex-direction: column; gap: 4px; } .bw-set label.row { flex-direction: row; align-items: center; gap: 8px; }
+.bw-set small { color: var(--dimmer); font: 11px var(--m); line-height: 1.5; }
+.bw-steps { display: flex; flex-direction: column; gap: 4px; font: 12px var(--m); margin-top: 6px; } .bw-steps div { color: var(--ceramic); } .bw-steps .no { color: #ff8d98; } .bw-steps .yes::before { content: "\2713  "; color: rgb(var(--cy)); } .bw-steps .no::before { content: "\2717  "; color: #ff5d6c; }
+.bw-steps small { display: block; color: var(--dimmer); margin-left: 18px; white-space: pre-wrap; }
+@media (max-width: 980px) { .bw-wrap { grid-template-columns: 1fr; } .bw-side { display: none; } }

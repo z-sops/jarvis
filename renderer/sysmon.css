@@ -1,0 +1,9 @@
+/* ---- This computer ---- */
+.sysmon { padding: 4px 16px 10px; display: flex; flex-direction: column; gap: 7px; flex: none; }
+.sm-title { font: 600 12px var(--m); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+.sm-row { display: grid; grid-template-columns: 62px 1fr auto; gap: 10px; align-items: center; font-size: 12.5px; }
+.sm-l { color: var(--dim); } .sm-v { color: var(--ceramic); font: 12px var(--m); text-align: right; min-width: 92px; white-space: nowrap; }
+.sm-bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .08); overflow: hidden; } .sm-bar i { display: block; height: 100%; width: 2%; border-radius: 3px; background: rgb(var(--cy)); transition: width .8s ease, background .4s; }
+.sm-row[data-level="warm"] .sm-bar i { background: rgb(var(--am)); } .sm-row[data-level="hot"] .sm-bar i { background: #ff5d6c; } .sm-row[data-level="none"] .sm-bar i { width: 0 !important; } .sm-row[data-level="none"] .sm-v { color: var(--dimmer); }
+.sm-orbit { font: 11.5px var(--m); color: var(--dimmer); margin-top: 2px; }
+body[data-look="holo"] .sm-title { letter-spacing: 0; text-transform: none; font: 600 13px var(--f); color: var(--ceramic); }

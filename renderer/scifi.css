@@ -1,0 +1,89 @@
+/* Sci-fi theme layer. Additive: loaded after style.css, removable by deleting this file and the two tags in index.html.
+   Ctrl+Shift+F toggles all effects (body.fx-off). */
+:root { --cy: 111, 227, 224; --am: 255, 178, 62; }
+
+/* ---------- hull canvas (drawn by fx.js) ---------- */
+#hull-fx { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; opacity: 0; transition: opacity 2.2s ease .3s; }
+.revealed #hull-fx { opacity: 1; }
+body.fx-off #hull-fx, body.fx-off #hud, body.fx-off .glass, body.fx-off .deck-fx { display: none; }
+
+/* ---------- forward window ---------- */
+#hud { position: absolute; inset: 0; width: 100%; height: 100%; clip-path: polygon(13% 0, 87% 0, 97% 100%, 3% 100%); pointer-events: none; }
+.glass { position: absolute; inset: 0; pointer-events: none; clip-path: polygon(13% 0, 87% 0, 97% 100%, 3% 100%);
+  background:
+    linear-gradient(115deg, transparent 33%, rgba(255,255,255,.06) 39%, transparent 46%, transparent 61%, rgba(160,225,255,.04) 67%, transparent 74%),
+    radial-gradient(ellipse at 50% 58%, transparent 52%, rgba(0,2,10,.62) 100%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.028) 0 1px, transparent 1px 3px);
+  background-size: 240% 100%, 100% 100%, 100% 100%; animation: glare 22s ease-in-out infinite alternate; }
+@keyframes glare { from { background-position: 0% 0, 0 0, 0 0; } to { background-position: 100% 0, 0 0, 0 0; } }
+.hud b { letter-spacing: .04em; text-shadow: 0 0 18px rgba(var(--am), .35), 0 1px 8px #000; }
+.hud span { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: rgb(var(--cy)); text-shadow: 0 0 10px rgba(var(--cy), .5); }
+.hud-l { padding-left: 14px; border-left: 2px solid rgba(var(--am), .8); box-shadow: -8px 0 18px -10px rgba(var(--am), .7); }
+.hud-r { padding-right: 14px; border-right: 2px solid rgba(var(--cy), .6); }
+#hud-clock { letter-spacing: .08em !important; }
+
+/* ---------- top bar ---------- */
+#topbar::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--cy), .45) 20%, rgba(var(--am), .5) 50%, rgba(var(--cy), .45) 80%, transparent); }
+.tb-name { letter-spacing: .14em; text-transform: uppercase; font-size: 13px; }
+.met { color: rgb(var(--cy)); letter-spacing: .08em; text-shadow: 0 0 8px rgba(var(--cy), .5); }
+
+/* ---------- console panels ---------- */
+.panel { background:
+    linear-gradient(180deg, rgba(var(--cy), .05), transparent 22%),
+    linear-gradient(0deg, rgba(4,8,14,.0), rgba(4,8,14,0)),
+    linear-gradient(180deg, #0b131f, #070c14);
+  border-color: rgba(var(--cy), .22);
+  box-shadow: inset 0 0 40px rgba(var(--cy), .04), inset 0 1px 0 rgba(var(--cy), .25), 0 12px 34px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.6); }
+.panel::before { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: screen;
+  background:
+    repeating-linear-gradient(0deg, rgba(120,200,255,.035) 0 1px, transparent 1px 3px),
+    radial-gradient(circle at 1px 1px, rgba(var(--cy), .10) 1px, transparent 1.4px) 0 0 / 22px 22px,
+    linear-gradient(180deg, transparent, rgba(var(--cy), .13) 50%, transparent) 0 -70px / 100% 60px no-repeat;
+  animation: panelscan 9s linear infinite; }
+@keyframes panelscan { from { background-position: 0 0, 0 0, 0 -70px; } to { background-position: 0 0, 0 0, 0 620px; } }
+.panel.comms::before { animation-delay: -3s; } .panel.sys::before { animation-delay: -6s; }
+.panel::after { content: ""; position: absolute; inset: -1px; z-index: 3; pointer-events: none; --c: rgba(var(--cy), .95); --l: 16px;
+  background:
+    linear-gradient(var(--c), var(--c)) top left / var(--l) 2px no-repeat, linear-gradient(var(--c), var(--c)) top left / 2px var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / var(--l) 2px no-repeat, linear-gradient(var(--c), var(--c)) top right / 2px var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / var(--l) 2px no-repeat, linear-gradient(var(--c), var(--c)) bottom left / 2px var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / var(--l) 2px no-repeat, linear-gradient(var(--c), var(--c)) bottom right / 2px var(--l) no-repeat;
+  filter: drop-shadow(0 0 4px rgba(var(--cy), .8)); }
+.panel.comms { border-radius: 4px 14px 4px 14px; }
+.ph { position: relative; }
+.ph h2 { display: flex; align-items: center; gap: 9px; letter-spacing: .16em; text-transform: uppercase; font-size: 12.5px; color: rgb(var(--cy)); text-shadow: 0 0 10px rgba(var(--cy), .45); }
+.ph h2::before { content: ""; width: 7px; height: 7px; background: rgb(var(--am)); box-shadow: 0 0 10px rgba(var(--am), .9); animation: led 2.4s ease-in-out infinite; }
+.ph h2::after { content: ""; width: 34px; height: 1px; background: linear-gradient(90deg, rgba(var(--cy), .7), transparent); }
+@keyframes led { 50% { opacity: .35; } }
+.ph h3 { letter-spacing: .16em; text-transform: uppercase; font-size: 11px; color: rgba(var(--cy), .7); }
+.ph-note { font-family: var(--m); font-size: 11.5px; letter-spacing: .04em; }
+.mini { font-family: var(--m); font-size: 11.5px; letter-spacing: .06em; border-color: rgba(var(--cy), .4); clip-path: polygon(0 5px, 5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%); transition: box-shadow .2s, background .2s, color .2s; }
+.mini:hover { background: rgba(var(--cy), .1); box-shadow: 0 0 14px rgba(var(--cy), .45); }
+
+/* ---------- comms: terminal feel ---------- */
+.msg { --acc: rgb(var(--cy)); position: relative; border-radius: 2px 14px 14px 14px; animation: msgin .38s cubic-bezier(.2, .8, .2, 1); border-color: rgba(var(--cy), .3) !important; }
+.msg.user { --acc: rgb(var(--am)); border-radius: 14px 2px 14px 14px; border-color: rgba(var(--am), .35) !important; background: linear-gradient(135deg, rgba(var(--am), .13), rgba(var(--am), .04)) !important; }
+.msg.ai { background: linear-gradient(135deg, rgba(var(--cy), .11), rgba(var(--cy), .03)) !important; }
+.msg.user::before, .msg.ai::before { content: ""; position: absolute; top: 7px; bottom: 7px; width: 2px; background: var(--acc); box-shadow: 0 0 10px var(--acc); border-radius: 2px; }
+.msg.ai::before { left: -2px; } .msg.user::before { right: -2px; }
+.msg small { font-family: var(--m); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--acc); opacity: .85; }
+.msg.sys { animation: none; } .msg.sys p::before { content: "// "; color: rgba(var(--cy), .6); font-family: var(--m); }
+@keyframes msgin { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+.chip-tool { border: 0; border-left: 2px solid var(--acc, rgba(var(--cy), .6)); border-radius: 0; background: linear-gradient(90deg, rgba(var(--cy), .09), transparent); font-size: 11.5px; }
+.chip-tool.run { --acc: rgb(var(--am)); } .chip-tool.ok { --acc: rgb(var(--cy)); } .chip-tool.bad { --acc: #ff5a4f; }
+.entry input { border-radius: 4px 20px 4px 20px; border-color: rgba(var(--cy), .3); background: rgba(2,6,12,.8); box-shadow: inset 0 0 14px rgba(var(--cy), .06); }
+.entry input:focus { box-shadow: 0 0 0 1px rgba(var(--cy), .6), 0 0 16px rgba(var(--cy), .25), inset 0 0 14px rgba(var(--cy), .08); }
+.mic.live { animation: micpulse 1.6s ease-out infinite; }
+@keyframes micpulse { from { box-shadow: 0 0 0 0 rgba(var(--am), .5), 0 0 18px rgba(var(--am), .35); } to { box-shadow: 0 0 0 16px rgba(var(--am), 0), 0 0 18px rgba(var(--am), .35); } }
+.send { box-shadow: 0 0 16px rgba(var(--am), .45); }
+
+/* ---------- systems + crew ---------- */
+.tiers b { letter-spacing: .1em; text-transform: uppercase; font-size: 11.5px; }
+.tiers i { box-shadow: 0 0 8px currentColor; }
+.t-free { color: #7bd88f; } .t-ask { color: #ffb23e; } .t-no { color: #ff5a4f; }
+.activity li { font-family: var(--m); font-size: 11.5px; } .activity li::before { content: "\203A"; color: rgb(var(--cy)); order: 0; }
+.deck-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: screen; }
+.inspect { border-color: rgba(var(--cy), .4); box-shadow: 0 0 22px rgba(var(--cy), .12); }
+
+@media (prefers-reduced-motion: reduce) { .glass, .panel::before, .ph h2::before, .mic.live { animation: none !important; } }
+body.fx-off .panel::before, body.fx-off .panel::after, body.fx-off .glass { display: none; }

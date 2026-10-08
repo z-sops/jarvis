@@ -1,0 +1,32 @@
+/* Screen vision card and the "screen watch" indicator. */
+.scr { padding: 0 14px 8px; flex: none; }
+.scr-row { display: flex; gap: 10px; align-items: flex-start; margin: 2px 0 0; }
+.scr img { display: block; flex: none; width: 112px; height: 63px; object-fit: cover; border: 1px solid rgba(111,227,224,.3); background: #02060c; }
+.scr-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.modal p.perm-who + p.perm-who { margin-top: 10px; }
+.scr small { display: block; margin-top: 6px; font-size: 11.5px; color: var(--dim); line-height: 1.35; }
+.mini.on { border-color: #ff5a4f; color: #ff9088; box-shadow: 0 0 12px rgba(255,90,79,.35); }
+#pill-watch { opacity: 1 !important; border-color: rgba(255,90,79,.5); color: #ffb3ad; }
+#pill-watch i { background: #ff5a4f; box-shadow: 0 0 8px #ff5a4f; animation: blink 1s infinite; }
+
+/* ---- microphone meter (renderer/js/mic-ui.js) ---- */
+.micbar { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 12px 0; flex: none; font: 11px var(--m); color: var(--dim); border-top: 1px solid var(--line); }
+.mb-k { letter-spacing: .16em; color: rgb(var(--cy)); }
+.mb-segs { display: flex; gap: 3px; flex: 1; min-width: 60px; }
+.mb-segs i { flex: 1; height: 9px; border-radius: 1px; background: rgba(var(--cy), .14); transition: background .08s; }
+.mb-segs i.on { background: rgb(var(--cy)); box-shadow: 0 0 6px rgba(var(--cy), .8); } .mb-segs i.on.hot { background: rgb(var(--am)); box-shadow: 0 0 6px rgba(var(--am), .8); }
+.micbar.muted .mb-segs i.on { background: #59636e; box-shadow: none; }
+.mb-state { min-width: 78px; text-align: right; } .micbar.active .mb-state { color: rgb(var(--cy)); } .micbar.muted .mb-state, .micbar.nosig .mb-state { color: #ff6b5f; }
+.mb-dev, .mb-test { font: inherit; color: inherit; background: none; border: 1px solid rgba(var(--cy), .3); padding: 2px 8px; border-radius: 2px; cursor: pointer; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-dev:hover, .mb-test:hover { background: rgba(var(--cy), .1); color: #fff; }
+.mb-menu { position: absolute; right: 12px; bottom: calc(100% - 4px); z-index: 40; min-width: 250px; max-width: 360px; background: #07101b; border: 1px solid rgba(var(--cy), .45); box-shadow: 0 10px 30px rgba(0,0,0,.6); padding: 4px; }
+.mb-menu button { display: block; width: 100%; text-align: left; font: 12px var(--m); color: var(--ink); background: none; border: 0; padding: 6px 8px; cursor: pointer; }
+.mb-menu button:hover { background: rgba(var(--cy), .12); } .mb-menu button.sel { color: rgb(var(--am)); }
+.mb-note { padding: 4px 8px 6px; color: var(--dim); font: 11px var(--m); }
+#presence.hearing { filter: hue-rotate(80deg) saturate(1.5) drop-shadow(0 0 26px rgba(90, 255, 150, .65)); }
+#presence { transition: filter .15s ease; }
+
+.mb-dev { max-width: 118px; }
+.micbar.probing .mb-state { color: rgb(var(--am)); }
+.mb-find.attn { border-color: rgb(var(--am)); color: rgb(var(--am)); animation: stoppulse 1.6s ease-in-out infinite; }
+.mb-test:disabled { opacity: .5; cursor: default; }

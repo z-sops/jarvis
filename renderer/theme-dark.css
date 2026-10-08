@@ -1,0 +1,30 @@
+/* Dark theme for the holographic look: graphite instead of blue, one warm champagne accent.
+   Loaded after holo.css. Only colours here (plus the Activity box under the crew list).
+   To go back to blue: delete this file and its <link> in index.html. */
+body[data-look="holo"] {
+  --cy: 214, 178, 112; --am: 255, 190, 92; --cyan: rgb(214, 178, 112);
+  --void: #08090b; --panel: #101114; --panel-2: #16181c;
+  --line: rgba(255, 255, 255, .07); --line-2: rgba(255, 255, 255, .13);
+  --ceramic: #ece9e2; --dim: #a29f98; --dimmer: #6f6d68;
+}
+body[data-look="holo"].phase-bridge { background: radial-gradient(1000px 560px at 50% -10%, rgba(214, 178, 112, .075), transparent 62%), radial-gradient(900px 560px at 100% 110%, rgba(255, 255, 255, .035), transparent 60%), #08090b; }
+body[data-look="holo"].phase-bridge::before { background-image: radial-gradient(rgba(255, 255, 255, .05) 1px, transparent 1.2px); }
+body[data-look="holo"].phase-bridge #topbar { background: rgba(8, 9, 11, .82); }
+body[data-look="holo"] .tb-tab:hover { background: rgba(255, 255, 255, .06); }
+body[data-look="holo"] .pill { background: rgba(255, 255, 255, .05); }
+body[data-look="holo"] #window { background: linear-gradient(90deg, rgba(var(--cy), .07), rgba(20, 21, 25, .7) 46%, rgba(20, 21, 25, .7)); }
+body[data-look="holo"] .panel { background: linear-gradient(180deg, rgba(27, 28, 32, .92), rgba(14, 15, 18, .96)); box-shadow: 0 18px 50px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .05); }
+body[data-look="holo"] .mini { background: rgba(255, 255, 255, .04); }
+body[data-look="holo"] .cl-item:hover { background: rgba(255, 255, 255, .06); }
+body[data-look="holo"] .entry input { background: rgba(5, 6, 8, .85); }
+body[data-look="holo"] .msg.ai { background: rgba(255, 255, 255, .055) !important; }
+body[data-look="holo"] .msg.user { background: rgba(var(--cy), .14) !important; border-color: rgba(var(--cy), .30) !important; }
+body[data-look="holo"] .chip-tool { background: rgba(255, 255, 255, .04); border-color: rgba(255, 255, 255, .10); }
+body[data-look="holo"] .chip-tool.bad, body[data-look="holo"] .chip-tool.error { --acc: #ff6b5f; }
+
+/* Activity lives under the crew list (moved there by js/layout-left.js) */
+body[data-look="holo"] #crew-list { flex: 0 1 auto; max-height: 46%; }
+body[data-look="holo"] .act-box { flex: 1 1 0; min-height: 150px; display: flex; flex-direction: column; margin: 0 12px 12px; border-top: 1px solid var(--line); }
+body[data-look="holo"] .act-box .ph.sub { padding: 12px 6px 6px; }
+body[data-look="holo"] .act-box .activity { flex: 1; min-height: 0; padding: 0 6px; overflow-y: auto; scrollbar-width: thin; }
+body[data-look="holo"] .act-box .activity li { overflow-wrap: anywhere; line-height: 1.35; }

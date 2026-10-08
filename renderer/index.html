@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; font-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' wss://generativelanguage.googleapis.com https://generativelanguage.googleapis.com; media-src 'self' blob:">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="scifi.css">
+<link rel="stylesheet" href="screen.css">
+<link rel="stylesheet" href="workspace.css">
+<link rel="stylesheet" href="office.css">
+<link rel="stylesheet" href="browser.css">
+<link rel="stylesheet" href="shutdown.css">
+<link rel="stylesheet" href="connectors.css">
+<link rel="stylesheet" href="holo.css">
+<link rel="stylesheet" href="memory.css">
+<link rel="stylesheet" href="sysmon.css">
+<link rel="stylesheet" href="chat.css">
+<link rel="stylesheet" href="sandbox.css">
+<link rel="stylesheet" href="quota.css">
+<link rel="stylesheet" href="library.css">
+<link rel="stylesheet" href="theme-dark.css">
+</head>
+<body class="phase-boot">
+<canvas id="scene" aria-hidden="true"></canvas>
+
+<!-- Ship hull with the forward window cut out. The world (canvas) shows through the window. -->
+<svg id="hull" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2533"/><stop offset=".5" stop-color="#121a26"/><stop offset="1" stop-color="#0b1119"/></linearGradient>
+    <pattern id="tiles" width="2.5" height="3.2" patternUnits="userSpaceOnUse"><path d="M0 0H2.5M0 0V3.2" stroke="rgba(255,255,255,.035)" stroke-width=".08" fill="none" vector-effect="non-scaling-stroke"/></pattern>
+  </defs>
+  <path fill="url(#hg)" fill-rule="evenodd" d="M0 0H100V100H0Z M13 9 H87 L97 51 H3 Z"/>
+  <path fill="url(#tiles)" fill-rule="evenodd" d="M0 0H100V100H0Z M13 9 H87 L97 51 H3 Z"/>
+  <path d="M38 9 L40.2 9 L34.6 51 L32.4 51 Z" fill="#111823"/><path d="M62 9 L59.8 9 L65.4 51 L67.6 51 Z" fill="#111823"/>
+  <path d="M13 9 H87 L97 51 H3 Z" fill="none" stroke="#05080d" stroke-width="5" vector-effect="non-scaling-stroke"/>
+  <path d="M13 9 H87 L97 51 H3 Z" fill="none" stroke="rgba(220,216,204,.22)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+</svg>
+
+<header id="topbar">
+  <div class="tb-left"><span class="mark" aria-hidden="true"></span><span class="tb-name">Orbit</span><span class="met" id="met" title="Time since this session started">T+ 00:00:00</span></div>
+  <div class="tb-right">
+    <span class="pill" id="pill-net" title="Voice link"><i></i><span>Voice offline</span></span>
+    <button class="wbtn" id="w-min" aria-label="Minimize">&#x2013;</button>
+    <button class="wbtn" id="w-max" aria-label="Maximize">&#x25A1;</button>
+    <button class="wbtn" id="w-hide" aria-label="Send to tray" title="Send to tray (I keep running)">&#x2193;</button>
+    <button class="wbtn danger" id="w-quit" aria-label="Quit">&#x2715;</button>
+  </div>
+</header>
+
+<main id="bridge" aria-label="Orbit">
+  <section id="window" aria-label="Forward window">
+    <div class="hud hud-l"><b id="hud-name">—</b><span id="hud-status">Standing by</span></div>
+    <div class="hud hud-r"><span id="hud-clock"></span></div>
+    <canvas id="presence" aria-hidden="true"></canvas>
+    <div class="cue" id="cue" role="status" aria-live="polite"></div>
+  </section>
+
+  <section id="console">
+    <div class="panel crew" aria-label="Crew deck">
+      <div class="ph"><h2>Crew deck</h2><button class="mini" id="add-crew">Add crew</button></div>
+      <div class="deck"><canvas id="town"></canvas></div>
+      <div class="inspect" id="inspect" hidden></div>
+    </div>
+
+    <div class="panel comms" aria-label="Comms">
+      <div class="ph"><h2>Comms</h2><span class="ph-note" id="comms-note">Say hello, or type below</span></div>
+      <div class="log" id="log" aria-live="polite"></div>
+      <div class="entry">
+        <button class="mic" id="mic" aria-label="Wake voice" aria-pressed="false"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12h-2Z"/></svg><i class="meter" id="micmeter"></i></button>
+        <button class="mini" id="attach" type="button" aria-label="Attach a file" title="Attach a file">📎</button>
+        <span id="attach-name" class="attach-name" hidden></span>
+        <input id="msg" type="text" autocomplete="off" placeholder="Type to your AI" aria-label="Message">
+        <button class="send" id="send" aria-label="Send"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M3 20.5 21 12 3 3.5v6.6L15 12 3 13.9v6.6Z"/></svg></button>
+      </div>
+    </div>
+
+    <div class="panel sys" aria-label="Systems">
+      <div class="ph"><h2>Systems</h2><button class="mini" id="open-settings">Settings</button></div>
+      <ul class="tiers">
+        <li><i class="t-free"></i><span><b>Free</b>Search, read inside the home folder, write in the workspace</span></li>
+        <li><i class="t-ask"></i><span><b>Asks you first</b>Shell commands, anything outside the home folder</span></li>
+        <li><i class="t-no"></i><span><b>Blocked</b>Passwords and keys, destructive commands</span></li>
+      </ul>
+      <div class="ph sub"><h3>Activity</h3></div>
+      <ol class="activity" id="activity"></ol>
+      <div class="sys-actions"><button class="mini" id="open-comms">Comms hub</button> <button class="mini" id="open-home">Open home folder</button></div>
+    </div>
+  </section>
+</main>
+
+<section id="onboarding" hidden></section>
+<div id="countdown" hidden aria-live="assertive"><div class="cd-num" id="cd-num"></div><div class="cd-line" id="cd-line"></div></div>
+<div id="modals"></div>
+
+<script src="js/sfx.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/presence.js"></script>
+<script src="js/town.js"></script>
+<script src="js/live.js"></script>
+<script src="js/onboarding.js"></script>
+<script src="js/app.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/screen-ui.js"></script>
+<script src="js/mic-ui.js"></script>
+<script src="js/mic-probe.js"></script>
+<script src="js/workspace-ui.js"></script>
+<script src="js/office-core.js"></script>
+<script src="js/office.js"></script>
+<script src="js/browser-ui.js"></script>
+<script src="js/connectors-ui.js"></script>
+<script src="js/shutdown.js"></script>
+<script src="js/usage-ui.js"></script>
+<script src="js/logs-ui.js"></script>
+<script src="js/holo.js"></script>
+<script src="js/layout-left.js"></script>
+<script src="js/memory-ui.js"></script>
+<script src="js/sysmon-ui.js"></script>
+<script src="js/translit.js"></script>
+<script src="js/chat-ui.js"></script>
+<script src="js/sandbox-ui.js"></script>
+<script src="js/quota-ui.js"></script>
+<script src="js/library-ui.js"></script>
+</body>
+</html>
