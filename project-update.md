@@ -54,9 +54,9 @@ Last updated: 2026-10-08 (Asia/Karachi)
 
 | ID | Gap found through code inspection | Proposed adjustment | Benefit | Status |
 | --- | --- | --- | --- | --- |
-| N01 | Orbit uses one saved connector token; upstream ignores the actor option and does not send delegated worker identity. | Map each worker to a NeuralOps identity and use its existing broker/delegate mechanism; reject missing/revoked mappings. | Correct ownership, actor history and separation of permissions. | Implemented on the review branch; 17 focused checks pass. Real-service verification and upstream actor-authentication hardening remain pending. |
+| N01 | Orbit uses one saved connector token; upstream ignores the actor option and does not send delegated worker identity. | Map each worker to a NeuralOps identity and use its existing broker/delegate mechanism; reject missing/revoked mappings. | Correct ownership, actor history and separation of permissions. | Implemented on the review branch; 17 focused checks pass. Actor-authentication hardening follows in F02 below; real-service verification remains pending. |
 | N02 | Inspected Orbit gateway does not automatically require NeuralOps clearance before other connector actions. | Enforce relevant checks in actual execution paths and synchronize Orbit jobs with NeuralOps tasks. | Guidance applies consistently instead of depending on model cooperation. | Proposed; scope and approval pending. |
-| N03 | gateStatus for non-completion actions accepts approved status without checking expiry or consumption. | Use consistent approval usability checks and review clearance semantics. | Expired/exhausted permissions do not clear future actions. | Static finding; fix and verification pending. |
+| N03 | gateStatus for non-completion actions accepts approved status without checking expiry or consumption. | Use consistent approval usability checks and review clearance semantics. | Expired/exhausted permissions do not clear future actions. | Implemented for N03 with 12 focused offline regressions passing; full integration pending. |
 | N04 | Journal write exceptions are logged and swallowed while live state may already change. | Propagate persistence failures and design safe state/acknowledgment handling. | Avoid reporting an operation as durably saved when disk persistence failed. | Static finding; design and approval pending. |
 | N05 | Verified evidence is assigned from producer attest authority; it is not automatic artifact inspection. | Connect trustworthy QA/CI evidence to acceptance criteria and artifact versions. | Completion requires appropriate evidence of the requested result. | Integration proposal pending. |
 | N06 | Compactor estimates tokens from characters and summarizes stored state; this is not provider usage/budget telemetry. | Keep estimates labeled; connect actual provider metrics and budget controls separately. | Honest economy reporting and enforceable limits. | Proposal pending. |
@@ -113,9 +113,9 @@ Last updated: 2026-10-08 (Asia/Karachi)
 ## Remaining boundaries and next proposals
 
 - F02: actor-bound gateway authentication is now implemented with focused in-memory verification. Credential theft through unrestricted local filesystem access remains outside this change.
-- N02-N06 remain proposed, not implemented: mandatory NeuralOps gating, approval gate expiry/consumption, journal failure propagation, evidence integration and actual economy telemetry.
+- N02, N04-N06 remain proposed, not implemented: mandatory NeuralOps gating, journal failure propagation, evidence integration and actual economy telemetry. N03 is recorded below.
 - OpenCode and built-in workers gain no new connector access in this change.
-- Next proposal: strengthen NeuralOps approval expiry/consumption checks (N03); explain the specific change and benefit and obtain approval before implementation.
+- N03 was subsequently authorized and implemented below. The next independent change needs its own gap/change/benefit explanation and approval.
 
 
 ## Repository publication
@@ -146,3 +146,21 @@ Last updated: 2026-10-08 (Asia/Karachi)
 - Implementation commit: c00d8e7afa095a34e3fea245e1e1e542f8a4ee41 (nine changed/new files). Branch update succeeded.
 - Draft PR #1 now describes both NeuralOps identity forwarding and worker-bound gateway authentication: https://github.com/z-sops/jarvis/pull/1.
 - A follow-up log-only commit records publication. Main is unchanged; no merge, deployment or Windows checkout update occurred.
+
+## Implementation record — N03 (2026-10-08)
+
+- User said “go ahead” after the expired/consumed approval proposal, authorizing this specific NeuralOps fix. NeuralOps main source baseline: decd1cbd19caebfbaf4a645324ee496a0d27d1bc. No AGENTS.md was found in the current recursive repository tree.
+- Independently traced gateStatus, isUsable, consumeApproval, perform, completed-task clearance and existing enforcement tests. Confirmed gateStatus accepted approved status without expiry/consumption checks and accepted old non-completion clearances as permission.
+- Updated mini-services/neuralops-mcp/src/engines/authority.ts: shared usability rejects consumed permissions, exhausted/invalid counts and invalid/expired timestamps; uses actual instants, treats exact expiry as expired, and defaults omitted check time to now. Explicit replay timestamps remain supported.
+- Updated src/engines/gate.ts: uses the shared predicate for non-completion approvals; historical non-completion clearances cannot bypass it. Completed-task clearance semantics, frozen workspace checks, task/action/scope matching and required verified evidence are preserved.
+- Added tests/gate-approval.test.ts (12 regressions), scripts/test-gate-offline.cjs (Node 24 in-memory source loader), package script test:gate:offline and README guidance. The loader substitutes only bun:test with node:test; production store, authority, gate and error modules execute from source. No services or journal persistence listeners are initialized.
+- Before fix: 4 passed, 8 failed, reproducing stale/expired/consumed approval, exact-expiry, malformed-count and clearance bypass behavior. After fix: 12 passed, 0 failed/skipped on Node 24.19.0. Source transformation/runtime parsing passed for loaded TypeScript modules; offline CJS runner syntax passed.
+- Bun is unavailable. Full Bun suite, semantic TypeScript checking, actual processAct/journal replay, HTTP/CLI/hook flows and Windows execution remain unverified. No packages installed, paid calls, sockets, child workers, production state mutation, merge or deployment.
+- Boundary: gateStatus remains read-only and does not reserve or consume permission. Check-only external actions can race or repeat before consumption; existing actor-bound perform consumes governed permissions. Mandatory external enforcement and artifact verification are separate proposed work.
+- Publish target: a separate NeuralOps review branch/draft PR; Jarvis review source is unchanged by N03. Publication confirmation follows.
+
+### N03 publication confirmation
+
+- Implementation commit: e9398d62d07e78e97fd1b3bfd05d2bc5d75fc381 (seven changed/new files) on codex/strengthen-approval-usability. Branch update succeeded.
+- NeuralOps draft review PR: https://github.com/z-sops/neuralops/pull/1. Main is unchanged; no merge/deployment performed.
+- Follow-up log-only commits synchronize this record to the NeuralOps and Jarvis review branches. Windows installations remain unchanged.
