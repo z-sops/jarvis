@@ -140,3 +140,9 @@ Last updated: 2026-10-08 (Asia/Karachi)
 - Activation requires updating the Windows checkout, stopping existing jobs and restarting Orbit; none of those actions have been performed here. Existing NeuralOps broker/delegate mappings from N01 still need configuration and live whoami verification.
 - Boundary: workers with unrestricted local filesystem access can steal another profile token or the master key. Same-ID recreation reuses its token under the same key; removal refuses future requests but does not cancel in-flight actions. This change does not claim OS sandbox isolation.
 - Publication target: existing review branch codex/strengthen-neuralops-identities and draft PR https://github.com/z-sops/jarvis/pull/1; main remains unchanged. Publication confirmation follows after successful branch update.
+
+### F02 publication confirmation
+
+- Implementation commit: c00d8e7afa095a34e3fea245e1e1e542f8a4ee41 (nine changed/new files). Branch update succeeded.
+- Draft PR #1 now describes both NeuralOps identity forwarding and worker-bound gateway authentication: https://github.com/z-sops/jarvis/pull/1.
+- A follow-up log-only commit records publication. Main is unchanged; no merge, deployment or Windows checkout update occurred.
