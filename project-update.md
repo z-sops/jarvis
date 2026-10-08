@@ -1,6 +1,6 @@
 # Orbit / Jarvis + NeuralOps — Project Update
 
-Last updated: 2026-10-08 (Asia/Karachi)
+Last updated: 2026-10-09 (Asia/Karachi)
 
 ## Working agreement
 
@@ -55,7 +55,7 @@ Last updated: 2026-10-08 (Asia/Karachi)
 | ID | Gap found through code inspection | Proposed adjustment | Benefit | Status |
 | --- | --- | --- | --- | --- |
 | N01 | Orbit uses one saved connector token; upstream ignores the actor option and does not send delegated worker identity. | Map each worker to a NeuralOps identity and use its existing broker/delegate mechanism; reject missing/revoked mappings. | Correct ownership, actor history and separation of permissions. | Implemented on the review branch; 17 focused checks pass. Actor-authentication hardening follows in F02 below; real-service verification remains pending. |
-| N02 | Inspected Orbit gateway does not automatically require NeuralOps clearance before other connector actions. | Enforce relevant checks in actual execution paths and synchronize Orbit jobs with NeuralOps tasks. | Guidance applies consistently instead of depending on model cooperation. | Proposed; scope and approval pending. |
+| N02 | Inspected Orbit gateway does not automatically require NeuralOps clearance before other connector actions. | Enforce relevant checks in actual execution paths and synchronize Orbit jobs with NeuralOps tasks. | Guidance applies consistently instead of depending on model cooperation. | Execution paths inspected; staged N02-A proposal prepared. Implementation approval pending. |
 | N03 | gateStatus for non-completion actions accepts approved status without checking expiry or consumption. | Use consistent approval usability checks and review clearance semantics. | Expired/exhausted permissions do not clear future actions. | Implemented for N03 with 12 focused offline regressions passing; full integration pending. |
 | N04 | Journal write exceptions are logged and swallowed while live state may already change. | Propagate persistence failures and design safe state/acknowledgment handling. | Avoid reporting an operation as durably saved when disk persistence failed. | Implemented after specific approval; 13 persistence failure-injection checks pass. Real filesystem/integration verification pending. |
 | N05 | Verified evidence is assigned from producer attest authority; it is not automatic artifact inspection. | Connect trustworthy QA/CI evidence to acceptance criteria and artifact versions. | Completion requires appropriate evidence of the requested result. | Integration proposal pending. |
@@ -113,7 +113,7 @@ Last updated: 2026-10-08 (Asia/Karachi)
 ## Remaining boundaries and next proposals
 
 - F02: actor-bound gateway authentication is now implemented with focused in-memory verification. Credential theft through unrestricted local filesystem access remains outside this change.
-- N02, N04-N06 remain proposed, not implemented: mandatory NeuralOps gating, journal failure propagation, evidence integration and actual economy telemetry. N03 is recorded below.
+- N02, N05 and N06 remain proposed: mandatory NeuralOps gating, artifact evidence integration and actual economy telemetry. N03 and N04 implementations and limitations are recorded below.
 - OpenCode and built-in workers gain no new connector access in this change.
 - N03 was subsequently authorized and implemented below. The next independent change needs its own gap/change/benefit explanation and approval.
 
@@ -198,3 +198,42 @@ Last updated: 2026-10-08 (Asia/Karachi)
 - NeuralOps draft PR https://github.com/z-sops/neuralops/pull/1 now covers N03 approval usability and N04 persistence failure handling.
 - Follow-up log-only commits synchronize this record across NeuralOps and Jarvis review branches. Main and Windows installations remain unchanged; no merge/deployment.
 - Local standalone log synchronization resumed after workspace access recovered.
+
+## N02 scope investigation — 2026-10-09 (Asia/Karachi)
+
+- User approved inspection/proposal preparation with “ok” after the next-step explanation. This authorizes analysis and log maintenance, not yet the new enforcement implementation. No production source changes or behavior tests were performed in this step.
+- Inspected current Jarvis review-branch main.js, lib/gateway.js, lib/workers.js, lib/home.js, lib/tools.js, lib/browser-mcp.js, lib/browser-tools.js, lib/hermes.js, lib/sandbox.js, lib/opencode.js and lib/fsmcp.js; inspected NeuralOps review-branch task-manager.ts, protocol/payloads.ts and mcp/tools.ts. A guessed mcp/registry.ts path returned 404; repository tree discovery identified mcp/tools.ts, which was then read.
+
+### Actual execution boundaries
+
+| Path | Source evidence | Current guidance gap |
+| --- | --- | --- |
+| External connectors and native Files/Library/Leads | Gateway.call -> Hub.authorize -> upstream/provider.callTool | Orbit permission/allowlists exist; no mandatory NeuralOps guard before invocation. |
+| Gateway native search/screen tools | Gateway.callNative -> Hub.authorize -> native function | Separate dispatch branch also needs the shared guard. |
+| Browser MCP actions | browser-mcp tools/call -> BrowserTools.execute, without Gateway.call for browser tool names | A gateway-only patch would miss browser actions. Browser's existing permission handling must remain. |
+| Laila and built-in workers | tools.exec -> local decide/ask -> IMPL; workers' Gemini loop calls tools.exec directly | Separate built-in path; runtime context must be trusted and captured before any approval wait. |
+| Hermes direct shell/file execution | Hermes profile configuration; optional Docker terminal backend | Direct engine tools do not automatically cross Orbit's MCP boundary. Sandbox is optional and not a NeuralOps gate. |
+| OpenCode direct execution | writeProjectConfig grants bash '*' allow; opencode run launches independently | No inspected NeuralOps/MCP authorization hook in this path. Do not claim full coverage from gateway integration. |
+
+### Weak transitions confirmed in source
+
+- Home.createJob persists only job ID, agent, task text, queued status and creation time. It has no automatic NeuralOps task binding. Workers.run/dispatch maintain active jobs in memory; they do not automatically create/claim a NeuralOps task.
+- Workers.run marks a job done once the engine returns final text (after cancellation check); it does not require NeuralOps completion/verified artifact acceptance. N05 artifact verification remains separate.
+- NeuralOps perform handles direct authority/policy/consumable approval and records authorization, but the inspected handler does not require task ownership/in_progress or matching gate requireVerified evidence. It permits ungoverned actions. perform_check is read-only; gate_status does not consume approval. Calling either alone is insufficient for strict managed execution.
+- Existing approval matching is requester + action + scope + task. target/detail are displayed data, not a machine-enforced argument binding. Approval for one concrete call must not silently authorize changed arguments.
+- Current gateway tokens bind worker identity, not a job execution generation. A strict job integration needs job-bound credentials/context, including rejection of stale calls and rechecking after user approval waits. Binding an arbitrary caller-supplied taskId is insufficient.
+
+### Concrete staged proposal — N02-A
+
+1. Add explicitly configured managed-job execution. Persist a unique Orbit job -> NeuralOps task binding; create/claim before starting governed work. Missing mapping, unavailable service or unclaimable task blocks that managed job. Use execution-generation-bound worker access so stale requests cannot inherit a later job's permission. Keep configuration migrations explicit and preserve existing architecture.
+2. Centralize the guard across Orbit-mediated connectors/providers, native gateway tools, built-in tools and browser agent calls. Preserve Orbit's user dialogs/allowlists; a dialog acceptance is not fabricated as a NeuralOps human authorization. Exempt only narrowly enumerated coordination/read/control operations needed to request approval, inspect state or stop work; unknown actions have no implicit write clearance. Actual user-operated controls remain distinct from agent calls.
+3. Use trusted tool/action/scope configuration and canonical call identity rather than model-supplied metadata or description heuristics. Bind approval to the intended operation/arguments, enforce task owner/runnable state and required evidence together with permission consumption in the NeuralOps server authorization step. Never allow ungoverned fallback in strict managed mode.
+4. Revalidate job generation, cancellation, connector identity/access and normalized arguments immediately before the governed invocation, after any await/user dialog. A pending/denied/expired approval, frozen workspace, persistence fault, missing evidence or unreachable service blocks execution. Do not automatically retry a non-idempotent action with uncertain outcome. An approval consumed before an external failure is not silently restored.
+5. Treat engine-returned text as a report pending acceptance, not a verified completion. Link the managed task lifecycle and display blocked/pending/final states honestly. A successful authorization record is not proof that the external action completed; retain a separate outcome/evidence record. Full artifact checking remains N05.
+6. Strict coverage cannot be claimed for Hermes/OpenCode direct code tools without separate engine hooks. In managed mode, reject/disable uncovered capabilities (with a clear reason) until those hooks are added; do not silently let shell/file tools bypass the guard. Preserve ordinary ungoverned jobs explicitly as unmanaged rather than claiming system-wide protection.
+
+- Benefit: approvals and task state become enforced at Orbit-mediated execution boundaries, with task ownership and call identity preserved instead of relying on the model to remember to check.
+- Impact: managed jobs pause/block when guidance is unavailable or approval/evidence is missing; unrestricted external engine code capabilities need dedicated hooks before use in strict managed mode. This is a coordinated Orbit + NeuralOps change, not a one-file gateway patch.
+- Next-stage N02-B: actual Hermes/OpenCode enforcement hooks, verified engine-tool coverage, and stronger end-to-end lifecycle/artifact checks. Do not label either gateway guard or optional Docker sandbox as universal enforcement.
+- Planned offline verification: denied/unavailable guard never calls the downstream tool; task/actor mismatch and stale generation rejection; changed arguments/permissions after an approval wait; separate browser/built-in/native/provider paths; coordination bootstrap without recursive authorization; existing dialogs retained; single-use concurrency/consumption and persistence faults; explicit rejection of uncovered engine capabilities. Live engine/Windows/SDK verification would remain separately pending under existing restrictions.
+- N02-A source implementation requires specific approval after this concrete scope is presented. No dependency installs, paid calls, worker/service execution, database mutation, merge or deployment in this investigation.
