@@ -71,7 +71,7 @@ function workersRig(engine = 'hermes', failSnapshot = false) {
   const home = { p: (...a) => '/memory/' + a.join('/'), getAgent: () => agent, updateJob: (_, id, patch) => { const next = { ...jobs.get(id), ...patch }; jobs.set(id, next); return next; }, appendMemory: (_, m) => memories.push(m) };
   const invoke = options => { const d = deferred(); engines.push({ options, resolve: d.resolve }); return d.promise; };
   const hermes = { runTask: (_, __, options) => invoke(options) }, gemini = { runLoop: invoke };
-  const { createWorkers } = load('lib/workers.js', { './persona': { buildAgentPrompt: () => '' }, './checkpoint': { createCard: () => ({ stepCount: 0 }), update() {}, finish() {} }, './tags': { peek: () => [], wrapTask: (_, __, t) => t, markRead() {}, collectFromReport: (_, __, ___, ____, t) => t }, './anomaly': { check() {} }, './jobundo': { begin() {}, snapDir() { if (failSnapshot) throw new Error('snapshot failed'); }, note: (...a) => notes.push(a), diffDir() {}, end() {} }, './jobreport': { makeTrail: () => trail, progressNote: () => '' } });
+  const { createWorkers } = load('lib/workers.js', { './persona': { buildAgentPrompt: () => '' }, './checkpoint': { createCard: () => ({ stepCount: 0, files: [] }), update: () => notes.push('checkpoint'), finish() {} }, './tags': { peek: () => [], wrapTask: (_, __, t) => t, markRead() {}, collectFromReport: (_, __, ___, ____, t) => t }, './anomaly': { check() {} }, './jobundo': { begin() {}, snapDir() { if (failSnapshot) throw new Error('snapshot failed'); }, note: (...a) => notes.push(a), diffDir() {}, end() {} }, './jobreport': { makeTrail: () => trail, progressNote: () => '' } });
   const tools = { declarationsFor: () => [], exec: () => { notes.push('executed'); return { ok: true }; } };
   const workers = createWorkers({ runs, home, bus, getCfg: () => ({}), hermes, gemini, tools });
   const job = id => { const j = { id, agent: 'alex', task: 'make an artifact', status: 'queued' }; jobs.set(id, j); return j; };
@@ -90,8 +90,8 @@ test('real worker lifecycle persists runId, revokes access on stop and ignores o
 });
 test('built-in callbacks and tool closures cannot write checkpoints or run tools after cancellation', async () => {
   const r = workersRig('builtin'), p = r.workers.run(r.agent, r.job('a')), old = r.engines[0].options;
-  old.onStep({ name: 'read' }); r.workers.cancel('alex'); const count = r.notes.length, events = r.events.length;
-  old.onStep({ name: 'write' }); old.onRetry({ status: 429 });
+  old.onStep({ name: 'read' }); old.onCheckpoint({ convo: [] }); r.workers.cancel('alex'); const count = r.notes.length, events = r.events.length;
+  old.onStep({ name: 'write' }); old.onCheckpoint({ convo: [] }); old.onRetry({ status: 429 });
   assert.throws(() => old.exec('write_file', {}), /expired/); assert.equal(r.notes.length, count); assert.equal(r.events.length, events);
   r.engines[0].resolve({ text: 'old success' }); await p; assert.equal(r.jobs.get('a').status, 'cancelled');
 });
