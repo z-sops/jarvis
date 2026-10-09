@@ -9,7 +9,7 @@
   const title = h('h2', {}, 'Laila\u2019s memory'), path = h('div', { class: 'mm-path' }), body = h('div', {});
   const open = h('button', { class: 'mm-btn', type: 'button', onclick: () => bridge.memory.open() }, 'Open the folder');
   const tabs = h('div', { class: 'mm-tabs', role: 'tablist' });
-  const root = h('section', { id: 'memory', 'aria-label': 'Memory' }, h('div', { class: 'mm-wrap' }, h('div', { class: 'mm-head' }, h('div', {}, title, h('p', {}, 'What your assistant knows about you and how she does her work. It is all plain files on your computer: you can read, change or delete anything here. Notes marked with a pin are rules she always keeps in mind.'), path), open), tabs, body));
+  const root = h('section', { id: 'memory', 'aria-label': 'Memory' }, h('div', { class: 'mm-wrap' }, h('div', { class: 'mm-head' }, h('div', {}, title, h('p', {}, 'Read, edit or remove saved notes here. AI notes are unverified; older notes have unknown origin. You can confirm a note as yours and pin it. Notes never grant permission to act.'), path), open), tabs, body));
   document.body.append(root);
 
   async function load() { const r = await bridge.memory.get(); if (!r.ok) return; S.d = r; path.textContent = r.folder; paint(); }
@@ -38,9 +38,9 @@
     const list = h('div', { class: 'mm-notes' }); const items = [...S.d.notes].reverse();
     if (!items.length) list.append(h('div', { class: 'mm-empty' }, 'Nothing yet. When you tell her something to remember, or add a note here, it appears in this list.'));
     for (const n of items) {
-      const tx = h('div', { class: 'tx' }, n.text, n.t ? h('small', {}, n.t) : null);
+      const tx = h('div', { class: 'tx' }, n.text, h('small', {}, [n.t, n.origin === 'user' ? 'Added or confirmed by you' : n.origin === 'model' ? 'AI note: unverified' : 'Older note: origin unknown'].filter(Boolean).join(' · ')));
       list.append(h('div', { class: 'mm-note' + (n.pin ? ' pin' : '') },
-        h('button', { class: 'mm-pin' + (n.pin ? ' on' : ''), type: 'button', title: n.pin ? 'Pinned: always in her mind. Click to unpin' : 'Pin: always keep in her mind', onclick: async () => { const r = await bridge.memory.noteUpdate(n.id, { pin: !n.pin }); if (r.ok) { S.d.notes = r.notes; paint(); } } }, '\uD83D\uDCCC'), tx,
+        h('button', { class: 'mm-pin' + (n.pin ? ' on' : ''), type: 'button', title: n.pin ? 'Pinned: click to unpin' : 'Confirm this note as yours and pin it', onclick: async () => { const r = await bridge.memory.noteUpdate(n.id, { pin: !n.pin }); if (r.ok) { S.d.notes = r.notes; paint(); } } }, '\uD83D\uDCCC'), tx,
         h('button', { class: 'mm-btn', type: 'button', onclick: () => { const inp = h('input', { class: 'mm-in', type: 'text', value: n.text, maxlength: 500 }); tx.replaceWith(inp); inp.focus(); const done = async () => { const r = await bridge.memory.noteUpdate(n.id, { text: inp.value }); if (r.ok) S.d.notes = r.notes; paint(); }; inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(); if (e.key === 'Escape') paint(); }); inp.addEventListener('blur', done); } }, 'Edit'),
         h('button', { class: 'mm-btn danger', type: 'button', onclick: async () => { if (!confirm('Forget this note?')) return; const r = await bridge.memory.noteRemove(n.id); if (r.ok) { S.d.notes = r.notes; paint(); } } }, 'Forget')));
     }

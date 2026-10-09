@@ -14,15 +14,16 @@ test('job skill selection is bounded, relevant and persisted without granting to
   const r = rig(t), lib = new Library(r.home);
   lib.saveSkill({ name: 'React testing', description: 'React component testing', body: 'Check accessible buttons and component behavior.' });
   lib.saveSkill({ name: 'Payroll', description: 'Salary accounting', body: 'Check payroll.' });
+  lib.setAssignment('alex', { skills: ['react-testing'] });
   const c = contracts.build(r.home, r.agent, 'Perform React component testing');
   assert.deepEqual(c.selectedSkills.map(s => s.slug), ['react-testing']); assert.equal(c.selectedSkills[0].selectedBy, 'keyword_match');
-  assert.deepEqual(c.context.approvalRefs, []); assert.equal(lib.assignmentFor('alex').skills.length, 0);
+  assert.deepEqual(c.context.approvalRefs, []); assert.deepEqual(lib.assignmentFor('alex').skills, ['react-testing']);
   const j = r.home.createJob('alex', 'React testing', { contract: c }); assert.match(contracts.prompt(r.home, j), /accessible buttons/);
   lib.saveSkill({ name: 'React testing', body: 'Changed instructions' }); assert.throws(() => contracts.prompt(r.home, j), /changed/);
 });
 test('unknown dependencies and invalid skill/project specifications fail before dispatch', t => {
   const r = rig(t); assert.throws(() => r.workers.dispatch('alex', 'Test', { dependencies: ['job-missing'] }), /existing job/);
-  assert.throws(() => r.workers.dispatch('alex', 'Test', { skills: ['missing'] }), /does not exist/);
+  assert.throws(() => r.workers.dispatch('alex', 'Test', { skills: ['missing'] }), /not given/);
   assert.throws(() => r.workers.dispatch('alex', 'Test', { projectRoot: '../repo' }), /absolute/);
   assert.equal(r.home.listJobs('alex', 99).length, 0);
 });

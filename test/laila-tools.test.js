@@ -15,9 +15,9 @@ test('the tool list is complete and shaped for Gemini', () => {
   assert.deepEqual(d.connector_call.parameters.required, ['tool']); assert.deepEqual(d.use_skill.parameters.required, ['name']);
 });
 
-test('"call me Zee, not Commander": the setting changes, a pinned note is written, and the screen is told', async () => {
+test('"call me Zee, not Commander": the setting changes, a model-origin note is written, and the screen is told', async () => {
   const { cfg, root, events, t, home } = rig(); const r = await t.update_profile({ title: '' }); assert.equal(cfg.userTitle, '', 'no title any more'); assert.equal(cfg.userName, 'Zee'); assert.equal(r.addressAs, 'Zee'); assert.equal(r.was, 'Commander Zee'); assert.deepEqual(events[0], ['profile:changed', { userName: 'Zee', userTitle: '' }]);
-  const notes = new Notes(path.join(root, 'jarvis', 'brain', 'memory', 'notes.md')).list(); assert.equal(notes.length, 1); assert.equal(notes[0].pin, true); assert.match(notes[0].text, /Call the user "Zee"\. No title of any kind: never Commander/);
+  const notes = new Notes(path.join(root, 'jarvis', 'brain', 'memory', 'notes.md')).list(); assert.equal(notes.length, 1); assert.equal(notes[0].pin, false); assert.equal(notes[0].origin, 'model'); assert.match(notes[0].text, /Call the user "Zee"\. No title of any kind: never Commander/);
   const r2 = await t.update_profile({ name: 'Zeeshan', title: 'Boss' }); assert.equal(r2.addressAs, 'Boss Zeeshan'); assert.equal(cfg.userName, 'Zeeshan'); await assert.rejects(t.update_profile({}), /Nothing to change/); await assert.rejects(t.update_profile({ name: '  ' }), /Nothing to change/); assert.equal((await t.update_profile({ name: 'x'.repeat(90) })).addressAs.length <= 24 + 41, true);
 });
 

@@ -550,3 +550,12 @@ Zee asked for his crew to be able to run on OpenCode (opencode.ai), the open-sou
 - Preserve connector permissions, run/identity checks, concurrent human review and persistence failure latches. Older jobs without outcome queues and binding/bootstrap uncertainty need separate reconciliation.
 - Latest: Jarvis381 pass/0 fail/3 real-Hermes skips, 49 focused checks,18 Chromium UI checks,7 actual Linux Electron checks; NeuralOps outcome8/8, managed10/10,gate12/12,persistence14/14. No Windows/live-provider claim.
 - Herdr source was sampled as reference, not installed/embedded or fully audited. Independent exact-revision review/test gates remain open. Record subsequent evidence in project-update.md.
+
+
+## Context trust — Phase 1A/1B, 2026-10-09
+
+- User approved the concrete master-audit proposal for skill authorization and memory origin with “go ahead”. Preserve stack, existing approvals and the feature-duplication prevention gate. No framework integration or ZCode copying.
+- Library.scopeFor/skillsFor/skillFor/readSkillFor unify existing assigned skill access for provider tools and task contracts. Select only authorized metadata; recheck assignment before queued execution; verify persisted instruction fingerprints as well as the current source. Metadata listing does not read deep references. Task/project ACL and complete lazy L1/L2 remain pending.
+- Notes default to model origin, never auto-pin model content. Trusted main-window/main-frame Memory IPC creates/confirms user-origin notes. Unknown old notes remain legacy; no eager disk migration. Model duplicates do not mutate user-origin records. Model profile updates replace only model-origin address notes. Memory search carries origin and unverified status; prompts must not describe AI/legacy notes as user commands or approvals.
+- Provenance markers are editable local files, not cryptographic or OS enforcement. Existing profile setting changes remain their own tool path; this slice does not claim all model preference changes require human confirmation. External-engine containment, full budgets, temporal knowledge and independent verification gates remain open.
+- Verification: 36 focused checks; full suite394 total/391 pass/0 fail/3 real-Hermes skips;19 Playwright fixture checks;7 actual Linux Electron smoke checks;14 JS syntax checks. Windows and live providers unverified. Record publication evidence and future work in project-update.md.

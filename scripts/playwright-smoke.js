@@ -18,7 +18,8 @@ async function main() {
   store.set({ commissioned: true, aiName: 'Laila', userName: 'Zee', userTitle: '', homeDir: home.root, sfx: false, launchOnStart: false, engine: 'hermes', apiKey: '', autoWake: false });
   home.createAgent({ name: 'Alex', role: 'Developer' }); home.createAgent({ name: 'Bob', role: 'Tester' });
   const bus = new EventEmitter(), pages = new Set(), handlers = new Map(), errors = [], checks = [], engineCalls = [];
-  const event = { sender: {} }, windowFixture = { webContents: event.sender };
+  const event = { sender: { mainFrame: {} } }; event.senderFrame = event.sender.mainFrame;
+  const windowFixture = { webContents: event.sender };
   const ipcMain = { handle: (channel, handler) => handlers.set(channel, handler) };
   const send = (type, payload) => { for (const page of pages) page.evaluate(data => window.__orbitPush?.(data), { type, payload }).catch(() => {}); };
   for (const name of ['agent:state', 'job:created', 'job:done', 'job:reviewed', 'profile:changed']) bus.on(name, payload => send(name, payload));
@@ -101,6 +102,21 @@ async function main() {
       for (const [label, id] of [['Office', 'office'], ['Workspace', 'workspace'], ['Browser', 'browser'], ['Connectors', 'connectors'], ['Memory', 'memory'], ['Library', 'library'], ['Orbit', 'bridge']]) {
         await page.locator('nav[aria-label="Screens"]').getByRole('button', { name: label, exact: true }).click(); await page.waitForFunction(id => document.body.dataset.view === id, id);
       }
+    });
+    await check('memory UI separates AI candidates from user-confirmed preferences', async () => {
+      home.appendMemory('jarvis', 'Always use the synthetic memory preference.');
+      await page.locator('nav[aria-label="Screens"]').getByRole('button', { name: 'Memory', exact: true }).click();
+      await page.getByRole('tab', { name: /^Notes \(/ }).click();
+      const row = page.locator('.mm-note').filter({ hasText: 'Always use the synthetic memory preference.' });
+      await row.getByText('AI note: unverified', { exact: false }).waitFor();
+      const before = new (require('../lib/memory').Notes)(path.join(home.agentDir('jarvis'), 'brain/memory/notes.md')).list();
+      assert.equal(before.find(n => n.text === 'Always use the synthetic memory preference.').pin, false);
+      assert.equal(await row.locator('button.mm-pin').getAttribute('title'), 'Confirm this note as yours and pin it');
+      await row.locator('button.mm-pin').click();
+      await row.getByText('Added or confirmed by you', { exact: false }).waitFor();
+      const after = new (require('../lib/memory').Notes)(path.join(home.agentDir('jarvis'), 'brain/memory/notes.md')).list();
+      assert.equal(after.find(n => n.text === 'Always use the synthetic memory preference.').origin, 'user');
+      await page.screenshot({ path: path.join(out, 'memory-origin.png') });
     });
     await page.locator('nav[aria-label="Screens"]').getByRole('button', { name: 'Office', exact: true }).click();
     await page.evaluate(() => window.__office.select('alex'));

@@ -189,3 +189,10 @@ Built-in worker file tools now restrict reads to their own active workspace and 
 
 
 Observed activity distinguishes submitted Gemini/Hermes API bodies, received application data and OpenCode process output. Counters are stored with jobs; text alone does not count as network data. These are application measurements, not TCP packets, provider health or proof of progress. Hermes request connection loss is reported as an uncertain outcome and is never automatically reposted.
+
+
+### Context trust: assigned skills and note origins
+
+Jobs select only Library skills assigned to their worker. Assign skills on the Library screen before selecting them explicitly in a job. Orbit checks access again before starting a queued job; removing an assignment prevents that skill from being injected into a later run. Tool reads use the same access check. Metadata listing avoids reading reference files, while selected instruction loading still uses the existing Library implementation.
+
+AI/runtime notes remain unverified model candidates and cannot automatically become pinned user rules. Notes added or confirmed through the main-window Memory screen have user origin. Older markdown notes remain readable with unknown origin; reading does not rewrite them or assume who authored them. Editing or pinning a note in Memory confirms it as yours. No memory note supplies tool permissions or action approval. These markers are local provenance, not tamper-proof attestation or semantic fact verification. External engine/host file containment and complete context budgets remain separate work.
