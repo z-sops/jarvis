@@ -186,6 +186,8 @@
       if (!window.confirm('Retry this job? Inspect existing files first. An earlier external action may already have happened.')) return Promise.resolve({ ok: true });
       return bridge.jobs.retry(j.id);
     }));
+    const remote = j.remoteOutcomes || [], pendingRemote = remote.some(e => e.delivery !== 'synced');
+    if (bridge.jobs?.syncOutcome && pendingRemote) actions.push(act('Sync NeuralOps outcome', () => bridge.jobs.syncOutcome(j.id)));
     const v = j.verification;
     const evidenceText = v ? v.status === 'files_checked' ? (j.status === 'done' ? 'Requested files checked and accepted by you. Correctness was decided in human review.' : 'Requested files checked. Review their correctness before accepting.') : v.status === 'failed' ? 'Output checks failed: ' + v.issues.map(i => (i.path ? i.path + ': ' : '') + i.reason).join(' ') : j.status === 'done' ? 'You accepted the report. No automatic artifact checks were requested.' : 'Worker report is unverified. Review before accepting.' : '';
     return h('details', { class: 'of-job', 'data-job-id': j.id },
@@ -195,6 +197,7 @@
       j.dependencies?.length ? h('p', {}, 'Prerequisite jobs: ' + j.dependencies.join(', ')) : null,
       j.selectedSkills?.length ? h('p', {}, 'Job skills: ' + j.selectedSkills.map(s => s.slug).join(', ')) : null,
       j.managed ? h('p', {}, 'Managed NeuralOps job' + (j.guidance?.taskId ? ': ' + j.guidance.taskId : ' — waiting for task binding')) : null,
+      remote.length ? h('p', { class: 'of-remote-outcome' }, pendingRemote ? (remote.some(e => e.delivery === 'unknown') ? 'Remote outcome unconfirmed. Inspect NeuralOps before Sync.' : 'Remote outcome pending. Use Sync to record it in NeuralOps.') : 'Outcome recorded in NeuralOps. Local acceptance is a client claim; remote approval and completion remain separate.') : null,
       h('p', {}, j.result ? clip(String(j.result), 700) : j.status === 'running' ? 'Still working on it.' : j.status === 'queued' ? 'Waiting in line.' : 'No report.'),
       j.error ? h('p', {}, j.error) : null, evidenceText ? h('p', {}, evidenceText) : null,
       v && v.artifacts.length ? h('ul', {}, v.artifacts.map(a => h('li', {}, `${a.path} · ${a.bytes} bytes · SHA-256 ${a.sha256.slice(0, 12)}…`))) : null,

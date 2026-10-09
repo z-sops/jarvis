@@ -22,7 +22,8 @@ async function main() {
   const ipcMain = { handle: (channel, handler) => handlers.set(channel, handler) };
   const send = (type, payload) => { for (const page of pages) page.evaluate(data => window.__orbitPush?.(data), { type, payload }).catch(() => {}); };
   for (const name of ['agent:state', 'job:created', 'job:done', 'job:reviewed', 'profile:changed']) bus.on(name, payload => send(name, payload));
-  const workers = createWorkers({ home, bus, getCfg: store.get, gemini: {}, tools: {}, hermes: { runTask: async (agent, task, { signal }) => {
+  let outcomeGuidance = null;
+  const workers = createWorkers({ home, bus, getGuidance: () => outcomeGuidance, getCfg: store.get, gemini: {}, tools: {}, hermes: { runTask: async (agent, task, { signal }) => {
     engineCalls.push({ actor: agent.id, task });
     if (/Wait for cancellation/.test(task)) return new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
     if (/proof\.txt/.test(task)) fs.writeFileSync(home.p('workspace', agent.id, 'proof.txt'), 'Offline fixture artifact.');
@@ -154,6 +155,27 @@ async function main() {
       await page.locator('.of-activity').filter({ hasText: '2 request attempts' }).waitFor();
       assert.equal(await input.inputValue(), 'Keep this draft'); assert.equal(await input.evaluate(el => el === document.activeElement), true);
       assert.match(await page.locator('.of-activity').textContent(), /local Hermes API/); assert.match(await page.locator('.of-activity').textContent(), /no packet measurement/);
+    });
+    await check('managed outcome UI keeps local acceptance separate and explicitly syncs through preload/IPC', async () => {
+      const { randomUUID } = require('node:crypto'), { outcomePatch } = require('../lib/job-outcomes');
+      let j = home.createJob('alex', 'Managed outcome review fixture', { contract: { managed: true } });
+      j = home.updateJob('alex', j.id, { status: 'running', runId: randomUUID() });
+      j = home.updateJob('alex', j.id, { guidance: { version: 'orbit-v1', runId: j.runId, taskId: 'task_ui' } });
+      j = home.updateJob('alex', j.id, outcomePatch(j, { status: 'review', result: 'Offline managed report' }));
+      // Provider boundary is a fixture; renderer, preload, IPC and Workers are real.
+      outcomeGuidance = { sync: async id => { const job = home.findJob(id); return home.updateJob('alex', id, { remoteOutcomes: job.remoteOutcomes.map(e => ({ ...e, delivery: 'synced', ledgerHash: 'a'.repeat(64) })) }); } };
+      send('job:reviewed', { agent: home.getAgent('alex'), job: j });
+      await page.waitForFunction(id => !!document.querySelector('[data-job-id="' + id + '"]'), j.id);
+      const c = await open(j.id); await c.getByText('Remote outcome pending.', { exact: false }).waitFor();
+      await c.getByRole('button', { name: 'Sync NeuralOps outcome', exact: true }).click();
+      await waitText(c, 'remote approval and completion remain separate');
+      await c.locator('summary').click(); await c.getByRole('button', { name: 'Accept result', exact: true }).click();
+      assert.equal(home.findJob(j.id).status, 'done'); assert.equal(home.findJob(j.id).remoteOutcomes[1].payload.state, 'accepted_locally');
+      await c.locator('summary').click(); await c.getByRole('button', { name: 'Sync NeuralOps outcome', exact: true }).click();
+      await waitText(c, 'remote approval and completion remain separate');
+      await c.locator('summary').click(); await page.screenshot({ path: path.join(out, 'office-managed-outcome.png') });
+      assert.equal(home.findJob(j.id).remoteOutcomes.every(e => e.delivery === 'synced'), true);
+      outcomeGuidance = null;
     });
     await check('untrusted report markup is displayed as text', async () => {
       await page.getByLabel('New job task').fill('Untrusted report'); await page.getByLabel('Expected output files').fill(''); await page.getByRole('button', { name: 'Queue job', exact: true }).click();

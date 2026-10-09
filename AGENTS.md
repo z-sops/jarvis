@@ -542,3 +542,11 @@ Zee asked for his crew to be able to run on OpenCode (opencode.ai), the open-sou
 - Separate rendered text, submitted bodies and measured received data. Gemini completed response bodies, local Hermes SSE chunks and OpenCode process output have distinct sources. Do not label them TCP packets or infer a stuck worker from silence. Telemetry failures never change job outcomes. Metrics are generation-fenced and persisted; Office updates them without replacing the focused job form.
 - Hermes must not automatically repost after a fetch connection error: the remote outcome may be unknown. Inspect before explicit retry. No automatic restoration of consumed approvals.
 - Latest validation: 375 total/372 pass/0 fail/3 real-Hermes skips, 30 focused transport/jobreport/run cases, 17 Playwright fixture checks and 7 actual Linux Electron checks. Real Windows/live providers remain unverified. Log all further work in project-update.md.
+
+
+## Managed outcome receipts — 2026-10-09
+
+- Commit local outcome and delivery queue together; fixed act IDs/receipts resolve unknown delivery. Explicit trusted UI Sync only, no startup/automatic replay. Local acceptance remains a worker-reported client claim remotely, never remote approval/attestation/completion. Old servers fail closed.
+- Preserve connector permissions, run/identity checks, concurrent human review and persistence failure latches. Older jobs without outcome queues and binding/bootstrap uncertainty need separate reconciliation.
+- Latest: Jarvis381 pass/0 fail/3 real-Hermes skips, 49 focused checks,18 Chromium UI checks,7 actual Linux Electron checks; NeuralOps outcome8/8, managed10/10,gate12/12,persistence14/14. No Windows/live-provider claim.
+- Herdr source was sampled as reference, not installed/embedded or fully audited. Independent exact-revision review/test gates remain open. Record subsequent evidence in project-update.md.
