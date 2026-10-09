@@ -51,11 +51,18 @@ bus.on('job:storage-error', ({ agent, jobId, error }) => {
 function showWindow() { if (!win) return; if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
 function askUser(req) {
   return new Promise(resolve => {
+    const { signal, ...display } = req;
+    if (signal?.aborted) return resolve('deny');
     const id = Math.random().toString(36).slice(2, 10);
-    pending.set(id, resolve);
+    let settled = false, timer;
+    const settle = answer => { if (settled) return; settled = true; pending.delete(id); clearTimeout(timer); signal?.removeEventListener('abort', expire); resolve(answer); };
+    const expire = () => { if (!settled) { send('permission:expired', { id }); settle('deny'); } };
+    pending.set(id, settle);
     showWindow();
-    send('permission', { id, ...req });
-    setTimeout(() => { if (pending.has(id)) { pending.delete(id); send('permission:expired', { id }); resolve('deny'); } }, 120000);
+    send('permission', { id, ...display });
+    timer = setTimeout(expire, 120000); timer.unref?.();
+    signal?.addEventListener('abort', expire, { once: true });
+    if (signal?.aborted) expire();
   });
 }
 
@@ -76,6 +83,8 @@ const usage = panels.makeUsage({ home });
 const audit = panels.makeAudit({ home, bus });
 gemini.setUsageHook(u => usage.add(u));
 const workers = createWorkers({ home, getCfg: store.get, gemini, tools, bus, hermes, usage, opencode, runs, getGuidance: () => runtime.guidance });
+const qa = require('./lib/job-qa').createQA({ home, workers, ask, bus });
+workers.qaPending = qa.hasPending;
 Object.assign(runtime, { dispatch: workers.dispatch, cancel: workers.cancel, stateOf: workers.stateOf });
 const chat = panels.chatGuard(bus);
 // Orbit Browser: Orbit's own private browser (isolated sessions). Laila uses it through tools, the crew through a local MCP server.
@@ -174,14 +183,14 @@ const publicCfg = () => ({ ...store.get(), voices: VOICES });
 ipcMain.handle('config:get', () => publicCfg());
 ipcMain.handle('config:save', (_e, patch) => {
   const before = store.get();
-  if (patch && patch.homeDir && patch.homeDir !== before.homeDir && workers.hasPending()) throw new Error('Stop or finish crew jobs before changing the home folder.');
+  if (patch && patch.homeDir && patch.homeDir !== before.homeDir && (workers.hasPending() || qa.hasPending())) throw new Error('Stop or finish crew/QA jobs before changing the home folder.');
   const cfg = store.set(patch);
   if (cfg.homeDir !== before.homeDir) { home.root = cfg.homeDir; home.ensure(); home.recoverJobs(); }
   applyLoginItem();
   return { ...cfg, voices: VOICES };
 });
 ipcMain.handle('config:commission', (_e, c) => {
-  if (workers.hasPending()) throw new Error('Stop or finish crew jobs before commissioning a different home folder.');
+  if (workers.hasPending() || qa.hasPending()) throw new Error('Stop or finish crew/QA jobs before commissioning a different home folder.');
   const clean = {
     aiName: String(c.aiName || '').trim().slice(0, 24), gender: c.gender === 'male' ? 'male' : 'female', voice: c.voice, lang: ['mix', 'en', 'ur'].includes(c.lang) ? c.lang : 'mix',
     userName: String(c.userName || '').trim().slice(0, 40), userTitle: String(c.userTitle || 'Commander').trim().slice(0, 24) || 'Commander',
@@ -213,14 +222,14 @@ ipcMain.handle('tool:exec', (_e, name, args) => tools.exec(String(name), args ||
 ipcMain.handle('agents:list', () => home.listAgents().map(a => ({ ...a, ...workers.stateOf(a.id) })));
 ipcMain.handle('agents:create', (_e, a) => tools.exec('create_agent', a, 'commander'));
 // These decisions exist only on the trusted application UI bridge, never in model tool declarations.
-require('./lib/job-control').registerJobControls({ ipcMain, workers,
+require('./lib/job-control').registerJobControls({ ipcMain, workers, qa,
   isTrusted: e => !!win && !win.isDestroyed() && e.sender === win.webContents && e.senderFrame === win.webContents.mainFrame });
 ipcMain.handle('agents:inspect', (_e, id) => {
   const isC = id === COMMANDER; const agent = isC ? { id: COMMANDER, name: store.get().aiName, role: 'Chief of staff' } : home.getAgent(id);
   if (!agent) return null;
   const rd = f => { try { return fs.readFileSync(path.join(home.agentDir(agent.id), f), 'utf8'); } catch { return ''; } };
   const recentJobs = home.listJobs(agent.id, 20);
-  return { agent, activity: workers.activityOf(agent.id) || recentJobs.find(j => j.activity)?.activity || null, folder: home.agentDir(agent.id), soul: rd('brain/soul.md'), skills: home.readSkills(agent.id).map(s => s.name), jobsError: home.recoveryFaults.get(agent.id), jobs: recentJobs.map(j => ({ id: j.id, status: j.status, task: j.task, result: j.result, error: j.error, recoveryNeeded: j.recoveryNeeded, managed: j.managed, guidance: j.guidance, remoteOutcomes: j.remoteOutcomes, expectedOutputs: j.expectedOutputs, verification: j.verification, completionKind: j.completionKind, acceptedAt: j.acceptedAt, dependencies: j.dependencies, workspaceDir: j.workspaceDir, isolation: j.isolation, selectedSkills: (j.selectedSkills || []).map(s => ({ slug: s.slug, selectedBy: s.selectedBy })) })), memory: home.readMemory(agent.id, 600) };
+  return { agent, activity: workers.activityOf(agent.id) || recentJobs.find(j => j.activity)?.activity || null, folder: home.agentDir(agent.id), soul: rd('brain/soul.md'), skills: home.readSkills(agent.id).map(s => s.name), jobsError: home.recoveryFaults.get(agent.id), jobs: recentJobs.map(j => ({ id: j.id, status: j.status, task: j.task, result: j.result, error: j.error, recoveryNeeded: j.recoveryNeeded, managed: j.managed, guidance: j.guidance, remoteOutcomes: j.remoteOutcomes, expectedOutputs: j.expectedOutputs, verification: j.verification, qa: j.qa, reviewTarget: j.reviewTarget, completionKind: j.completionKind, acceptedAt: j.acceptedAt, dependencies: j.dependencies, workspaceDir: j.workspaceDir, isolation: j.isolation, selectedSkills: (j.selectedSkills || []).map(s => ({ slug: s.slug, selectedBy: s.selectedBy })) })), memory: home.readMemory(agent.id, 600) };
 });
 ipcMain.handle('agents:update', (_e, id, patch) => { try { return { ok: true, agent: home.updateAgent(id, patch || {}) }; } catch (e) { return { ok: false, error: e.message }; } });
 ipcMain.handle('hermes:check', async (_e, opts) => { try { return { steps: await hermes.check(opts || {}) }; } catch (e) { return { steps: [{ name: 'Check', ok: false, detail: e.message }] }; } });
@@ -323,7 +332,7 @@ app.whenReady().then(() => {
     }
     if (SHOTS) win.webContents.once('did-finish-load', () => require('./scripts/shots.js')(win, app, { store, home }));
   });
-  app.on('before-quit', () => { quitting = true; workers.cancelAll(); hermes.stopAll(); comms.stop(); try { orbitBrowser.dispose(); } catch {} try { gateway.closeAll(); } catch {} try { sysPanel.stop(); } catch {} });
+  app.on('before-quit', () => { quitting = true; qa.cancel(); workers.cancelAll(); hermes.stopAll(); comms.stop(); try { orbitBrowser.dispose(); } catch {} try { gateway.closeAll(); } catch {} try { sysPanel.stop(); } catch {} });
   app.on('will-quit', () => globalShortcut.unregisterAll());
   require('./lib/diag').install({ app, getDir: () => path.join(store.get().homeDir, 'logs') });
   app.on('window-all-closed', () => { if (SHOTS) app.quit(); /* otherwise stay alive in the tray */ });

@@ -15,7 +15,8 @@ async function main() {
   for (const j of [accepted, missing, report, rejected]) home.updateJob('alex', j.id, { verification: review.evidence(home, 'alex', j) });
   const projectRoot = path.join(temp, 'project'); fs.mkdirSync(projectRoot);
   const git = args => require('child_process').execFileSync('git', args, { cwd: projectRoot, stdio: ['ignore', 'pipe', 'pipe'] });
-  git(['init']); fs.writeFileSync(path.join(projectRoot, 'code.txt'), 'Fixture code'); git(['add', 'code.txt']);
+  git(['init']); fs.writeFileSync(path.join(projectRoot, 'code.txt'), 'Fixture code');
+  fs.writeFileSync(path.join(projectRoot, 'check.test.cjs'), "const {test}=require('node:test');test('fixture',()=>{});\n"); git(['add', '.']);
   git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'Fixture']);
   const projectJob = make('Project fingerprint fixture', 'review', ['code.txt']);
   const isolated = await require('../lib/job-contract').prepareWorkspace(home, 'alex', { ...projectJob, projectRoot });
@@ -56,6 +57,24 @@ async function main() {
       fs.writeFileSync(path.join(isolated.workspaceDir, 'unlisted.txt'), 'Changed after report');
       const result = await page.evaluate(id => bridge.jobs.review(id, 'accept'), projectJob.id);
       assert.equal(result.ok, false); assert.match(result.error, /project revision changed/); assert.equal(home.findJob(projectJob.id).status, 'review');
+    });
+    await check('QA host tests require real UI permission and bind passing evidence to candidate contents', async () => {
+      assert.equal((await page.evaluate(id => bridge.jobs.configureQA(id, ['check.test.cjs']), projectJob.id)).ok, true);
+      await page.evaluate(id => { window.__qaRun = bridge.jobs.runQATests(id); }, projectJob.id);
+      await page.getByRole('alertdialog').waitFor();
+      await page.screenshot({ path: path.join(out, 'qa-test-approval.png'), fullPage: true });
+      await page.getByRole('button', { name: 'Deny', exact: true }).click();
+      assert.equal((await page.evaluate(() => window.__qaRun)).job.qa.test.status, 'denied');
+      await page.evaluate(id => { window.__qaRun = bridge.jobs.runQATests(id); }, projectJob.id);
+      await page.getByRole('alertdialog').waitFor();
+      assert.ok((await page.evaluate(() => bridge.stop.busy())).crew > 0);
+      await page.getByRole('button', { name: 'Allow once', exact: true }).click();
+      const result = await page.evaluate(() => window.__qaRun); assert.equal(result.ok, true); assert.equal(result.job.qa.test.status, 'passed'); assert.equal(result.job.qa.test.tests, 1);
+      const blocked = await page.evaluate(id => bridge.jobs.review(id, 'accept'), projectJob.id); assert.equal(blocked.ok, false); assert.match(blocked.error, /independently executed/);
+      const card = page.locator('[data-job-id="' + projectJob.id + '"]');
+      if (!(await card.evaluate(el => el.open))) await card.locator('summary').click();
+      await card.getByText(/Host tests: passed/).waitFor();
+      await page.screenshot({ path: path.join(out, 'qa-evidence.png'), fullPage: true });
     });
     await check('human rejection and invalid dispatch use real main-process handlers', async () => {
       assert.equal((await page.evaluate(id => bridge.jobs.review(id, 'reject'), rejected.id)).ok, true);

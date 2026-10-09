@@ -182,6 +182,18 @@
     } }, label);
     const actions = [];
     if (bridge.jobs && j.status === 'review') actions.push(act('Accept result', () => bridge.jobs.review(j.id, 'accept')), act('Reject result', () => bridge.jobs.review(j.id, 'reject')));
+    if (bridge.jobs?.configureQA && j.status === 'review' && j.isolation === 'git_worktree') {
+      actions.push(act(j.qa?.required ? 'Select QA test files' : 'Enable QA gate', () => {
+        const files = window.prompt('Workspace-relative JavaScript test files, one per line. Running them later requires approval and uses your OS permissions.', (j.qa?.tests || []).join('\n'));
+        return files === null ? Promise.resolve({ ok: true }) : bridge.jobs.configureQA(j.id, files.split(/\r?\n/).map(s => s.trim()).filter(Boolean));
+      }));
+      if (j.qa?.tests?.length) {
+        actions.push(act('Queue independent review', () => {
+          const actor = window.prompt('Choose another existing worker by name or ID. The reviewer receives a separate source snapshot.');
+          return actor === null ? Promise.resolve({ ok: true }) : bridge.jobs.queueQAReview(j.id, actor.trim());
+        }), act('Run QA tests (ask first)', () => bridge.jobs.runQATests(j.id)), act('Stop QA tests', async () => { await bridge.stop.agent(j.agent); return { ok: true }; }));
+      }
+    }
     if (bridge.jobs && (['interrupted', 'failed', 'cancelled', 'rejected'].includes(j.status) || j.status === 'queued' && j.recoveryNeeded)) actions.push(act('Retry job', () => {
       if (!window.confirm('Retry this job? Inspect existing files first. An earlier external action may already have happened.')) return Promise.resolve({ ok: true });
       return bridge.jobs.retry(j.id);
@@ -195,6 +207,8 @@
       h('p', { class: 'of-job-state' }, jobLabel(j)),
       j.workspaceDir ? h('p', {}, 'Isolated project folder: ' + j.workspaceDir) : null,
       v?.revision ? h('p', {}, 'Project content fingerprint: ' + v.revision.sha256.slice(0, 16) + ' · ' + v.revision.files + ' files. This is not independent QA evidence.') : null,
+      j.qa?.required ? h('p', {}, 'QA gate required. Reviewer: ' + (j.qa.reviewJobId || 'not queued') + '. Host tests: ' + (j.qa.test?.status || 'not run') + '. Human acceptance is still required.') : null,
+      j.reviewTarget ? h('p', {}, 'Independent review of ' + j.reviewTarget.jobId + '. Candidate source is in source/. Your review report needs human acceptance.') : null,
       j.dependencies?.length ? h('p', {}, 'Prerequisite jobs: ' + j.dependencies.join(', ')) : null,
       j.selectedSkills?.length ? h('p', {}, 'Job skills: ' + j.selectedSkills.map(s => s.slug).join(', ')) : null,
       j.managed ? h('p', {}, 'Managed NeuralOps job' + (j.guidance?.taskId ? ': ' + j.guidance.taskId : ' — waiting for task binding')) : null,

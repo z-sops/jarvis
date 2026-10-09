@@ -22,6 +22,12 @@ This register describes verified boundaries, not overall production readiness. E
 | Typed lifecycle checkpoint | Partially implemented; runtime path verified | Full goal, lifecycle plan/current stage, preserved decision records, actor/job/run/revision, files and reported-complete/failed/unknown tool outcomes survive checkpoint projection. Empty approvalRefs prevents inherited grants. This is not generated project planning, complete typed approval provenance, temporal truth or native internal history restoration. |
 | Built-in worker model/key overrides | Implemented and verified offline | Explicit built-in workers use their selected Gemini model/key without changing commander defaults. Async scope preserves those fields in nested Gemini generation during that loop; parallel scopes tested. Unsupported built-in provider fails before engine execution. This does not complete capability/cost routing or live model discovery. |
 
+## Independent QA slice
+
+| Capability | Status | Evidence and boundary |
+| --- | --- | --- |
+| Revision-bound independent review and Node host tests | Implemented and verified offline within Node scope | Different reviewer worker, source snapshot, human-accepted structured verdict, unchanged artifact/source, current candidate fingerprint, actual host Node declared-test result, and separate final human acceptance. Existing job store/queue/permission flow reused. Storage-fault linkage, denial/Stop/deadline/restart, stale code, empty/skipped/forged/excessive output tested. Actual Electron approval/busy/test/acceptance block verified. Reviewer model quality, meaningful test coverage, native containment, other languages and Windows execution remain unverified/incomplete. |
+
 ## Remaining engineering work
 
 These items need further implementation or a separate end-to-end proof; they must not be relabelled as merely waiting for user credentials.
@@ -29,7 +35,7 @@ These items need further implementation or a separate end-to-end proof; they mus
 | Priority | Gap | Required completion evidence |
 | --- | --- | --- |
 | P0 | Complete typed continuation state | Persist and restore goal, plan, current step, decisions, outcomes and approval provenance; ambiguous effects must not replay. Existing checkpoint manifests are a foundation. |
-| P0 | Independent revision-bound QA | Different reviewer identity, review and tests bound to exact revision; changed revision invalidates evidence; human acceptance remains distinct. Existing artifact hashes/human review do not establish this whole pipeline. |
+| P0 | Broader independent QA coverage and containment | Node host-test gate and separate reviewer identity/snapshot are implemented and verified offline. Still prove real reviewer quality, useful test coverage, supported non-Node commands/languages, Windows termination and native containment. Fingerprints exclude ignored files/Git metadata and are not atomic OS snapshots. |
 | P0 | Cross-engine enforcement | Prove every relevant native action reaches the intended permission/run/managed gate; contain bypass paths. Git worktrees/profile folders are not OS sandboxes. |
 | P1 | Complete Laila orchestration | Structured feasibility/team sizing, dependencies, contradiction handling, artifact-aware progress and robust stuck-worker handling. Do not infer these from prompts alone. |
 | P1 | Reliable capability/cost router | Verified availability/authentication, capability matching, bounded fallback and safe continuity across providers. Existing routing and health adapters are partial foundations. |

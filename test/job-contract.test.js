@@ -97,7 +97,7 @@ test('project acceptance fingerprints unlisted code, deletions and new files, no
   fs.writeFileSync(path.join(saved.workspaceDir,'extra.txt'),'new unlisted code');assert.throws(()=>r.workers.decideReview(j.id,'accept'),/project revision changed/);
   fs.unlinkSync(path.join(saved.workspaceDir,'source.txt'));assert.throws(()=>r.workers.decideReview(j.id,'accept'),/project revision changed/);
   const now=r.home.findJob(j.id);assert.notEqual(now.verification.revision.sha256,saved.verification.revision.sha256);
-  assert.equal(r.workers.decideReview(j.id,'accept').acceptedBy,'human');
+  assert.throws(()=>r.workers.decideReview(j.id,'accept'),/QA gate/);
   assert.equal(review.revisionEvidence(r.home,'alex',saved).sha256,now.verification.revision.sha256);
 });
 test('project fingerprint accepts empty source files, excludes ignored data explicitly and fails on links', t => {
