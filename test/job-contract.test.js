@@ -86,3 +86,22 @@ test('handoff destination links and secret artifacts are refused before copying'
   fs.writeFileSync(r.home.p('workspace', 'alex', '.env'), 'fixture-only'); r.home.updateJob('alex', parent.id, { verification: { artifacts: [{ path: '.env', ...review.inspectOutput(r.home, 'alex', '.env') }] } });
   assert.throws(() => contracts.prepareHandoffs(r.home, 'bob', child), /Secret files/);
 });
+
+test('project acceptance fingerprints unlisted code, deletions and new files, not only requested artifacts', async t => {
+  const r=rig(t,async(_a,_task,o)=>{fs.writeFileSync(path.join(o.cfgOverride.workspaceDir,'proof.txt'),'artifact');return 'Review changes';}),p=repo(r);
+  const done=settled(r),j=r.workers.dispatch('alex','Build',{projectRoot:p.dir,expectedOutputs:['proof.txt']});await done;
+  const saved=r.home.findJob(j.id),review=require('../lib/job-review');assert.ok(saved.verification.revision.sha256);assert.equal(saved.verification.revision.files,2);
+  fs.writeFileSync(path.join(saved.workspaceDir,'source.txt'),'changed after report');
+  assert.throws(()=>r.workers.decideReview(j.id,'accept'),/project revision changed/);assert.equal(r.home.findJob(j.id).status,'review');
+  // The blocked attempt records a fresh fingerprint for an explicit second human review.
+  fs.writeFileSync(path.join(saved.workspaceDir,'extra.txt'),'new unlisted code');assert.throws(()=>r.workers.decideReview(j.id,'accept'),/project revision changed/);
+  fs.unlinkSync(path.join(saved.workspaceDir,'source.txt'));assert.throws(()=>r.workers.decideReview(j.id,'accept'),/project revision changed/);
+  const now=r.home.findJob(j.id);assert.notEqual(now.verification.revision.sha256,saved.verification.revision.sha256);
+  assert.equal(r.workers.decideReview(j.id,'accept').acceptedBy,'human');
+  assert.equal(review.revisionEvidence(r.home,'alex',saved).sha256,now.verification.revision.sha256);
+});
+test('project fingerprint accepts empty source files, excludes ignored data explicitly and fails on links', t => {
+  const r=rig(t),p=repo(r),review=require('../lib/job-review');fs.writeFileSync(path.join(p.dir,'empty.txt'),'');fs.writeFileSync(path.join(p.dir,'.gitignore'),'ignored.txt\n');
+  const job={workspaceDir:p.dir,isolation:'git_worktree'};const before=review.revisionEvidence(r.home,'alex',job);fs.writeFileSync(path.join(p.dir,'ignored.txt'),'excluded runtime data');assert.equal(review.revisionEvidence(r.home,'alex',job).sha256,before.sha256);
+  fs.symlinkSync(path.join(p.dir,'source.txt'),path.join(p.dir,'link.txt'));assert.throws(()=>review.revisionEvidence(r.home,'alex',job),/Symbolic links/);
+});

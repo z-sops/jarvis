@@ -225,3 +225,14 @@ Existing `read_file` and Files `read_text_file` tools support bounded UTF-8 byte
 Built-in requests may omit older successful `read_file` data from the outgoing request copy while preserving the original conversation and latest two reads. Goals, model text, calls, signatures and effect results are retained; the existing 128 KiB byte ceiling still blocks requests that cannot fit. Omitted data may need to be read again; its digest is not a verified or retrievable snapshot. This is partial compaction, not complete state reconstruction or token budgeting.
 
 Current scope and remaining engineering gaps: [gap register](docs/gap-register.md). User-machine/live-service checks: [verification checklist](docs/user-verification.md).
+
+
+## Review freshness and worker execution deadlines
+
+Project jobs now bind review evidence to Git HEAD and a bounded manifest of tracked/nonignored untracked contents, not just requested output files. Changes, additions or deletions invalidate the prior fingerprint and block acceptance. The blocked attempt records fresh evidence for another explicit human review. Evidence collection refuses symlinks and projects above2000 files/64MiB total/8MiB per file; ignored files/Git metadata are outside this boundary. This detects stale content; it is not independent QA or an atomic OS snapshot.
+
+Settings → **Worker deadline (seconds)** defaults to1800, range1–86400. Timeout fails the job without replay; Stop cancels it. Orbit releases its engine wait even when a provider ignores AbortSignal and fences late callbacks. Native process termination still depends on the engine; inspect prior effects before retrying. Dependency waiting keeps its separate30-minute bound. The timer does not keep a quitting process alive.
+
+Job context now carries runtime lifecycle stages, full goal, decisions, run binding and next action. Checkpoints include files and known/failed/unknown tool outcomes; permission grants are never restored. This lifecycle plan is not a generated project plan, and model/tool reports remain unverified.
+
+Explicit **Built-in** agent overrides now select that worker's Gemini model/key; nested Gemini calls during the loop retain the same scope. Commander settings are not mutated. Other providers require a compatible native engine. These fixes do not complete the availability/cost router.

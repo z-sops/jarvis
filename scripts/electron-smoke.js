@@ -13,6 +13,14 @@ async function main() {
   const missing = make('Missing artifact', 'review', ['missing.txt']), report = make('Report only', 'review'), rejected = make('Reject this report', 'review');
   fs.writeFileSync(home.p('workspace', 'alex', 'proof.txt'), 'Fixture artifact');
   for (const j of [accepted, missing, report, rejected]) home.updateJob('alex', j.id, { verification: review.evidence(home, 'alex', j) });
+  const projectRoot = path.join(temp, 'project'); fs.mkdirSync(projectRoot);
+  const git = args => require('child_process').execFileSync('git', args, { cwd: projectRoot, stdio: ['ignore', 'pipe', 'pipe'] });
+  git(['init']); fs.writeFileSync(path.join(projectRoot, 'code.txt'), 'Fixture code'); git(['add', 'code.txt']);
+  git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'Fixture']);
+  const projectJob = make('Project fingerprint fixture', 'review', ['code.txt']);
+  const isolated = await require('../lib/job-contract').prepareWorkspace(home, 'alex', { ...projectJob, projectRoot });
+  const projectReady = home.updateJob('alex', projectJob.id, isolated);
+  home.updateJob('alex', projectJob.id, { verification: review.evidence(home, 'alex', projectReady) });
   fs.writeFileSync(path.join(temp, 'settings.json'), JSON.stringify({ commissioned: true, aiName: 'Laila', userName: 'Fixture', homeDir: home.root, launchOnStart: false, sfx: false, autoWake: false, apiKey: '', workerApiKey: '', engine: 'builtin' }));
   const boot = path.join(temp, 'boot.cjs');
   fs.writeFileSync(boot, `require.cache[require.resolve(${JSON.stringify(path.join(root, 'scripts/shots.js'))})]={exports:()=>{}};require(${JSON.stringify(path.join(root, 'main.js'))});`);
@@ -39,6 +47,16 @@ async function main() {
       for (const j of [accepted, report]) assert.equal((await page.evaluate(id => bridge.jobs.review(id, 'accept'), j.id)).ok, true);
       assert.equal(home.findJob(accepted.id).completionKind, 'human_accepted_files'); assert.equal(home.findJob(report.id).verification.status, 'unverified');
     });
+    await check('project fingerprint is visible and blocks unlisted changes through real IPC', async () => {
+      await page.locator('nav[aria-label="Screens"]').getByRole('button', { name: 'Office', exact: true }).click();
+      await page.evaluate(() => window.__office.select('alex'));
+      const card = page.locator('[data-job-id="' + projectJob.id + '"]'); await card.locator('summary').click();
+      await card.getByText(/Project content fingerprint:/).waitFor();
+      await page.screenshot({ path: path.join(out, 'project-fingerprint.png'), fullPage: true });
+      fs.writeFileSync(path.join(isolated.workspaceDir, 'unlisted.txt'), 'Changed after report');
+      const result = await page.evaluate(id => bridge.jobs.review(id, 'accept'), projectJob.id);
+      assert.equal(result.ok, false); assert.match(result.error, /project revision changed/); assert.equal(home.findJob(projectJob.id).status, 'review');
+    });
     await check('human rejection and invalid dispatch use real main-process handlers', async () => {
       assert.equal((await page.evaluate(id => bridge.jobs.review(id, 'reject'), rejected.id)).ok, true);
       assert.equal(home.findJob(rejected.id).status, 'rejected');
@@ -47,13 +65,16 @@ async function main() {
     });
     await check('request cap setting saves through actual UI and rejects invalid real IPC input', async () => {
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerMaxRequests: 0 })), /integer/);
+      await assert.rejects(page.evaluate(() => bridge.config.save({ workerTimeoutSeconds: 0 })), /integer/);
       await page.evaluate(() => window.__ui.openSettings());
-      const input = page.getByRole('spinbutton'); await input.fill('2');
+      const input = page.getByRole('spinbutton', { name: 'Built-in requests per job' }); await input.fill('2');
+      await page.getByRole('spinbutton', { name: 'Worker deadline (seconds)' }).fill('30');
       await page.screenshot({ path: path.join(out, 'request-cap-settings.png'), fullPage: true });
       await page.getByRole('button', { name: 'Save', exact: true }).click();
       await page.waitForFunction(() => !document.querySelector('.settings'));
       assert.equal((await page.evaluate(() => bridge.config.get())).workerMaxRequests, 2);
       assert.equal(JSON.parse(fs.readFileSync(path.join(temp, 'settings.json'), 'utf8')).workerMaxRequests, 2);
+      assert.equal((await page.evaluate(() => bridge.config.get())).workerTimeoutSeconds, 30);
     });
     await check('accepted state survives a real renderer reload without exceptions', async () => {
       await page.reload(); await page.waitForFunction(() => document.body.classList.contains('revealed'));

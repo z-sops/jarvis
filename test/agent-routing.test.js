@@ -80,3 +80,13 @@ test('home.updateAgent rejects an unknown agent', () => {
   const home = new Home(path.join(dir, 'BridgeHome')).ensure();
   assert.throws(() => home.updateAgent('no-such-agent', { engine: 'opencode' }), /Unknown agent/);
 });
+
+test('explicit built-in workers honor separate Gemini keys/models without mutating commander defaults', async t => {
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-builtin-model-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const home=new Home(root).ensure(),bus=new EventEmitter(),seen=[];
+  const shared={engine:'hermes',apiKey:'COMMANDER_FIXTURE',textModel:'commander-model'};
+  for(const name of ['Alex','Bob']){home.createAgent({name});home.updateAgent(name.toLowerCase(),{engine:'builtin',workerProvider:'gemini',workerModel:name+'-model',workerApiKey:name+'-key'});}
+  const workers=createWorkers({home,bus,getCfg:()=>shared,tools:{declarationsFor:()=>[]},gemini:{runLoop:async o=>{seen.push({actor:o.agentId,key:o.cfg.apiKey,model:o.cfg.textModel});return {text:'Review report'};}}});t.after(()=>workers.cancelAll());
+  await Promise.all(home.listAgents().map(a=>workers.run(a,home.createJob(a.id,'Inspect'))));
+  assert.deepEqual(seen.sort((a,b)=>a.actor.localeCompare(b.actor)),[{actor:'alex',key:'Alex-key',model:'Alex-model'},{actor:'bob',key:'Bob-key',model:'Bob-model'}]);assert.equal(shared.apiKey,'COMMANDER_FIXTURE');assert.equal(shared.textModel,'commander-model');
+  const a=home.updateAgent('alex',{workerProvider:'custom'}),j=home.createJob('alex','Unsupported provider');await workers.run(a,j);assert.equal(home.findJob(j.id).status,'failed');assert.match(home.findJob(j.id).error,/Gemini only/);assert.equal(seen.length,2);
+});

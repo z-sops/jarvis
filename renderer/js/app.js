@@ -200,6 +200,7 @@
       f('Crew provider', sel('workerProvider', [['gemini', 'Google Gemini'], ['openrouter', 'OpenRouter'], ['anthropic', 'Anthropic'], ['openai', 'OpenAI'], ['custom', 'Custom endpoint']])),
       f('Crew model', inp('workerModel', { placeholder: 'blank = the Gemini thinking model' }), 'Use a strong tool-calling model for coding.'),
       f('Built-in requests per job', inp('workerMaxRequests', { type: 'number', min: 1, max: 500, step: 1 }), 'Counts model submissions, including retries and fallback. Does not cap Hermes/OpenCode, tokens or billing.'),
+      f('Worker deadline (seconds)', inp('workerTimeoutSeconds', { type: 'number', min: 1, max: 86400, step: 1 }), 'Stops Orbit waiting after this execution limit. Inspect prior effects before retrying; external process termination depends on the engine.'),
       f('Crew API key', inp('workerApiKey', { type: 'password', autocomplete: 'off', placeholder: 'blank = reuse Gemini key' })),
       f('Custom base URL', inp('workerBaseUrl', { placeholder: 'https://.../v1' }), 'Only for the custom provider.'),
       h('div', { class: 'set-test' }, h('button', { class: 'btn ghost', onclick: async () => {

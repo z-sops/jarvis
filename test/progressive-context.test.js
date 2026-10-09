@@ -182,3 +182,11 @@ test('Files tail reads the actual end of a large file instead of the end of its 
   const provider=new FilesProvider({roots:[root]});assert.equal(provider.t_read_text_file({path:file,tail:1}),'FINAL_CANARY');assert.equal(provider.t_read_text_file({path:file,head:1}),'FIRST_CANARY');
   assert.throws(()=>provider.t_read_text_file({path:file,head:1,tail:1}),/not both/);assert.throws(()=>provider.t_read_text_file({path:file,tail:0}),/integer/);
 });
+
+test('nested Gemini calls keep parallel worker model/key scopes instead of borrowing commander credentials', async t => {
+  const g=require('../lib/gemini'),old=global.fetch; t.after(()=>{global.fetch=old;});const seen=[];
+  global.fetch=async(url,options)=>{const body=JSON.parse(options.body);seen.push({key:options.headers['x-goog-api-key'],model:/models\/([^:]+)/.exec(String(url))[1]});return new Response(JSON.stringify({candidates:[{content:{role:'model',parts:body.contents.length?[{functionCall:{name:'nested',args:{}}}]:[{text:'nested result'}]}}]}),{status:200});};
+  const shared={apiKey:'COMMANDER_FIXTURE',textModel:'commander-model'};
+  await Promise.all(['Alex','Bob'].map(name=>g.runLoop({cfg:{apiKey:name+'-key',textModel:name+'-model'},system:'Fixture',contents:[{role:'user',parts:[{text:'Goal'}]}],maxSteps:1,exec:async()=>{await new Promise(r=>setTimeout(r,name==='Alex'?5:1));await g.generate(shared,{contents:[]});return {ok:true};}})));
+  for(const name of ['Alex','Bob'])assert.equal(seen.filter(s=>s.key===name+'-key'&&s.model===name+'-model').length,2);assert.equal(seen.some(s=>s.key==='COMMANDER_FIXTURE'),false);assert.equal(shared.apiKey,'COMMANDER_FIXTURE');
+});

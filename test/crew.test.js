@@ -88,3 +88,19 @@ test('50 configured workers drain 100 queued jobs with per-worker identity/model
   for(const rec of records){const i=rec.actor.match(/-(\d+)$/)[1];assert.equal(rec.model,'fixture-model-'+i);}
   assert.equal(workers.hasPending(),false);
 });
+
+test('deadline settles a signal-ignoring native worker, releases queue and fences late callbacks', {timeout:5000}, async t => {
+  const fs=require('fs'),os=require('os'),path=require('path'),{Home}=require('../lib/home'),{EventEmitter}=require('events');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-deadline-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const home=new Home(root).ensure();home.createAgent({name:'Alex'});const bus=new EventEmitter(),done=[],progress=[];let firstOptions,finishFirst,calls=0;
+  const workers=require('../lib/workers').createWorkers({home,bus,jobTimeoutMs:100,getCfg:()=>({engine:'hermes'}),tools:{},gemini:{},hermes:{runTask:async(_a,_task,o)=>{calls++;if(calls===1){firstOptions=o;return new Promise(resolve=>{finishFirst=resolve;});}return 'Second report';}}});t.after(()=>workers.cancelAll());
+  let resolveDone;const all=new Promise(resolve=>{resolveDone=resolve;});bus.on('job:done',e=>{done.push(e.job);if(done.length===2)resolveDone();});bus.on('job:progress',e=>progress.push(e));
+  const a=workers.dispatch('alex','Hang'),b=workers.dispatch('alex','Next');await all;
+  assert.equal(home.findJob(a.id).status,'failed');assert.match(home.findJob(a.id).error,/deadline exceeded/);assert.equal(firstOptions.signal.aborted,true);assert.equal(home.findJob(b.id).status,'review');assert.equal(calls,2);assert.equal(workers.hasPending(),false);
+  const count=progress.length;firstOptions.onProgress({tool:'late',status:'running',label:'forged success'});finishFirst('Late success');await new Promise(resolve=>setTimeout(resolve,20));assert.equal(progress.length,count);assert.equal(home.findJob(a.id).status,'failed');
+});
+test('Stop settles a signal-ignoring built-in model without accepting its late result', {timeout:5000}, async t => {
+  const fs=require('fs'),os=require('os'),path=require('path'),{Home}=require('../lib/home'),{EventEmitter}=require('events');const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-stop-hang-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const home=new Home(root).ensure();home.createAgent({name:'Alex'});const bus=new EventEmitter();let start,finish,opts;
+  const begun=new Promise(resolve=>{start=resolve;});const workers=require('../lib/workers').createWorkers({home,bus,getCfg:()=>({engine:'builtin'}),tools:{declarationsFor:()=>[]},gemini:{runLoop:o=>{opts=o;start();return new Promise(resolve=>{finish=resolve;});}}});t.after(()=>workers.cancelAll());
+  const stopped=new Promise(resolve=>bus.once('job:done',resolve)),j=workers.dispatch('alex','Wait');await begun;workers.cancel('alex');await stopped;assert.equal(home.findJob(j.id).status,'cancelled');assert.equal(workers.hasPending(),false);
+  opts.onCheckpoint({convo:[]});finish({text:'Late success'});await new Promise(resolve=>setTimeout(resolve,20));assert.equal(home.findJob(j.id).status,'cancelled');assert.equal(require('../lib/checkpoint').load(home,j.id),null);
+});

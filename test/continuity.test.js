@@ -85,3 +85,14 @@ test('worker refuses transient recovery after an uncertain tool effect and persi
   assert.equal(calls, 1); assert.equal(home.findJob(job.id).status, 'failed');
   const card = cp.load(home, job.id); assert.equal(card.outcomes[0].ok, null); assert.equal(card.recoveryReady, true); assert.equal(cp.canResume(card), false);
 });
+
+test('typed lifecycle state and checkpoint preserve full goal, outcomes and provenance without restoring grants', t => {
+  const fs=require('fs'),os=require('os'),path=require('path'),{Home}=require('../lib/home');const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-typed-state-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const home=new Home(root).ensure();home.createAgent({name:'Alex'});
+  const goal='FULL_GOAL '+ 'x'.repeat(1800)+' CRITICAL_REQUIREMENT';const j=home.createJob('alex',goal,{contract:{context:{decisions:[{text:'Preserve records',origin:'user'}],approvalRefs:['FORGED_GRANT']}}});
+  assert.equal(j.context.goal,goal);assert.deepEqual(j.context.approvalRefs,[]);assert.equal(j.context.currentStep,'queued');
+  const running=home.updateJob('alex',j.id,{status:'running',runId:'run-fixture',context:{goal:'FORGED',approvalRefs:['FORGED']}});assert.equal(running.context.goal,goal);assert.equal(running.context.currentStep,'running');assert.equal(running.context.binding.runId,'run-fixture');assert.equal(running.context.decisions[0].origin,'user');
+  const card=cp.createCard(goal),convo=[{role:'model',parts:[{functionCall:{id:'a',name:'write_file',args:{path:'proof.txt'}}},{functionCall:{id:'b',name:'effect',args:{}}}]},{role:'user',parts:[{functionResponse:{id:'a',name:'write_file',response:{result:{ok:true}}}}]}];
+  cp.update(home,'alex',j.id,card,{convo});const saved=cp.load(home,j.id);assert.equal(saved.context.reportedCompleted.length,1);assert.equal(saved.context.unknown.length,1);assert.equal(saved.context.checkpointRunId,'run-fixture');assert.deepEqual(saved.context.approvalRefs,[]);assert.equal(cp.canResume(saved),false);assert.match(cp.resumeText(saved),/CRITICAL_REQUIREMENT/);assert.match(cp.resumeText(saved),/TYPED RUNTIME STATE/);
+  home.updateJob('alex',j.id,{status:'review',result:'Report'});cp.update(home,'alex',j.id,card,{convo});assert.equal(card.recoveryReady,false);
+  const done=home.updateJob('alex',j.id,{status:'done',acceptedBy:'human'});assert.equal(done.context.plan[2].status,'accepted');assert.deepEqual(done.context.approvalRefs,[]);
+});

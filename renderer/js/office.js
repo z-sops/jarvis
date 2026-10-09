@@ -194,6 +194,7 @@
       h('summary', {}, dot(jobTone(j.status)), h('span', {}, clip(String(j.task || ''), 70))),
       h('p', { class: 'of-job-state' }, jobLabel(j)),
       j.workspaceDir ? h('p', {}, 'Isolated project folder: ' + j.workspaceDir) : null,
+      v?.revision ? h('p', {}, 'Project content fingerprint: ' + v.revision.sha256.slice(0, 16) + ' · ' + v.revision.files + ' files. This is not independent QA evidence.') : null,
       j.dependencies?.length ? h('p', {}, 'Prerequisite jobs: ' + j.dependencies.join(', ')) : null,
       j.selectedSkills?.length ? h('p', {}, 'Job skills: ' + j.selectedSkills.map(s => s.slug).join(', ')) : null,
       j.managed ? h('p', {}, 'Managed NeuralOps job' + (j.guidance?.taskId ? ': ' + j.guidance.taskId : ' — waiting for task binding')) : null,
