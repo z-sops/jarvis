@@ -186,6 +186,8 @@
     const voiceSel = h('select'); const fillVoices = () => { voiceSel.replaceChildren(...cfg.voices[d.gender].map(v => h('option', { value: v.id, selected: v.id === d.voice }, `${v.id} · ${v.note}`))); if (!cfg.voices[d.gender].some(v => v.id === d.voice)) d.voice = cfg.voices[d.gender][0].id; }; fillVoices(); voiceSel.addEventListener('change', () => (d.voice = voiceSel.value));
     const chk = (k, label) => { const i = h('input', { type: 'checkbox', checked: !!d[k] }); i.addEventListener('change', () => (d[k] = i.checked)); return h('label', { class: 'check inline' }, i, h('span', {}, label)); };
     const err = h('p', { class: 'ob-err', role: 'alert' }); const testOut = h('div', { class: 'steps' });
+    const rates = h('textarea', { rows: 3 }); rates.value = JSON.stringify(d.workerModelRates || {});
+    const models = h('input', { value: (d.workerAllowedModels || []).join(', ') });
     const body = h('div', { class: 'set-grid' },
       f('AI name', inp('aiName', { maxlength: 24 })), f('Gender', sel('gender', [['female', 'Female'], ['male', 'Male']], fillVoices)), f('Voice', voiceSel), f('Language', sel('lang', [['mix', 'Roman Urdu + English'], ['en', 'English'], ['ur', 'اردو']])),
       f('How I talk', sel('style', [['formal', 'Formal and polite'], ['casual', 'Casual, like a friend'], ['yaar', 'Full yaar mode: playful banter']])), f('Emotion', sel('emotion', [['calm', 'Calm'], ['expressive', 'Expressive'], ['dramatic', 'Very animated']])),
@@ -201,6 +203,11 @@
       f('Crew model', inp('workerModel', { placeholder: 'blank = the Gemini thinking model' }), 'Use a strong tool-calling model for coding.'),
       f('Built-in requests per job', inp('workerMaxRequests', { type: 'number', min: 1, max: 500, step: 1 }), 'Counts model submissions, including retries and fallback. Does not cap Hermes/OpenCode, tokens or billing.'),
       f('Worker deadline (seconds)', inp('workerTimeoutSeconds', { type: 'number', min: 1, max: 86400, step: 1 }), 'Stops Orbit waiting after this execution limit. Inspect prior effects before retrying; external process termination depends on the engine.'),
+      f('Built-in token budget per job', inp('workerTokenBudget', { type: 'number', min: 0, max: 100000000, step: 1 }), '0 disables. Counts input plus output/thinking tokens. Reserves before generation; capped jobs refuse native engines.'),
+      f('Built-in token cost budget (USD)', inp('workerCostBudgetUsd', { type: 'number', min: 0, max: 10000, step: 0.01 }), '0 disables. Requires explicit model prices below; this covers token charges, not all provider fees.'),
+      f('Reserved output tokens per request', inp('workerMaxOutputTokens', { type: 'number', min: 1, max: 65536, step: 1 }), 'Maximum generated output/thinking tokens for a budgeted request.'),
+      f('Worker model allowlist', models, 'Comma-separated model IDs. Blank keeps existing selection. Native engines cannot enforce this policy and are refused when configured.'),
+      f('Model token prices (USD per million)', rates, 'JSON: {"model-id":{"input":0.3,"output":2.5}}. Enter verified prices; Orbit does not guess them.'),
       f('Crew API key', inp('workerApiKey', { type: 'password', autocomplete: 'off', placeholder: 'blank = reuse Gemini key' })),
       f('Custom base URL', inp('workerBaseUrl', { placeholder: 'https://.../v1' }), 'Only for the custom provider.'),
       h('div', { class: 'set-test' }, h('button', { class: 'btn ghost', onclick: async () => {
@@ -214,6 +221,8 @@
       try {
         const voiceChanged = ['aiName', 'gender', 'voice', 'lang', 'userName', 'userTitle', 'liveModel', 'apiKey', 'style', 'emotion'].some(k => d[k] !== cfg[k]);
         if (!d.aiName || !d.userName) throw new Error('Both names are required');
+        d.workerModelRates = JSON.parse(rates.value);
+        d.workerAllowedModels = models.value.split(',').map(s => s.trim()).filter(Boolean);
         cfg = await bridge.config.save(d); window.__holo && __holo.apply(cfg); SFX.enable(cfg.sfx); cfg.sfx ? SFX.hum(true) : SFX.hum(false); $('#hud-name').textContent = cfg.aiName; town.setCommander({ name: cfg.aiName });
         if (voiceChanged && live.want) { live.stop(); addMsg('sys', 'Settings saved. Wake voice again to apply the new voice settings.'); } else addMsg('sys', 'Settings saved.');
         paintState(); m.close();

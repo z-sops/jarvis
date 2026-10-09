@@ -53,3 +53,16 @@ These items need further implementation or a separate end-to-end proof; they mus
 - Standalone Playwright browser suite: current saved Chromium is truncated and crashes before checks; no installed default browser is available. Restore a complete supported browser before counting a rerun. The separate actual Electron smoke does not replace that suite.
 
 External Hermes profiles/.env files, native engine credential stores, process environments and in-memory credentials remain separate exposure boundaries. safeStorage is OS-user protection, not protection from all processes running as the same user. Legacy plaintext is preserved if migration cannot safely encrypt it; never claim that every old file is encrypted in that state.
+
+
+## Five requested gaps — current slice
+
+| Gap | Implemented path | Remaining boundary |
+| --- | --- | --- |
+| Laila planning | Durable DAG, bounded assumptions/risks, role/assigned-skill availability, existing job dispatch, fresh human-accepted dependency evidence, exact contradictory claims and human resolution | Business feasibility, optimal staffing, automatic team creation, free-form/native semantic contradiction analysis, dedicated planning UI |
+| Model router | Gemini worker allowlist, credential/policy scoped discovery, configured token-price preference and context-preserving fallback | Other-provider automatic routing/auth health, capability scoring and live model availability |
+| Token/cost budgets | Full-request count, persisted reservations, actual usage settlement, shared nested/retry/continuation ledger; settings UI | Token prices entered explicitly; non-token fees/overbilling outside claim; native jobs fail closed when capped |
+| Continuity | Original worktree owner survives repeat retries; host decisions/budget persist; fresh run with no inherited grants | Native transcript restoration, complete typed approvals, OS-atomic snapshots and multi-file crash transactions |
+| Native security | OpenCode 1.x isolated config/env and shell/outside denial; Hermes manual-approval profile/cwd/cancellation fixes; passive unknown-state telemetry | Real CLI enforcement, Windows process-tree behavior and OS sandbox escape resistance; worktrees are not sandboxes |
+
+The five broad requirements remain partially implemented. Offline fixtures establish the listed execution paths, not live engine behavior or full product completion.

@@ -82,18 +82,26 @@ async function main() {
       const count = home.listJobs('alex', 99).length;
       assert.equal((await page.evaluate(() => bridge.jobs.dispatch('alex', 'Unsafe', ['../outside']))).ok, false); assert.equal(home.listJobs('alex', 99).length, count);
     });
-    await check('request cap setting saves through actual UI and rejects invalid real IPC input', async () => {
+    await check('request, model and token budget settings save through real UI and reject invalid IPC input', async () => {
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerMaxRequests: 0 })), /integer/);
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerTimeoutSeconds: 0 })), /integer/);
+      await assert.rejects(page.evaluate(() => bridge.config.save({ workerTokenBudget: -1 })), /budget|tokens/i);
+      await assert.rejects(page.evaluate(() => bridge.config.save({ workerModelRates: { fixture: { input: -1, output: 1 } } })), /price|rate/i);
       await page.evaluate(() => window.__ui.openSettings());
       const input = page.getByRole('spinbutton', { name: 'Built-in requests per job' }); await input.fill('2');
       await page.getByRole('spinbutton', { name: 'Worker deadline (seconds)' }).fill('30');
+      await page.getByRole('spinbutton', { name: 'Built-in token budget per job' }).fill('12000');
+      await page.getByRole('spinbutton', { name: 'Built-in token cost budget (USD)' }).fill('1');
+      await page.getByRole('spinbutton', { name: 'Reserved output tokens per request' }).fill('512');
+      await page.getByRole('textbox', { name: 'Model token prices (USD per million)' }).fill('{"fixture":{"input":1,"output":2}}');
       await page.screenshot({ path: path.join(out, 'request-cap-settings.png'), fullPage: true });
       await page.getByRole('button', { name: 'Save', exact: true }).click();
-      await page.waitForFunction(() => !document.querySelector('.settings'));
+      await page.waitForFunction(() => !document.querySelector('.settings') || !!document.querySelector('.settings .ob-err')?.textContent);
+      if (await page.locator('.settings').count()) throw new Error('Settings save: ' + await page.locator('.settings .ob-err').innerText());
       assert.equal((await page.evaluate(() => bridge.config.get())).workerMaxRequests, 2);
       assert.equal(JSON.parse(fs.readFileSync(path.join(temp, 'settings.json'), 'utf8')).workerMaxRequests, 2);
-      assert.equal((await page.evaluate(() => bridge.config.get())).workerTimeoutSeconds, 30);
+      const saved = await page.evaluate(() => bridge.config.get());
+      assert.equal(saved.workerTimeoutSeconds, 30); assert.equal(saved.workerTokenBudget, 12000); assert.equal(saved.workerCostBudgetUsd, 1); assert.equal(saved.workerMaxOutputTokens, 512); assert.deepEqual(saved.workerModelRates, {fixture:{input:1,output:2}});
     });
     await check('accepted state survives a real renderer reload without exceptions', async () => {
       await page.reload(); await page.waitForFunction(() => document.body.classList.contains('revealed'));

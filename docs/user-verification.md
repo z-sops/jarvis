@@ -10,3 +10,6 @@ Use the existing draft PR for review. Do not overwrite an unrelated Windows chec
 6. **Voice/comms:** test actual microphone and desired channels separately. Notifications to other people require explicit recipient/action authorization.
 
 Engineering work still open is listed separately in gap-register.md. Passing this checklist alone does not complete independent revision-bound QA, universal engine enforcement or full Laila orchestration.
+
+
+For this planning/budget slice, use a disposable home: confirm dependency steps stay blocked until a reviewed artifact is accepted, and editing that artifact blocks them again. Set explicit verified model rates and a small approved budget before any live Gemini test. Confirm unknown charges survive a stopped retry. Native capped/allowlisted jobs should refuse; do not disable policy to work around that refusal. OpenCode's current native adapter accepts 1.x only and denies native shell/outside-directory tools. Verify the actual Hermes approval UI independently; its generated configuration is not proof of enforcement.

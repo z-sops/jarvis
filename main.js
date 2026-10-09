@@ -82,10 +82,11 @@ const panels = require('./lib/panels');
 const usage = panels.makeUsage({ home });
 const audit = panels.makeAudit({ home, bus });
 gemini.setUsageHook(u => usage.add(u));
-const workers = createWorkers({ home, getCfg: store.get, gemini, tools, bus, hermes, usage, opencode, runs, getGuidance: () => runtime.guidance });
+const workers = createWorkers({ home, getCfg: store.get, gemini, tools, bus, hermes, usage, opencode, runs, getGuidance: () => runtime.guidance, getPlanner: () => runtime.planner });
 const qa = require('./lib/job-qa').createQA({ home, workers, ask, bus });
 workers.qaPending = qa.hasPending;
 Object.assign(runtime, { dispatch: workers.dispatch, cancel: workers.cancel, stateOf: workers.stateOf });
+runtime.planner = require('./lib/project-plan').createPlanner({ home, dispatch: workers.dispatch, bus });
 const chat = panels.chatGuard(bus);
 // Orbit Browser: Orbit's own private browser (isolated sessions). Laila uses it through tools, the crew through a local MCP server.
 const orbitBrowser = require('./lib/browser-panel').create({ electron: { BrowserWindow, session, ipcMain }, home, getCfg: store.get, store, bus, ask, send, runs,

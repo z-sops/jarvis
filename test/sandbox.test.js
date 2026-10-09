@@ -48,7 +48,7 @@ test('a Hermes profile for a sandboxed member really contains the Docker block, 
   const alex = home.createAgent({ name: 'Alex', role: 'Developer' }), bob = home.createAgent({ name: 'Bob', role: 'Researcher' }); for (const a of [alex, bob]) fs.mkdirSync(eng.profileDir(a.id), { recursive: true });   // (normally made by hermes profile create)
   const h1 = eng.writeProfile(bob, 1111), y1 = fs.readFileSync(path.join(eng.profileDir(bob.id), 'config.yaml'), 'utf8'); assert.ok(!/backend: docker/.test(y1)); assert.match(y1, /terminal:\n  cwd: /);
   const box = { ...alex, sandbox: { enabled: true, folders: [path.join(root, 'proj')], network: true, memoryMB: 3072, cpu: 2 } }; const h2 = eng.writeProfile(box, 1112), y2 = fs.readFileSync(path.join(eng.profileDir(alex.id), 'config.yaml'), 'utf8');
-  assert.match(y2, /terminal:\n  cwd: .*\n  backend: docker\n/); assert.match(y2, /docker_volumes:\n    - ".*:\/workspace\/proj"\n    - ".*:\/output"\ncompression:/, 'the block ends before the next section'); assert.ok(y2.indexOf('compression:') > y2.indexOf('docker_volumes'));
+  assert.match(y2, /terminal:\n  cwd: .*\n  backend: docker\n/); assert.match(y2, /docker_volumes:\n    - ".*:\/workspace\/proj"\n    - ".*:\/output"\napprovals:/, 'the block ends before the next section'); assert.ok(y2.indexOf('compression:') > y2.indexOf('docker_volumes'));
   const h3 = eng.writeProfile({ ...box, sandbox: { ...box.sandbox, network: false } }, 1112); assert.notEqual(h2, h3, 'a change gives a new fingerprint, so the running member restarts with the new sandbox'); assert.equal(eng.writeProfile(box, 9999), h2, 'the port does not change it');
   const env = fs.readFileSync(path.join(eng.profileDir(alex.id), '.env'), 'utf8'); assert.ok(!/BridgeHome|secrets/.test(env));
 });
