@@ -45,6 +45,16 @@ async function main() {
       const count = home.listJobs('alex', 99).length;
       assert.equal((await page.evaluate(() => bridge.jobs.dispatch('alex', 'Unsafe', ['../outside']))).ok, false); assert.equal(home.listJobs('alex', 99).length, count);
     });
+    await check('request cap setting saves through actual UI and rejects invalid real IPC input', async () => {
+      await assert.rejects(page.evaluate(() => bridge.config.save({ workerMaxRequests: 0 })), /integer/);
+      await page.evaluate(() => window.__ui.openSettings());
+      const input = page.getByRole('spinbutton'); await input.fill('2');
+      await page.screenshot({ path: path.join(out, 'request-cap-settings.png'), fullPage: true });
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
+      await page.waitForFunction(() => !document.querySelector('.settings'));
+      assert.equal((await page.evaluate(() => bridge.config.get())).workerMaxRequests, 2);
+      assert.equal(JSON.parse(fs.readFileSync(path.join(temp, 'settings.json'), 'utf8')).workerMaxRequests, 2);
+    });
     await check('accepted state survives a real renderer reload without exceptions', async () => {
       await page.reload(); await page.waitForFunction(() => document.body.classList.contains('revealed'));
       assert.equal(home.findJob(accepted.id).acceptedBy, 'human'); assert.deepEqual(errors, []);

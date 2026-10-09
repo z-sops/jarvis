@@ -210,3 +210,18 @@ An initial128KiB UTF-8 byte guard bounds known worker task payloads and individu
 Built-in worker checkpoints now retain the complete recorded tool-outcome manifest and touched paths, while the anomaly detector keeps its existing rolling window. Replies bind to exact call IDs when present; ambiguous, missing or unmatched replies remain uncertain. Calls are checkpointed before dispatch and partial batches after each result. Stop is checked between tools. Unknown outcomes or failed checkpoint persistence prevent automatic transient recovery; inspect outputs before explicit retry. Continuations retain their preceding outcome manifest.
 
 Recovery text preserves the full goal, labels clipped arguments/results/model text as untrusted excerpts, records SHA-256 fingerprints and refuses an oversized summary instead of silently trimming required data. Fingerprints are identifiers, not correctness evidence or approvals. This is recovery hardening, not adaptive token compaction or complete plan/decision/approval reconstruction. Checkpoint persistence remains best effort and does not block an initial tool dispatch or provide OS containment.
+
+
+## Credential protection and bounded built-in execution
+
+The production main process uses Electron `safeStorage` for settings API keys, nested comms credentials, connector tokens and per-worker override keys. Startup migrates supported legacy files after the key store is ready. Locked, malformed or undecryptable files are preserved and cannot be silently overwritten; new secret saves fail when protected storage is unavailable. Linux `basic_text`/unknown backends are rejected. Empty disabled-channel settings can still be saved. External Hermes profiles/.env files and native credential stores remain separate boundaries. OS-user encryption does not protect against every process running as the same user. See [Electron safeStorage](https://www.electronjs.org/docs/latest/api/safe-storage).
+
+IPC invoke handlers require the current main window/main frame. This origin check complements existing tool permissions; it does not prove human intent inside a compromised trusted renderer.
+
+Settings → **Built-in requests per job** sets a 1–500 model-submission limit (default 40). Retries, fallback and nested Gemini generations share the job limit, including its recovery continuation. Reservations are persisted before submission. This counts attempted submissions, not tokens or money, and does not cap native Hermes/OpenCode, commander chat or Live voice.
+
+Existing `read_file` and Files `read_text_file` tools support bounded UTF-8 byte `offset`/`limit` windows (up to 20,000 bytes). Use returned `nextOffset` to avoid splitting a character. Files windows cannot be combined with head/tail. Large-file tail scans now read the actual file end.
+
+Built-in requests may omit older successful `read_file` data from the outgoing request copy while preserving the original conversation and latest two reads. Goals, model text, calls, signatures and effect results are retained; the existing 128 KiB byte ceiling still blocks requests that cannot fit. Omitted data may need to be read again; its digest is not a verified or retrievable snapshot. This is partial compaction, not complete state reconstruction or token budgeting.
+
+Current scope and remaining engineering gaps: [gap register](docs/gap-register.md). User-machine/live-service checks: [verification checklist](docs/user-verification.md).

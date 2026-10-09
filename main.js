@@ -23,8 +23,10 @@ const lock = SHOTS ? true : app.requestSingleInstanceLock();
 if (!lock) app.quit();
 
 let win = null, tray = null, quitting = false;
-const store = createStore(path.join(app.getPath('userData'), 'settings.json'));
-const home = new Home(store.get().homeDir);
+require('./lib/ipc-origin').installMainFrameGuard(ipcMain, () => win);
+const secretStorage = require('./lib/secret-storage').createSecretStorage(require('electron').safeStorage);
+const store = createStore(path.join(app.getPath('userData'), 'settings.json'), { secretStorage });
+const home = new Home(store.get().homeDir, { secretStorage });
 const bus = new EventEmitter();
 const pending = new Map();
 const runs = require('./lib/job-runs').createJobRuns();
@@ -79,7 +81,7 @@ const chat = panels.chatGuard(bus);
 // Orbit Browser: Orbit's own private browser (isolated sessions). Laila uses it through tools, the crew through a local MCP server.
 const orbitBrowser = require('./lib/browser-panel').create({ electron: { BrowserWindow, session, ipcMain }, home, getCfg: store.get, store, bus, ask, send, runs,
   label: a => (a === 'commander' ? (store.get().aiName || 'Commander AI') : (home.getAgent(a)?.name || a)), onNeedsUser: () => showWindow() });
-const connectorsStore = new (require('./lib/connectors').Connectors)({ home, allowInsecureLocal: !!process.env.BRIDGE_SHOTS });   // http://localhost is allowed only in the test mode
+const connectorsStore = new (require('./lib/connectors').Connectors)({ home, allowInsecureLocal: !!process.env.BRIDGE_SHOTS, secretStorage });   // http://localhost is allowed only in the test mode
 orbitBrowser.setConnectors(connectorsStore);
 // The gateway: the crew's one door to outside services and to a few of Orbit's own tools. Orbit holds the tokens; every call goes through the permission hub.
 const { Hub } = require('./lib/hub'), { Gateway } = require('./lib/gateway');
@@ -299,11 +301,16 @@ const flushStartup = () => STARTUP.flush(path.join(store.get().homeDir || app.ge
 ipcMain.handle('startup:mark', (_e, name) => { STARTUP.mark('page: ' + String(name).slice(0, 60)); flushStartup(); return true; });
 app.whenReady().then(() => {
     STARTUP.mark('Electron is ready');
+    const credentialFaults = [];
+    for (const protect of [() => store.protect(), () => connectorsStore.protectSecrets(), () => home.protectAgents()]) {
+      try { protect(); } catch { credentialFaults.push('Protected credential storage is unavailable or locked. Existing files were preserved. Unlock the OS key store before using or saving credentials.'); }
+    }
     session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'media' || perm === 'audioCapture'));
     session.defaultSession.setPermissionCheckHandler((_wc, perm) => perm === 'media' || perm === 'audioCapture');
     if (store.get().commissioned) { home.ensure(); const recovered = home.recoverJobs(); if (recovered.length) audit.add({ kind: 'job', event: 'restart_recovery', detail: `${recovered.length} job record(s) recovered. No jobs were automatically replayed.` }); }
     STARTUP.mark('home folder checked');
     createWindow(); STARTUP.mark('window created'); win.webContents.once('did-finish-load', () => { STARTUP.mark('page loaded (all its scripts were read)'); flushStartup(); });
+    if (credentialFaults.length) win.webContents.once('did-finish-load', () => send('report', { text: credentialFaults[0], ok: false }));
     if (!SHOTS) {
       createTray();
       globalShortcut.register('CommandOrControl+Alt+J', () => { showWindow(); send('wake'); });

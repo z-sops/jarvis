@@ -69,3 +69,22 @@ test('usage: a finished Hermes run reports its tokens with the model it used', a
   r.workers.dispatch('bob', 'x'); await until(() => r.done.length === 1);
   assert.equal(seen.length, 1); assert.equal(seen[0].source, 'hermes'); assert.equal(seen[0].model, 'gemini-3.5-flash-lite'); assert.equal(seen[0].inTok, 120000); assert.equal(seen[0].outTok, 900); assert.equal(seen[0].run, true);
 });
+
+test('50 configured workers drain 100 queued jobs with per-worker identity/model/workspace isolation', { timeout: 15000 }, async t => {
+  const fs=require('fs'), os=require('os'), path=require('path'), {EventEmitter}=require('events'), {Home}=require('../lib/home');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-crew-50-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const home=new Home(root).ensure(),bus=new EventEmitter();
+  const active=new Map(),max=new Map(),records=[];let totalActive=0,maxTotal=0;
+  for(let i=0;i<50;i++){const a=home.createAgent({name:'Fixture worker '+i,role:i%2?'Tester':'Developer'});home.updateAgent(a.id,{engine:'hermes',workerModel:'fixture-model-'+i});}
+  const workers=require('../lib/workers').createWorkers({home,bus,getCfg:()=>({engine:'hermes',workerProvider:'custom'}),tools:{},gemini:{},hermes:{runTask:async(agent,task,options)=>{
+    const n=(active.get(agent.id)||0)+1;active.set(agent.id,n);max.set(agent.id,Math.max(max.get(agent.id)||0,n));maxTotal=Math.max(maxTotal,++totalActive);
+    const match=/JOB_(\d)/.exec(task);assert.ok(match);const filename='out-'+match[1]+'.txt';records.push({actor:agent.id,model:options.cfgOverride.workerModel});
+    try{await new Promise(resolve=>setTimeout(resolve,5));assert.equal(options.signal.aborted,false);fs.writeFileSync(home.p('workspace',agent.id,filename),agent.id+':'+filename);return 'Artifact ready for human review: '+filename;}
+    finally{active.set(agent.id,n-1);totalActive--;}
+  }}});t.after(()=>workers.cancelAll());
+  const jobs=[],done=[];let resolveAll;const finished=new Promise(resolve=>{resolveAll=resolve;});bus.on('job:done',e=>{done.push(e.job);if(done.length===100)resolveAll();});
+  for(const agent of home.listAgents())for(let n=1;n<=2;n++)jobs.push(workers.dispatch(agent.id,'JOB_'+n+' produce own artifact',{expectedOutputs:['out-'+n+'.txt']}));
+  await finished;assert.equal(records.length,100);assert.ok(maxTotal>1);assert.equal(max.size,50);for(const n of max.values())assert.equal(n,1);
+  for(const job of jobs){const saved=home.findJob(job.id);assert.equal(saved.status,'review',saved.error);assert.equal(saved.verification.artifacts.length,1);assert.match(fs.readFileSync(home.p('workspace',job.agent,saved.expectedOutputs[0]),'utf8'),new RegExp('^'+job.agent+':'));}
+  for(const rec of records){const i=rec.actor.match(/-(\d+)$/)[1];assert.equal(rec.model,'fixture-model-'+i);}
+  assert.equal(workers.hasPending(),false);
+});
