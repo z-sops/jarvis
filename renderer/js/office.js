@@ -8,6 +8,12 @@
   const h = (tag, attrs = {}, ...kids) => { const el = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') el.className = v; else if (k.startsWith('on')) el.addEventListener(k.slice(2), v); else if (v != null && v !== false) el.setAttribute(k, v === true ? '' : v); } for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(kid)); return el; };
   const NICE = { run_shell: 'Running a command', write_file: 'Writing a file', read_file: 'Reading a file', list_dir: 'Looking in a folder', web_search: 'Searching the web', browser_open: 'Opening a web page', browser_read: 'Reading a web page', browser_click: 'Clicking on a web page', browser_type: 'Typing on a web page', browser_select: 'Using a web page', browser_press: 'Using a web page', browser_scroll: 'Scrolling a web page', browser_nav: 'Using a web page', browser_tabs: 'Using browser tabs', browser_wait: 'Waiting for a web page', open_url: 'Opening a page', look_at_screen: 'Looking at the screen', assign_task: 'Giving out a job', cancel_job: 'Stopping a job', create_agent: 'Adding crew', get_system_info: 'Checking the system', remember: 'Making a note', list_jobs: 'Checking jobs', get_job: 'Reading a report' };
   const clip = (s, n) => (s.length > n ? s.slice(0, n - 1) + '\u2026' : s);
+  const activityText = a => {
+    if (!a) return 'No measured activity yet. No packet measurement is available.';
+    const size = n => (Math.max(0, Number(n) || 0) / 1024).toFixed(1) + ' KB';
+    const source = (a.sources || []).map(s => ({ gemini_http_body: 'Gemini HTTP body', hermes_local_api: 'local Hermes API', opencode_process_output: 'OpenCode process output' })[s] || 'unspecified output').join(', ') || 'no observed source';
+    return `${a.attempts || 0} request attempts · ${size(a.submittedBytes)} submitted · ${size(a.receivedBytes)} received. Source: ${source}. Job ${a.jobId}. Application data only; no packet measurement or guarantee of progress.`;
+  };
   const now = () => performance.now() / 1000;
   const state = { agents: new Map(), files: new Map(), total: 0, sel: null, hover: null, visible: false, aiName: 'Laila', cmd: { x: 25, y: 15, mode: 'idle', bubble: '', until: 0 }, k: 1, ox: 0, oy: 0, w: 0, h: 0, dpr: 1, last: 0, t: 0 };
 
@@ -61,6 +67,7 @@
     if (type === 'agent:state') { const o = state.agents.get(p.id); if (o) { o.state = p.state === 'working' ? 'working' : 'idle'; o.task = p.task || ''; if (o.state !== 'working') o.label = ''; paintStats(); if (state.sel === p.id || !state.sel) paintSide(); } }
     else if (type === 'agent:created' || type === 'agent:updated') loadAgents();
     else if (type === 'job:progress') { if (p && p.agent) { note(p.agent.id, p.tool, p.label); if (!state.sel) crewListSoon(); } }
+    else if (type === 'job:activity' && p?.actor === state.sel) { const node = side.querySelector('.of-activity'); if (node) node.textContent = activityText(p.activity); }
     else if (type === 'tool') { if (p.status === 'start') { if (p.actor === 'commander') { state.cmd.bubble = NICE[p.name] || p.name; state.cmd.until = now() + 5; } else note(p.actor, p.name); } }
     else if (type === 'job:done' || type === 'job:reviewed') { const o = state.agents.get(p.agent.id); if (o) { o.label = ''; o.flash = { text: p.job.status === 'review' ? 'Review' : p.job.status === 'done' ? 'Accepted' : p.job.status === 'cancelled' ? 'Stopped' : 'Problem', tone: p.job.status === 'done' || p.job.status === 'review' ? 'ok' : 'bad', until: now() + 5 }; } loadFiles(); if (state.sel === p.agent.id) paintSide(); }
     else if (type === 'ws:changed') loadFiles();
@@ -248,6 +255,7 @@
       sec(`Files (${(state.files.get(id) || []).length})`, files.length ? files.map(f => h('button', { class: 'of-file', type: 'button', title: f.rel, onclick: () => window.__ws && __ws.open(f.rel) }, h('span', {}, f.name), h('em', {}, f.size < 1024 ? f.size + ' B' : (f.size / 1024).toFixed(f.size < 10240 ? 1 : 0) + ' KB'))) : h('p', { class: 'of-dim' }, isC ? 'Files saved straight into the workspace.' : 'Nothing saved yet.')),
       r && r.skills && r.skills.length ? sec('Skills', h('div', { class: 'of-chips' }, ...r.skills.slice(0, 12).map(s => h('span', {}, s)))) : null,
       r && r.soul ? sec('Character', h('p', { class: 'of-dim' }, clip(r.soul.replace(/^#.*\n+/, '').split('\n').filter(Boolean).slice(0, 4).join(' '), 260))) : null].filter(Boolean));
+    if (!isC) side.appendChild(sec('Observed activity', h('p', { class: 'of-dim of-activity' }, activityText(r?.activity))));
     if (engineRow) side.appendChild(engineRow);
     if (!isC && bridge.jobs) {
       const task = h('textarea', { class: 'of-job-field', 'aria-label': 'New job task', placeholder: 'Describe the job' });

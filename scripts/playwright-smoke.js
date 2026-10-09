@@ -148,6 +148,13 @@ async function main() {
       assert.equal(job.managed, true); assert.equal(job.status, 'failed'); assert.equal(engineCalls.length, count);
       await page.getByLabel('Managed NeuralOps job', { exact: true }).uncheck();
     });
+    await check('measured activity updates without replacing a focused job draft', async () => {
+      const input = page.getByLabel('New job task'); await input.fill('Keep this draft'); await input.focus();
+      await page.evaluate(() => window.__orbitPush({ type: 'job:activity', payload: { actor: 'alex', activity: { jobId: 'job-fixture', attempts: 2, submittedBytes: 1024, receivedBytes: 2048, sources: ['hermes_local_api'] } } }));
+      await page.locator('.of-activity').filter({ hasText: '2 request attempts' }).waitFor();
+      assert.equal(await input.inputValue(), 'Keep this draft'); assert.equal(await input.evaluate(el => el === document.activeElement), true);
+      assert.match(await page.locator('.of-activity').textContent(), /local Hermes API/); assert.match(await page.locator('.of-activity').textContent(), /no packet measurement/);
+    });
     await check('untrusted report markup is displayed as text', async () => {
       await page.getByLabel('New job task').fill('Untrusted report'); await page.getByLabel('Expected output files').fill(''); await page.getByRole('button', { name: 'Queue job', exact: true }).click();
       await page.waitForFunction(() => [...document.querySelectorAll('#office summary')].some(e => e.textContent.includes('Untrusted report')));

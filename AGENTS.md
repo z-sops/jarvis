@@ -535,3 +535,10 @@ Zee asked for his crew to be able to run on OpenCode (opencode.ai), the open-sou
 - Built-in workers read only their active job workspace, not the whole home or commander session grants. Canonical paths, secret/internal credential blocks and argument snapshots are checked around approval waits. External engine/host filesystem containment remains separate.
 - Retry/pause/continue retain managed mode and create fresh bindings. No inherited approval, automatic side-effect replay or remote completion on model report. Remote task finalization and actual outcome synchronization remain open.
 - Validation: 352 pass/0 fail/3 real-Hermes skips; final 32 relevant security/core/run/guidance cases; 16 Playwright fixture checks; 7 actual Linux Electron checks. NeuralOps real dispatcher managed tests 10/10, gate12/12, persistence13/13. See project-update.md for exact limits and later changes.
+
+
+## Measured activity and uncertain Hermes dispatch — 2026-10-09
+
+- Separate rendered text, submitted bodies and measured received data. Gemini completed response bodies, local Hermes SSE chunks and OpenCode process output have distinct sources. Do not label them TCP packets or infer a stuck worker from silence. Telemetry failures never change job outcomes. Metrics are generation-fenced and persisted; Office updates them without replacing the focused job form.
+- Hermes must not automatically repost after a fetch connection error: the remote outcome may be unknown. Inspect before explicit retry. No automatic restoration of consumed approvals.
+- Latest validation: 375 total/372 pass/0 fail/3 real-Hermes skips, 30 focused transport/jobreport/run cases, 17 Playwright fixture checks and 7 actual Linux Electron checks. Real Windows/live providers remain unverified. Log all further work in project-update.md.

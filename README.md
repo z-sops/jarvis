@@ -186,3 +186,6 @@ Skills are selected by bounded keyword matching or explicit library names and st
 Optional managed jobs: In Office > Give a job, enable **Managed NeuralOps job** for built-in workers. Requires one enabled mapped NeuralOps connector with `managedJobs: orbit-v1`, and a governing policy or explicit direct authority. Each built-in action is bound to the current task/job/run/tool and argument fingerprint. Pending approval blocks execution. Managed shell and direct Hermes/OpenCode engines are refused until containment/hooks are verified. Retry/continue obtain fresh bindings. Local acceptance does not yet finalize the remote task; inspect/reconcile that task separately. Unmanaged jobs retain their existing permissions.
 
 Built-in worker file tools now restrict reads to their own active workspace and reject symlink escapes and internal credential paths. This API policy does not sandbox external engines or an approved unmanaged shell.
+
+
+Observed activity distinguishes submitted Gemini/Hermes API bodies, received application data and OpenCode process output. Counters are stored with jobs; text alone does not count as network data. These are application measurements, not TCP packets, provider health or proof of progress. Hermes request connection loss is reported as an uncertain outcome and is never automatically reposted.
