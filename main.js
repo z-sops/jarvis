@@ -89,7 +89,7 @@ const fsOpts = { home, userData: app.getPath('userData'), userProfile: require('
 const makeFiles = c => { const chk = checkRoots(c.roots, fsOpts); if (!chk.ok) throw new Error(chk.error); return new FilesProvider({ roots: chk.roots, forbid: [home.p('connectors'), home.p('browser'), home.p('hermes'), app.getPath('userData')], backupDir: home.p('backups', 'files'), trash: f => shell.trashItem(f) }); };
 const gateway = new Gateway({ runs, connectors: connectorsStore, hub: new Hub({ ask, actorName: a => orbitBrowser.manager.actorName(a) }), bus, actorName: a => orbitBrowser.manager.actorName(a),
   providers: { files: makeFiles, library: () => new (require('./lib/library-provider').LibraryProvider)({ home }), leads: () => new (require('./lib/leads-provider').LeadsProvider)({ home }) },
-  native: { web_search: a => tools.exec('web_search', a, 'commander'), look_at_screen: a => require('./lib/screen').describe(a, { getCfg: store.get, gemini, bus }) } });
+  native: { use_skill: async (a, ctx) => { const r = await tools.exec('use_skill', a, ctx.actor); if (r.error) throw new Error(r.error); return r; }, web_search: a => tools.exec('web_search', a, 'commander'), look_at_screen: a => require('./lib/screen').describe(a, { getCfg: store.get, gemini, bus }) } });
 orbitBrowser.setGateway(gateway); runtime.gateway = gateway; runtime.store = store;
 runtime.guidance = require('./lib/job-guidance').createGuidance({ home, runs, gateway });
 const decider = require('./lib/decide').createDecider({ getCfg: store.get, gemini });

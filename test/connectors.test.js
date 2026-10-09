@@ -55,8 +55,8 @@ test('who sees which connector; Linear/Supabase addresses follow the mode; the c
 });
 
 test('Orbit\'s own tools for the crew: web search is free, looking at the screen asks, and both can be changed', () => {
-  const { c } = mk(); assert.deepEqual(c.nativeLevels(), { web_search: 'free', look_at_screen: 'ask' }); c.setNativeLevel('look_at_screen', 'blocked'); assert.equal(c.nativeLevels().look_at_screen, 'blocked'); assert.equal(c.nativeLevels().web_search, 'free');
-  assert.throws(() => c.setNativeLevel('run_shell', 'free'), /No such tool/); assert.throws(() => c.setNativeLevel('web_search', 'sometimes'), /No such tool or level/); assert.deepEqual(C.NATIVE_TOOLS.map(t => t.name), ['web_search', 'look_at_screen']);
+  const { c } = mk(); assert.deepEqual(c.nativeLevels(), { web_search: 'free', look_at_screen: 'ask', use_skill: 'free' }); c.setNativeLevel('look_at_screen', 'blocked'); assert.equal(c.nativeLevels().look_at_screen, 'blocked'); assert.equal(c.nativeLevels().web_search, 'free');
+  assert.throws(() => c.setNativeLevel('run_shell', 'free'), /No such tool/); assert.throws(() => c.setNativeLevel('web_search', 'sometimes'), /No such tool or level/); assert.deepEqual(C.NATIVE_TOOLS.map(t => t.name), ['use_skill', 'web_search', 'look_at_screen']);
   assert.equal(C.checkSpec({ name: 'my__tools', url: 'https://mcp.example.com/mcp' }).id, 'my_tools', 'a double underscore separates service and tool in the gateway, so a service name can never contain one');
 });
 
