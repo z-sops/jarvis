@@ -171,3 +171,13 @@ A dropped connector response or a quota interruption can occur after an action a
 ### Offline UI regression check
 
 `npm run test:ui` uses an already installed Playwright/Chromium to exercise the real renderer and preload API against real job/panel backends in a temporary home. Providers and Electron window APIs are fixtures; no API keys or live services are used. Results, screenshots and a trace are written to `test-results/playwright` (ignored by git), or `ORBIT_UI_RESULTS`. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` for an existing browser binary. This check does not verify Electron process isolation, Windows process management or real model providers.
+
+### Job contracts, project isolation and repeatable UI verification
+
+Office's Give a job form and Laila's assign_task accept expected outputs, existing prerequisite job IDs, library skills and an optional absolute Git project folder. Prerequisites must be accepted by the human before dependent execution; reports alone do not release dependent work. Accepted file evidence is copied with fingerprints into job-specific handoff folders. Changed evidence, secret files and linked destinations block handoff.
+
+Project jobs use independent detached Git worktrees from committed HEAD. Orbit refuses dirty source checkouts, does not merge automatically and retains worktrees for inspection. This prevents ordinary same-project job edits from overwriting each other; it does not contain direct engine tools that deliberately access absolute host paths. Non-project jobs keep existing per-worker workspaces.
+
+Skills are selected by bounded keyword matching or explicit library names and stored with instruction fingerprints. This is deterministic selection, not proof that a skill/worker can fulfill the whole goal. Large skills need to be split into focused instructions. Checkpoint/pause summaries retain the full goal and mark failed/unknown tool outcomes; complete cross-engine continuation remains pending.
+
+`npm run test:electron` runs actual Linux Electron main/window/preload/IPC checks in temporary storage with no provider keys. Playwright must already be available. The developer screenshot driver is disabled; provider engines and Windows are not exercised. `npm run test:ui` remains the broader Chromium renderer/backend fixture test. Dependency installation is now explicitly authorized; package-lock includes the previously missing Electron packaging dependencies without changing any existing locked package versions.

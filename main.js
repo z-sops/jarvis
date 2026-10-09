@@ -93,7 +93,7 @@ const gateway = new Gateway({ runs, connectors: connectorsStore, hub: new Hub({ 
 orbitBrowser.setGateway(gateway); runtime.gateway = gateway; runtime.store = store;
 const decider = require('./lib/decide').createDecider({ getCfg: store.get, gemini });
 for (const bid of ['library', 'leads']) (async () => { try { if (!connectorsStore.get(bid)) { const sp = require('./lib/connectors').checkSpec({ catalogId: bid }); if (sp.ok) connectorsStore.add(sp); } const t = await gateway.test(bid); if (t.ok) { connectorsStore.applyTools(bid, t.tools); if (!connectorsStore.get(bid).enabled) connectorsStore.update(bid, { enabled: true }); } } catch { /* the crew simply lacks it until the next start */ } })();   // skills and knowledge packs reach the crew through the same door as every other tool
-runtime.browser = orbitBrowser; hermes.extraYaml = agent => ({ ...orbitBrowser.crewYaml(agent, { force: !!agent.forceBrowser }), terminal: require('./lib/sandbox').terminalLines(agent, { ws: home.p('workspace', agent.id) }) });
+runtime.browser = orbitBrowser; hermes.extraYaml = agent => ({ ...orbitBrowser.crewYaml(agent, { force: !!agent.forceBrowser }), terminal: require('./lib/sandbox').terminalLines(agent, { ws: agent.workspaceDir || home.p('workspace', agent.id) }) });
 hermes.extraSig = agent => JSON.stringify(orbitBrowser.crewYaml(agent, { force: !!agent.forceBrowser })) + connectorsStore.signature(agent.id) + (agent.allowCode === false ? '|nocode' : '');
 orbitBrowser.start().catch(e => console.error('Orbit Browser link failed:', e.message));
 
@@ -216,7 +216,7 @@ ipcMain.handle('agents:inspect', (_e, id) => {
   const isC = id === COMMANDER; const agent = isC ? { id: COMMANDER, name: store.get().aiName, role: 'Chief of staff' } : home.getAgent(id);
   if (!agent) return null;
   const rd = f => { try { return fs.readFileSync(path.join(home.agentDir(agent.id), f), 'utf8'); } catch { return ''; } };
-  return { agent, folder: home.agentDir(agent.id), soul: rd('brain/soul.md'), skills: home.readSkills(agent.id).map(s => s.name), jobsError: home.recoveryFaults.get(agent.id), jobs: home.listJobs(agent.id, 20).map(j => ({ id: j.id, status: j.status, task: j.task, result: j.result, error: j.error, recoveryNeeded: j.recoveryNeeded, expectedOutputs: j.expectedOutputs, verification: j.verification, completionKind: j.completionKind, acceptedAt: j.acceptedAt })), memory: home.readMemory(agent.id, 600) };
+  return { agent, folder: home.agentDir(agent.id), soul: rd('brain/soul.md'), skills: home.readSkills(agent.id).map(s => s.name), jobsError: home.recoveryFaults.get(agent.id), jobs: home.listJobs(agent.id, 20).map(j => ({ id: j.id, status: j.status, task: j.task, result: j.result, error: j.error, recoveryNeeded: j.recoveryNeeded, expectedOutputs: j.expectedOutputs, verification: j.verification, completionKind: j.completionKind, acceptedAt: j.acceptedAt, dependencies: j.dependencies, workspaceDir: j.workspaceDir, isolation: j.isolation, selectedSkills: (j.selectedSkills || []).map(s => ({ slug: s.slug, selectedBy: s.selectedBy })) })), memory: home.readMemory(agent.id, 600) };
 });
 ipcMain.handle('agents:update', (_e, id, patch) => { try { return { ok: true, agent: home.updateAgent(id, patch || {}) }; } catch (e) { return { ok: false, error: e.message }; } });
 ipcMain.handle('hermes:check', async (_e, opts) => { try { return { steps: await hermes.check(opts || {}) }; } catch (e) { return { steps: [{ name: 'Check', ok: false, detail: e.message }] }; } });

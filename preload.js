@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld('bridge', {
   chat: { send: t => inv('chat:send', t), reset: () => inv('chat:reset'), pickFile: () => inv('chat:pickFile') },
   live: { context: () => inv('live:context'), tool: (n, a) => inv('tool:exec', n, a) },
   agents: { list: () => inv('agents:list'), inspect: id => inv('agents:inspect', id), create: a => inv('agents:create', a), update: (id, patch) => inv('agents:update', id, patch) },
-  jobs: { dispatch: (actor, task, expectedOutputs) => inv('jobs:dispatch', actor, task, expectedOutputs), retry: id => inv('jobs:retry', id), review: (id, decision) => inv('jobs:review', id, decision) },
+  jobs: { dispatch: (actor, task, expectedOutputs, options) => inv('jobs:dispatch', actor, task, expectedOutputs, options), retry: id => inv('jobs:retry', id), review: (id, decision) => inv('jobs:review', id, decision) },
   comms: { get: () => inv('comms:get'), save: c => inv('comms:save', c), status: () => inv('comms:status'), stop: () => inv('comms:stop'), pair: () => inv('comms:pair') },
   screen: { look: q => inv('screen:look', q), frame: o => inv('screen:frame', o) },
   hermes: { check: o => inv('hermes:check', o) },
