@@ -187,6 +187,7 @@
       j.workspaceDir ? h('p', {}, 'Isolated project folder: ' + j.workspaceDir) : null,
       j.dependencies?.length ? h('p', {}, 'Prerequisite jobs: ' + j.dependencies.join(', ')) : null,
       j.selectedSkills?.length ? h('p', {}, 'Job skills: ' + j.selectedSkills.map(s => s.slug).join(', ')) : null,
+      j.managed ? h('p', {}, 'Managed NeuralOps job' + (j.guidance?.taskId ? ': ' + j.guidance.taskId : ' — waiting for task binding')) : null,
       h('p', {}, j.result ? clip(String(j.result), 700) : j.status === 'running' ? 'Still working on it.' : j.status === 'queued' ? 'Waiting in line.' : 'No report.'),
       j.error ? h('p', {}, j.error) : null, evidenceText ? h('p', {}, evidenceText) : null,
       v && v.artifacts.length ? h('ul', {}, v.artifacts.map(a => h('li', {}, `${a.path} · ${a.bytes} bytes · SHA-256 ${a.sha256.slice(0, 12)}…`))) : null,
@@ -249,21 +250,24 @@
       r && r.soul ? sec('Character', h('p', { class: 'of-dim' }, clip(r.soul.replace(/^#.*\n+/, '').split('\n').filter(Boolean).slice(0, 4).join(' '), 260))) : null].filter(Boolean));
     if (engineRow) side.appendChild(engineRow);
     if (!isC && bridge.jobs) {
-      const task = h('textarea', { 'aria-label': 'New job task', placeholder: 'Describe the job' });
-      const expected = h('textarea', { 'aria-label': 'Expected output files', placeholder: 'Optional: workspace-relative output files, one per line' });
-      const project = h('input', { 'aria-label': 'Project folder', placeholder: 'Optional: full path to a clean Git project' });
-      const dependencies = h('input', { 'aria-label': 'Prerequisite jobs', placeholder: 'Optional: prerequisite job IDs, comma separated' });
-      const skills = h('input', { 'aria-label': 'Library skills', placeholder: 'Optional: library skill names; blank selects relevant skills' });
+      const task = h('textarea', { class: 'of-job-field', 'aria-label': 'New job task', placeholder: 'Describe the job' });
+      const expected = h('textarea', { class: 'of-job-field', 'aria-label': 'Expected output files', placeholder: 'Optional: workspace-relative output files, one per line' });
+      const project = h('input', { class: 'of-job-field', 'aria-label': 'Project folder', placeholder: 'Optional: full path to a clean Git project' });
+      const dependencies = h('input', { class: 'of-job-field', 'aria-label': 'Prerequisite jobs', placeholder: 'Optional: prerequisite job IDs, comma separated' });
+      const skills = h('input', { class: 'of-job-field', 'aria-label': 'Library skills', placeholder: 'Optional: library skill names; blank selects relevant skills' });
+      const managed = h('input', { type: 'checkbox', 'aria-label': 'Managed NeuralOps job' });
       const draft = jobDrafts.get(id); task.value = draft?.task || ''; expected.value = draft?.expected || '';
       project.value = draft?.project || ''; dependencies.value = draft?.dependencies || ''; skills.value = draft?.skills || '';
-      const saveDraft = () => jobDrafts.set(id, { task: task.value, expected: expected.value, project: project.value, dependencies: dependencies.value, skills: skills.value });
+      managed.checked = draft?.managed === true;
+      const saveDraft = () => jobDrafts.set(id, { managed: managed.checked, task: task.value, expected: expected.value, project: project.value, dependencies: dependencies.value, skills: skills.value });
+      managed.addEventListener('change', saveDraft);
       task.addEventListener('input', saveDraft); expected.addEventListener('input', saveDraft);
       for (const field of [project, dependencies, skills]) field.addEventListener('input', saveDraft);
       const out = h('small', { role: 'status' });
-      side.appendChild(sec('Give a job', task, expected, project, dependencies, skills, h('small', {}, 'Project jobs use a separate worktree. Prerequisites wait for your acceptance. Changes are never merged automatically.'), h('button', { class: 'mini', type: 'button', onclick: async e => {
+      side.appendChild(sec('Give a job', task, expected, project, dependencies, skills, h('label', { class: 'of-job-mode' }, managed, 'Managed NeuralOps job (built-in only; no shell)'), h('small', { class: 'of-job-help' }, 'Managed jobs require an updated NeuralOps server and policy or direct authority. Project jobs use a separate worktree. Prerequisites wait for your acceptance. Changes are never merged automatically.'), h('button', { class: 'mini', type: 'button', onclick: async e => {
         if (!task.value.trim()) { out.textContent = 'Describe the job first.'; return; }
         const button = e.currentTarget; button.disabled = true; out.textContent = 'Queueing…';
-        try { const names = value => value.split(',').map(s => s.trim()).filter(Boolean); const result = await bridge.jobs.dispatch(id, task.value.trim(), expected.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean), { dependencies: names(dependencies.value), ...(skills.value.trim() ? { skills: names(skills.value) } : {}), ...(project.value.trim() ? { projectRoot: project.value.trim() } : {}) }); if (!result || !result.ok) throw new Error(result && result.error || 'Could not queue the job.'); jobDrafts.delete(id); await paintSide(); }
+        try { const names = value => value.split(',').map(s => s.trim()).filter(Boolean); const result = await bridge.jobs.dispatch(id, task.value.trim(), expected.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean), { managed: managed.checked, dependencies: names(dependencies.value), ...(skills.value.trim() ? { skills: names(skills.value) } : {}), ...(project.value.trim() ? { projectRoot: project.value.trim() } : {}) }); if (!result || !result.ok) throw new Error(result && result.error || 'Could not queue the job.'); jobDrafts.delete(id); await paintSide(); }
         catch (err) { out.textContent = err.message || String(err); button.disabled = false; }
       } }, 'Queue job'), out));
     }

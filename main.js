@@ -73,7 +73,7 @@ const panels = require('./lib/panels');
 const usage = panels.makeUsage({ home });
 const audit = panels.makeAudit({ home, bus });
 gemini.setUsageHook(u => usage.add(u));
-const workers = createWorkers({ home, getCfg: store.get, gemini, tools, bus, hermes, usage, opencode, runs });
+const workers = createWorkers({ home, getCfg: store.get, gemini, tools, bus, hermes, usage, opencode, runs, getGuidance: () => runtime.guidance });
 Object.assign(runtime, { dispatch: workers.dispatch, cancel: workers.cancel, stateOf: workers.stateOf });
 const chat = panels.chatGuard(bus);
 // Orbit Browser: Orbit's own private browser (isolated sessions). Laila uses it through tools, the crew through a local MCP server.
@@ -91,6 +91,7 @@ const gateway = new Gateway({ runs, connectors: connectorsStore, hub: new Hub({ 
   providers: { files: makeFiles, library: () => new (require('./lib/library-provider').LibraryProvider)({ home }), leads: () => new (require('./lib/leads-provider').LeadsProvider)({ home }) },
   native: { web_search: a => tools.exec('web_search', a, 'commander'), look_at_screen: a => require('./lib/screen').describe(a, { getCfg: store.get, gemini, bus }) } });
 orbitBrowser.setGateway(gateway); runtime.gateway = gateway; runtime.store = store;
+runtime.guidance = require('./lib/job-guidance').createGuidance({ home, runs, gateway });
 const decider = require('./lib/decide').createDecider({ getCfg: store.get, gemini });
 for (const bid of ['library', 'leads']) (async () => { try { if (!connectorsStore.get(bid)) { const sp = require('./lib/connectors').checkSpec({ catalogId: bid }); if (sp.ok) connectorsStore.add(sp); } const t = await gateway.test(bid); if (t.ok) { connectorsStore.applyTools(bid, t.tools); if (!connectorsStore.get(bid).enabled) connectorsStore.update(bid, { enabled: true }); } } catch { /* the crew simply lacks it until the next start */ } })();   // skills and knowledge packs reach the crew through the same door as every other tool
 runtime.browser = orbitBrowser; hermes.extraYaml = agent => ({ ...orbitBrowser.crewYaml(agent, { force: !!agent.forceBrowser }), terminal: require('./lib/sandbox').terminalLines(agent, { ws: agent.workspaceDir || home.p('workspace', agent.id) }) });
@@ -216,7 +217,7 @@ ipcMain.handle('agents:inspect', (_e, id) => {
   const isC = id === COMMANDER; const agent = isC ? { id: COMMANDER, name: store.get().aiName, role: 'Chief of staff' } : home.getAgent(id);
   if (!agent) return null;
   const rd = f => { try { return fs.readFileSync(path.join(home.agentDir(agent.id), f), 'utf8'); } catch { return ''; } };
-  return { agent, folder: home.agentDir(agent.id), soul: rd('brain/soul.md'), skills: home.readSkills(agent.id).map(s => s.name), jobsError: home.recoveryFaults.get(agent.id), jobs: home.listJobs(agent.id, 20).map(j => ({ id: j.id, status: j.status, task: j.task, result: j.result, error: j.error, recoveryNeeded: j.recoveryNeeded, expectedOutputs: j.expectedOutputs, verification: j.verification, completionKind: j.completionKind, acceptedAt: j.acceptedAt, dependencies: j.dependencies, workspaceDir: j.workspaceDir, isolation: j.isolation, selectedSkills: (j.selectedSkills || []).map(s => ({ slug: s.slug, selectedBy: s.selectedBy })) })), memory: home.readMemory(agent.id, 600) };
+  return { agent, folder: home.agentDir(agent.id), soul: rd('brain/soul.md'), skills: home.readSkills(agent.id).map(s => s.name), jobsError: home.recoveryFaults.get(agent.id), jobs: home.listJobs(agent.id, 20).map(j => ({ id: j.id, status: j.status, task: j.task, result: j.result, error: j.error, recoveryNeeded: j.recoveryNeeded, managed: j.managed, guidance: j.guidance, expectedOutputs: j.expectedOutputs, verification: j.verification, completionKind: j.completionKind, acceptedAt: j.acceptedAt, dependencies: j.dependencies, workspaceDir: j.workspaceDir, isolation: j.isolation, selectedSkills: (j.selectedSkills || []).map(s => ({ slug: s.slug, selectedBy: s.selectedBy })) })), memory: home.readMemory(agent.id, 600) };
 });
 ipcMain.handle('agents:update', (_e, id, patch) => { try { return { ok: true, agent: home.updateAgent(id, patch || {}) }; } catch (e) { return { ok: false, error: e.message }; } });
 ipcMain.handle('hermes:check', async (_e, opts) => { try { return { steps: await hermes.check(opts || {}) }; } catch (e) { return { steps: [{ name: 'Check', ok: false, detail: e.message }] }; } });

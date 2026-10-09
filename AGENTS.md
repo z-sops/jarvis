@@ -527,3 +527,11 @@ Zee asked for his crew to be able to run on OpenCode (opencode.ai), the open-sou
 - Checkpoints and pause summaries preserve full goals and failure/unknown outcome distinctions. Do not claim complete cross-engine state/approval preservation from these summaries.
 - Final validation for this slice: 341 total, 338 pass, zero fail, three real Hermes skips; 15 Chromium fixture checks; seven actual Linux Electron checks; 17 changed/new JavaScript syntax checks. After the final isolated undo-snapshot adjustment, 16 contract/continuity/directory-undo checks passed. A second-window inspector-driven Electron check could not complete in the headless setup and is not counted as passing.
 - Mandatory NeuralOps action/task/evidence binding, direct-engine enforcement, semantic verification, full observatory/router and actual Windows/live-provider paths remain open. Record subsequent changes and evidence in project-update.md.
+
+
+## Managed action and built-in file boundary — 2026-10-09
+
+- User authorized autonomous strengthening/testing and per-action logging. Preserve architecture and existing permission dialogs. Optional managed jobs require an updated NeuralOps orbit-v1 capability and exact worker/job/run/task binding. Built-in tools are gated by argument fingerprint; old/unavailable server fails closed. Managed shell and Hermes/OpenCode are refused pending verified containment/hooks. Do not claim universal protection.
+- Built-in workers read only their active job workspace, not the whole home or commander session grants. Canonical paths, secret/internal credential blocks and argument snapshots are checked around approval waits. External engine/host filesystem containment remains separate.
+- Retry/pause/continue retain managed mode and create fresh bindings. No inherited approval, automatic side-effect replay or remote completion on model report. Remote task finalization and actual outcome synchronization remain open.
+- Validation: 352 pass/0 fail/3 real-Hermes skips; final 32 relevant security/core/run/guidance cases; 16 Playwright fixture checks; 7 actual Linux Electron checks. NeuralOps real dispatcher managed tests 10/10, gate12/12, persistence13/13. See project-update.md for exact limits and later changes.

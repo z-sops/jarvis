@@ -131,9 +131,22 @@ async function main() {
     });
     await check('background refresh preserves a typed job draft', async () => {
       await page.getByLabel('New job task').fill('Pending draft'); await page.getByLabel('Expected output files').fill('draft.txt');
+      await page.getByLabel('Managed NeuralOps job', { exact: true }).check();
       await page.evaluate(() => window.__orbitPush({ type: 'agent:state', payload: { id: 'alex', state: 'idle' } }));
       await page.waitForFunction(() => document.querySelector('[aria-label="New job task"]')?.value === 'Pending draft');
       assert.equal(await page.getByLabel('Expected output files').inputValue(), 'draft.txt');
+      assert.equal(await page.getByLabel('Managed NeuralOps job', { exact: true }).isChecked(), true);
+      await page.getByLabel('Managed NeuralOps job', { exact: true }).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: path.join(out, 'office-managed-job-form.png') });
+    });
+    await check('managed job option crosses preload/IPC and fails closed without guidance', async () => {
+      const count = engineCalls.length;
+      await page.getByLabel('New job task').fill('Managed fixture job'); await page.getByLabel('Expected output files').fill('');
+      await page.getByRole('button', { name: 'Queue job', exact: true }).click();
+      await page.waitForFunction(() => document.body.textContent.includes('Managed job guidance is not available.'));
+      const job = home.listJobs('alex', 100).find(j => j.task === 'Managed fixture job');
+      assert.equal(job.managed, true); assert.equal(job.status, 'failed'); assert.equal(engineCalls.length, count);
+      await page.getByLabel('Managed NeuralOps job', { exact: true }).uncheck();
     });
     await check('untrusted report markup is displayed as text', async () => {
       await page.getByLabel('New job task').fill('Untrusted report'); await page.getByLabel('Expected output files').fill(''); await page.getByRole('button', { name: 'Queue job', exact: true }).click();
