@@ -648,3 +648,5 @@ Validation follow-up: expanded Node suite570 total/567 pass/0 fail/3 real-Hermes
 Validation this turn: reproduced relay400 before correction; focused41/41 pass; expanded Node577 total574 pass3 real-Hermes skips; final npm539 total536 pass3 skips, zero failures. Recipe checks and syntax results recorded below before publication. No local Docker/native CLI/provider/physical power-failure execution. Previous readiness, SDK and Linux Electron evidence retains its narrower scope. Native task success and exact Windows dependency diagnosis remain pending.
 
 Final validation: Python artifact/recipe4/4 pass; five changed JavaScript files pass syntax checks. No image build/install performed.
+
+Published code/recipe correction to existing draft PR1: 99c5a24d2289d168128f9f7b369058bbd973d437. All13 changed Git blobs matched local hashes before publication. Main remains unmerged/undeployed. Dependency check on the existing Windows image and refreshed native task retry are the next evidence; rebuilding requires the explicit build invocation/installation approval.
