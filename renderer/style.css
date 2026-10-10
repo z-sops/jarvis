@@ -195,3 +195,7 @@ textarea { resize: vertical; }
 .crew-config-body textarea { width: 100%; font-family: var(--mono, monospace); resize: vertical; }
 .crew-config-body pre { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .crew-config .modal-actions { flex-wrap: wrap; }
+
+.crew-config-body [aria-label="Import recovery summary"] { overflow-wrap: anywhere; }
+.crew-config-body table { width: 100%; border-collapse: collapse; }
+.crew-config-body th, .crew-config-body td { padding: 6px; text-align: left; border-bottom: 1px solid var(--line, #333); }

@@ -7,7 +7,7 @@ function playwright() { try { return require('playwright'); } catch { if (proces
 async function main() {
   const root = path.resolve(__dirname, '..'), temp = fs.mkdtempSync(path.join(os.tmpdir(), 'orbit-electron-smoke-'));
   const out = path.resolve(process.env.ORBIT_ELECTRON_RESULTS || path.join(root, 'test-results', 'electron')); fs.mkdirSync(out, { recursive: true });
-  const home = new Home(path.join(temp, 'home')).ensure(); home.createAgent({ name: 'Alex' });
+  const home = new Home(path.join(temp, 'home')).ensure(); for (const name of ['Alex', 'Bob', 'Charlie', 'Dave', 'Eve']) home.createAgent({ name });
   const make = (task, status, expectedOutputs = []) => { const j = home.createJob('alex', task, { expectedOutputs }); return home.updateJob('alex', j.id, { status, runId: 'fixture-prior-run', result: 'Fixture report for review' }); };
   const interrupted = make('Previously running job', 'running'), accepted = make('Review a real file', 'review', ['proof.txt']);
   const missing = make('Missing artifact', 'review', ['missing.txt']), report = make('Report only', 'review'), rejected = make('Reject this report', 'review');
@@ -150,13 +150,29 @@ async function main() {
       await page.getByRole('status').filter({ hasText: /unsupported configuration field/ }).waitFor(); assert.equal(await apply.isDisabled(), true);
       await page.getByRole('dialog', { name: 'Crew configuration', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
     });
+    await check('closing a reviewed YAML preview cancels without changing durable settings', async () => {
+      const before = fs.readFileSync(home.p('agents', 'alex', 'agent.json'));
+      await page.evaluate(() => window.__ui.openCrewConfig());
+      const editor = page.getByRole('textbox', { name: 'Crew YAML', exact: true });
+      await page.waitForFunction(() => document.querySelector('[aria-label="Crew YAML"]')?.value.includes('schemaVersion: 1'));
+      await editor.fill((await editor.inputValue()).replace('workerModel: fixture-ui-model', 'workerModel: fixture-cancelled'));
+      await page.getByRole('button', { name: 'Preview changes', exact: true }).click();
+      await page.waitForFunction(() => ![...document.querySelectorAll('button')].find(b => b.textContent === 'Apply reviewed changes').disabled);
+      await page.getByRole('dialog', { name: 'Crew configuration', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
+      assert.deepEqual(fs.readFileSync(home.p('agents', 'alex', 'agent.json')), before);
+    });
     await check('incomplete YAML import is visible and explicitly acknowledged without replaying worker settings', async () => {
       const ledger = JSON.parse(fs.readFileSync(home.p('logs', 'crew-config.json')));
-      ledger.events.push({ id: 'fixture-interrupted-import', status: 'prepared', at: new Date().toISOString(), changes: [], appliedWorkers: [] });
+      ledger.events.push({ ...ledger.events.at(-1), id: 'fixture-interrupted-import', status: 'prepared', at: new Date().toISOString(), appliedWorkers: [] });
       require('../lib/job-storage').atomicWrite(home.p('logs', 'crew-config.json'), ledger);
       await page.evaluate(() => window.__ui.openCrewConfig());
       await page.getByRole('status').filter({ hasText: /Incomplete import/ }).waitFor();
       await page.getByLabel('Incomplete import history', { exact: true }).getByText(/fixture-interrupted-import/).waitFor();
+      const summary = page.getByLabel('Import recovery summary', { exact: true });
+      assert.equal(await summary.locator('tbody tr').count(), 5);
+      await summary.getByText('Requested settings match', { exact: true }).waitFor();
+      assert.equal(await summary.getByText('Unchanged', { exact: true }).count(), 4);
+      await summary.getByText(/rollback safety has not been established/).waitFor();
       const ack = page.getByRole('button', { name: 'Record inspection', exact: true }); assert.equal(await ack.isDisabled(), true);
       const jobsBefore = home.listJobs('alex', Infinity).length;
       const blocked = await page.evaluate(() => bridge.jobs.dispatch('alex', 'Must not execute during incomplete import', []));

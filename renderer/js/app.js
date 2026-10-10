@@ -184,10 +184,11 @@
     const text = h('textarea', { rows: 16, spellcheck: 'false', 'aria-label': 'Crew YAML', maxlength: 65536 });
     const status = h('p', { role: 'status' }), diff = h('pre', { class: 'perm-detail', 'aria-label': 'Configuration diff' });
     const history = h('pre', { class: 'perm-detail', 'aria-label': 'Incomplete import history' });
+    const recoverySummary = h('div', { 'aria-label': 'Import recovery summary' });
     const inspected = h('input', { type: 'checkbox' });
     const ackLabel = h('label', { class: 'check inline', hidden: true }, inspected, h('span', {}, 'I inspected the current configuration and incomplete import history'));
     const apply = h('button', { class: 'btn primary', disabled: true, onclick: async () => {
-      const selected = token; invalidate(); text.disabled = true;
+      const selected = token; invalidate(false); text.disabled = true;
       try {
         const r = await bridge.crewConfig.apply(selected); if (!r.ok) throw new Error(r.error);
         await refreshAgents(); await reload(); status.textContent = `Applied and verified ${r.changed} field change(s).`;
@@ -201,7 +202,7 @@
         if (!r.ok) throw new Error(r.error); await reload(); status.textContent = 'Inspection recorded. Preview a new import to make further changes.';
       } catch (e) { status.textContent = errText(e); }
     } }, 'Record inspection');
-    function invalidate() { generation++; token = null; apply.disabled = true; diff.textContent = ''; }
+    function invalidate(cancel = true) { const old = token; generation++; token = null; apply.disabled = true; diff.textContent = ''; if (old && cancel !== false) bridge.crewConfig.cancel(old).catch(() => {}); }
     text.addEventListener('input', invalidate);
     inspected.addEventListener('change', () => { ack.disabled = !inspected.checked; });
     async function reload() {
@@ -210,6 +211,18 @@
       if (n !== generation) return;
       text.value = r.text; revision = r.revision; unresolved = r.unresolved;
       history.textContent = unresolved.length ? JSON.stringify(unresolved, null, 2) : '';
+      const labels = { matches_requested: 'Requested settings match', unchanged: 'Unchanged', partial: 'Partially changed', drifted: 'Configuration drift', missing: 'Worker missing', unknown: 'Unknown' };
+      recoverySummary.replaceChildren(...unresolved.flatMap(e => {
+        const r = e.reconciliation;
+        return [h('h3', {}, 'Interrupted import reconciliation'),
+          h('p', {}, `Base revision: ${r.baseRevision || 'Unavailable'}`),
+          h('p', {}, `Current revision: ${r.currentRevision}`),
+          h('p', {}, `Requested document: ${r.requestedDocumentHash || 'Unavailable'}`),
+          h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Worker'), h('th', {}, 'Persisted configuration'), h('th', {}, 'Progress recorded'))),
+            h('tbody', {}, r.workers.map(w => h('tr', {}, h('td', {}, w.id), h('td', {}, labels[w.status] || 'Unknown'), h('td', {}, w.progressRecorded ? 'Yes' : 'No'))))),
+          r.legacyIntentWithoutWorkerHashes ? h('p', {}, 'Older intent lacks per-worker hashes. Worker outcomes cannot be inferred.') : null,
+          h('p', {}, 'Automatic rollback is unavailable; rollback safety has not been established. Explicit inspection is required.')].filter(Boolean);
+      }));
       ackLabel.hidden = ack.hidden = !unresolved.length; inspected.checked = false; ack.disabled = true;
       status.textContent = unresolved.length ? 'Incomplete import: inspect the current export and history. No automatic replay occurred.' : 'Current stored configuration. Edit or load YAML, then preview the changes.';
     }
@@ -221,7 +234,7 @@
       catch { status.textContent = 'File could not be read.'; }
     });
     const body = h('div', { class: 'crew-config-body' }, h('p', {}, 'Versioned configuration for existing workers: engine, provider, model, context and shared Library assignments. Create workers through Add crew. Credentials, permissions, jobs and runtime status stay outside YAML.'),
-      h('label', { class: 'field' }, h('span', {}, 'Load YAML file'), file), text, status, diff, history, ackLabel, ack);
+      h('label', { class: 'field' }, h('span', {}, 'Load YAML file'), file), text, status, diff, recoverySummary, history, ackLabel, ack);
     const m = modal('Crew configuration', body, [h('button', { class: 'btn ghost', onclick: async () => { try { await reload(); } catch (e) { status.textContent = errText(e); } } }, 'Reload from Orbit'),
       h('button', { class: 'btn ghost', onclick: async () => {
         try {
@@ -237,7 +250,7 @@
           token = r.token; diff.textContent = r.changes.length ? JSON.stringify(r.changes, null, 2) : 'No changes.';
           apply.disabled = !r.changes.length; status.textContent = 'Preview only. Apply explicitly within five minutes; queued or running jobs block changes.';
         } catch (e) { if (n === generation) status.textContent = errText(e); }
-      } }, 'Preview changes'), apply, h('button', { class: 'btn ghost', onclick: () => m.close() }, 'Close')], { cls: 'settings crew-config' });
+      } }, 'Preview changes'), apply, h('button', { class: 'btn ghost', onclick: () => { invalidate(); m.close(); } }, 'Close')], { cls: 'settings crew-config' });
     try { await reload(); } catch (e) { status.textContent = errText(e); }
   }
   function openSettings() {

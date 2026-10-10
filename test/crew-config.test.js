@@ -102,7 +102,7 @@ test('symlinked configuration targets cannot redirect writes outside home', t =>
 });
 test('IPC requires trusted main window for reads, previews, apply and acknowledgement', t => {
   const r = rig(t), handlers = new Map(); register({ home: r.home, getCfg: () => r.cfg, ipcMain: { handle: (n, f) => handlers.set(n, f) }, isTrusted: e => e.trusted === true });
-  for (const op of ['export', 'preview', 'apply', 'acknowledge']) assert.equal(handlers.get('crew-config:' + op)({}, 'ignored').ok, false);
+  for (const op of ['export', 'preview', 'apply', 'cancel', 'acknowledge']) assert.equal(handlers.get('crew-config:' + op)({}, 'ignored').ok, false);
   const exported = handlers.get('crew-config:export')({ trusted: true }); assert.equal(exported.ok, true);
   const d = parse(exported.text); d.workers[0].config.workerModel = 'fixture';
   const p = handlers.get('crew-config:preview')({ trusted: true }, yaml.dump(d)); assert.equal(p.ok, true);
@@ -142,4 +142,29 @@ test('incomplete-import quarantine blocks real worker dispatch before job creati
   assert.throws(() => workers.dispatch('alex', 'Do not start'), /incomplete crew import/); assert.equal(r.home.listJobs('alex').length, 0); assert.equal(providerCalls, 0);
   const ex = r.service.export(); r.service.acknowledge({ revision: ex.revision, receiptIds: ex.unresolved.map(e => e.id) });
   assert.doesNotThrow(() => require('../lib/crew-config').assertReady(r.home));
+});
+test('export/import/export round-trip is equivalent and cancellation revokes preview without writes', t => {
+  const r = rig(t); r.home.updateAgent('alex', { engine: 'hermes', workerProvider: 'gemini', workerModel: 'fixture-round-trip', workerContext: 8192 }); r.library.setAssignment('alex', { skills: ['code-review'], packs: ['manual'] });
+  const before = parse(r.service.export().text), p = r.service.preview(yaml.dump(before)); assert.equal(r.service.apply(p.token).changed, 0);
+  assert.deepEqual(parse(r.service.export().text), before);
+  const changed = r.service.preview(edited(r)); r.service.cancel(changed.token); assert.throws(() => r.service.apply(changed.token), /expired|already used/); assert.equal(r.home.getAgent('alex').workerModel, 'fixture-round-trip');
+});
+test('abrupt process exit reconciles five-worker partial state and unrecorded successful writes after restart', t => {
+  for (const mode of ['fourth-assignment', 'third-progress']) {
+    const r = rig(t); for (const name of ['Charlie', 'Dave', 'Eve']) r.home.createAgent({ name });
+    const text = edited(r, d => { for (const w of d.workers) { w.config.engine = 'hermes'; w.config.workerModel = 'fixture-crash'; w.skills = ['code-review']; } });
+    const code = `const fs=require('fs');const input=JSON.parse(fs.readFileSync(0,'utf8'));const {Home}=require('./lib/home');const {Library}=require('./lib/library');const {createCrewConfig}=require('./lib/crew-config');const {atomicWrite}=require('./lib/job-storage');const home=new Home(input.root),library=new Library(home);let calls=0;const original=library.setAssignment.bind(library);library.setAssignment=(...args)=>{if(input.mode==='fourth-assignment'&&++calls===4)process.exit(47);return original(...args)};const write=(file,j)=>{if(input.mode==='third-progress'&&j.events.at(-1).appliedWorkers.length===3)process.exit(47);atomicWrite(file,j)};const service=createCrewConfig({home,library,getCfg:()=>input.cfg,write});service.apply(service.preview(input.text).token);process.exit(2);`;
+    assert.throws(() => require('child_process').execFileSync(process.execPath, ['-e', code], { cwd: path.resolve(__dirname, '..'), input: JSON.stringify({ root: r.home.root, text, cfg: r.cfg, mode }), timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] }), e => e.status === 47);
+    const original = fs.readFileSync(r.home.p('logs', 'crew-config.json'));
+    const restarted = createCrewConfig({ home: new Home(r.home.root), getCfg: () => r.cfg });
+    const ex = restarted.export(), pending = ex.unresolved[0], report = pending.reconciliation;
+    assert.equal(pending.status, 'prepared'); assert.equal(report.workers.length, 5); assert.equal(report.inspectionRequired, true); assert.equal(report.rollback.automatic, false); assert.equal(report.rollback.safety, 'not_established');
+    assert.equal(report.currentRevision, ex.revision); assert.notEqual(report.currentRevision, report.baseRevision); assert.match(report.requestedDocumentHash, /^[a-f0-9]{64}$/);
+    assert.deepEqual(report.workers.map(w => w.status), ['matches_requested', 'matches_requested', 'matches_requested', mode === 'fourth-assignment' ? 'partial' : 'unchanged', 'unchanged']);
+    assert.equal(report.workers[2].progressRecorded, mode !== 'third-progress');
+    assert.deepEqual(fs.readFileSync(r.home.p('logs', 'crew-config.json')), original, 'Reconciliation is read-only, never a replay');
+    assert.throws(() => require('../lib/crew-config').assertReady(r.home), /incomplete crew import/);
+    r.home.updateAgent('dave', { workerModel: 'outside-intent' }); assert.equal(restarted.export().unresolved[0].reconciliation.workers[3].status, 'drifted');
+    assert.throws(() => restarted.acknowledge({ revision: ex.revision, receiptIds: ex.unresolved.map(e => e.id) }), /revision changed/);
+  }
 });

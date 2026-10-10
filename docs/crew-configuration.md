@@ -33,3 +33,21 @@ On failure or crash, some settings may already have changed. Prepared/partial re
 Each replaced file is flushed/atomically renamed; a batch across worker and assignment files is **not** one filesystem transaction. Windows directory flush and physical power-loss durability remain unverified. Serialization assumes Orbit's existing single main process; arbitrary concurrent external file writers are outside this guarantee. If the history is damaged/unreadable, jobs/imports fail closed and manual inspection/repair is required rather than deleting the evidence automatically.
 
 Outside version 1: worker creation/deletion/renaming/role edits, team leaders, desired-running-state reconciliation, lifecycle start/stop commands, credentials/connector permissions, container image changes and native private-session state. Continue using their existing controls. No claim that the broader HiClaw-inspired architecture is complete.
+
+## Interrupted-import reconciliation
+
+The recovery screen compares the **actual current persisted public configuration** against per-worker before/after hashes recorded before apply. It lists every worker selected by the document (including workers with no requested changes):
+
+| Status | Meaning |
+| --- | --- |
+| Requested settings match | Current configuration matches the intended after-state. |
+| Unchanged | Current configuration matches its recorded before-state. |
+| Partially changed | Some requested fields match before and others after; unrelated fields still match the before-state. |
+| Configuration drift | Current state cannot be explained by that recorded transition. |
+| Worker missing / Unknown | The outcome cannot be inferred safely. |
+
+Separately, **Progress recorded** reports whether the worker completion was flushed into the receipt. A crash can leave a successful setting write ahead of this progress record; reconciliation reads actual files rather than assuming the progress counter is complete. Matching state does not prove which process made a change.
+
+Each report shows the base configuration revision, current persisted revision and requested document hash. The document hash identifies the intended input; it is not invented as a successful resulting revision. Older intents without worker hashes remain explicitly unverified. Reconciliation is read-only, not automatic completion/replay. Rollback safety is **not established** because there is no complete protected-state rollback snapshot or cross-file transaction. Explicit user inspection remains required.
+
+Offline tests exercise an abrupt child-process exit on worker4 of5, plus exit after worker3's durable changes but before progress publication. Restart checks the actual applied/partial/unchanged classifications, drift detection, untouched receipt bytes and job quarantine. This is process-crash evidence in temporary homes, not a physical power-cut or Windows durability result.
