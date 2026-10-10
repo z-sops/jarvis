@@ -1,6 +1,14 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),{modelReply}=require('../scripts/native-task-check');
-const {relayPolicy,classifyRuntimeIssue,mcpStatus,createRelay,relayReply}=require('../lib/native-container-runner');
+const {relayPolicy,classifyRuntimeIssue,mcpStatus,createRelay,relayReply,hermesStartupDetails}=require('../lib/native-container-runner');
+test('Hermes startup inspection exposes only bounded states and categories from private runtime logs',t=>{
+  const fs=require('fs'),path=require('path'),dir=fs.mkdtempSync(path.join(require('os').tmpdir(),'orbit-startup-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));fs.mkdirSync(path.join(dir,'logs'));
+  fs.writeFileSync(path.join(dir,'gateway_state.json'),JSON.stringify({gateway_state:'starting',platforms:{api_server:{state:'fatal',error_code:'api_server_key_invalid',error_message:'PRIVATE_TOKEN'}},private:'PRIVATE_TOKEN'}));
+  fs.writeFileSync(path.join(dir,'logs/gateway.log'),"Starting Hermes Gateway...\nMCP server 'orbit' (HTTP): registered 12 tool(s): PRIVATE_TOOL_NAMES\nModuleNotFoundError: PRIVATE_DEPENDENCY\n");
+  const details=hermesStartupDetails(dir);assert.equal(details.gatewayState,'starting');assert.equal(details.apiError,'api_server_key_invalid');assert.equal(details.logIssue,'missing_dependency');assert.equal(details.startupMilestones.mcpRegistered,true);assert.ok(!JSON.stringify(details).includes('PRIVATE_'));
+  fs.writeFileSync(path.join(dir,'gateway_state.json'),'{broken');assert.equal(hermesStartupDetails(dir).gatewayState,'unknown');
+  fs.unlinkSync(path.join(dir,'logs/gateway.log'));fs.symlinkSync(path.join(dir,'gateway_state.json'),path.join(dir,'logs/gateway.log'));assert.equal(hermesStartupDetails(dir).logIssue,'unknown');
+});
 test('native MCP status parser distinguishes failure from successful exit and never returns log text',()=>{
   assert.equal(mcpStatus('orbit failed\n private-token'), 'failed');assert.equal(mcpStatus('orbit needs authentication'), 'unavailable');assert.equal(mcpStatus('orbit \x1b[2mconnected\n private-url'),'connected');assert.equal(mcpStatus('unrelated connected private-token'),'unknown');
   assert.equal(classifyRuntimeIssue('Unexpected content type: PRIVATE_VALUE'),'mcp_invalid_response');assert.equal(classifyRuntimeIssue('No messaging platforms enabled.'),'api_platform_missing');
@@ -28,6 +36,20 @@ test('contained stateless MCP relay rejects optional GET/DELETE with405 without 
   assert.equal(relayPolicy('/mcp','POST',false,true),401);assert.equal(relayPolicy('/mcp','POST',true,false),400);assert.equal(relayPolicy('/other','POST',true,true),400);
   assert.equal(relayPolicy('/v1/chat/completions','POST',true,false),200);
 });
+test('relay admits MCP while a bounded model request is pending, and refuses overflow without forwarding',async t=>{
+  const requests=new Map(),held=[];let release;
+  const firstSent=new Promise(r=>release=r);
+  const relay=createRelay({token:'LOCAL_TOKEN',config:{gateway:true}},{requests,checkpoint:()=>{},send:m=>{held.push(m);release();if(m.type==='gateway')relayReply({id:m.id,status:200,contentType:'application/json',body:Buffer.from('{}').toString('base64')},requests);}});
+  await new Promise(r=>relay.listen(0,'127.0.0.1',r));t.after(()=>{for(const p of requests.values())clearTimeout(p.timer);requests.clear();relay.closeAllConnections();relay.close();});
+  const base='http://127.0.0.1:'+relay.address().port,opts={method:'POST',headers:{Authorization:'Bearer LOCAL_TOKEN'},body:'{}'};
+  const first=fetch(base+'/v1/chat/completions',opts);first.catch(()=>{});await firstSent;
+  const mcp=await fetch(base+'/mcp',opts);assert.equal(mcp.status,200);await mcp.body.cancel();
+  const others=Array.from({length:7},()=>fetch(base+'/v1/chat/completions',opts));for(const p of others)p.catch(()=>{});
+  for(let i=0;i<100&&held.filter(m=>m.type==='broker').length<8;i++)await new Promise(r=>setTimeout(r,5));
+  assert.equal(held.filter(m=>m.type==='broker').length,8);const overflow=await fetch(base+'/v1/chat/completions',opts);assert.equal(overflow.status,429);await overflow.body.cancel();assert.equal(held.length,9);
+  for(const m of held.filter(m=>m.type==='broker'))relayReply({id:m.id,status:200,contentType:'application/json',body:Buffer.from('{}').toString('base64')},requests);
+  for(const r of await Promise.all([first,...others])){assert.equal(r.status,200);await r.body.cancel();}
+});
 test('native stderr yields only fixed diagnostic categories, never arbitrary text or secrets',()=>{
   assert.equal(classifyRuntimeIssue('ModuleNotFoundError: private-value'),'missing_dependency');assert.equal(classifyRuntimeIssue('EROFS private-path'),'readonly_runtime_write');assert.equal(classifyRuntimeIssue('Permission denied secret-token'),'permission_denied');assert.equal(classifyRuntimeIssue('MCP connection failed private-url'),'mcp_connection');assert.equal(classifyRuntimeIssue('secret-token'),'unknown');
 });
@@ -37,6 +59,16 @@ test('offline native fixture requires actual MCP discovery and returned tool evi
   const body=await modelReply({messages:[],tools:[{type:'function',function:{name:'orbit_read_fixture'}}]},state).json();assert.equal(body.choices[0].message.tool_calls[0].function.name,'orbit_read_fixture');
   state.calls=1;assert.throws(()=>modelReply({messages:[]},state),/did not return/);
   const done=await modelReply({messages:[{role:'tool',content:state.marker}]},state).json();assert.equal(done.choices[0].message.content,state.marker);
+});
+test('native fixture recognizes bounded OpenCode auxiliary title requests without satisfying task evidence',async()=>{
+  const title={messages:[{role:'system',content:'You are a title generator.'},{role:'user',content:'Generate a title for this conversation:\n'}],tools:[]};
+  const state={engine:'opencode',marker:'REAL_TOOL_MARKER',requests:0,calls:0};
+  const response=await modelReply(title,state).json();assert.equal(response.choices[0].message.content,'Offline MCP diagnostic');assert.ok(!JSON.stringify(response).includes(state.marker));assert.equal(state.titleRequests,1);assert.equal(state.taskRequests,undefined);
+  assert.throws(()=>modelReply({messages:[{role:'user',content:'Use read_fixture'}],tools:[]},state),/did not expose/);
+  assert.throws(()=>modelReply(title,{...state,engine:'hermes'}),/did not expose/);
+  const split={...title,messages:[{role:'system',content:[{type:'text',text:'You are a title generator.'}]},title.messages[1]]};await modelReply(split,state).text();assert.throws(()=>modelReply(title,state),/title request limit/);
+  const merged={...title,messages:[title.messages[0],{role:'user',content:'Generate a title for this conversation:\nUse read_fixture'}]};assert.equal((await modelReply(merged,{engine:'opencode',requests:0,calls:0}).json()).choices[0].message.content,'Offline MCP diagnostic');
+  state.calls=1;const result=await modelReply({messages:[{role:'tool',content:state.marker}]},state).json();assert.equal(result.choices[0].message.content,state.marker);assert.equal(state.taskRequests,2); // Missing-tool task attempt + result; title calls never contribute.
 });
 test('offline native fixture bounds model loops and supports bounded OpenAI SSE',async()=>{
   const state={marker:'SYNTHETIC_MARKER',requests:0,calls:1};const text=await modelReply({stream:true,messages:[{role:'tool',content:state.marker}]},state).text();assert.match(text,/chat.completion.chunk/);assert.match(text,/SYNTHETIC_MARKER/);assert.ok(text.endsWith('data: [DONE]\n\n'));

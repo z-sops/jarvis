@@ -15,7 +15,7 @@ WORKDIR /opt/hermes
 # Its exact source tree is loaded by the fixed PYTHONPATH wrapper below.
 RUN /opt/orbit-image-build/uv sync --frozen --no-dev --no-install-project \
     --python /opt/orbit-python/bin/python3 --no-python-downloads \
-    --extra web --extra mcp --extra pty --extra cron
+    --extra web --extra mcp --extra pty --extra cron --extra sms
 RUN /opt/hermes/.venv/bin/python scripts/write_install_stamp.py \
     --output /opt/hermes/install-stamp.json \
     --commit 818c13be1dc4fd28987e1e881a9408224afd4535 \
@@ -37,7 +37,7 @@ WORKDIR /workspace
 # This is an offline build smoke, not a model request or production task proof.
 RUN --network=none node -e "if(+process.versions.node.split('.')[0]<20)process.exit(1)" && \
     opencode --version && hermes --version && \
-    PYTHONPATH=/opt/hermes /opt/hermes/.venv/bin/python -c "import openai,fastapi,uvicorn,mcp; import gateway.platforms.api_server"
+    PYTHONPATH=/opt/hermes /opt/hermes/.venv/bin/python -c "import openai,fastapi,uvicorn,mcp,aiohttp; from gateway.platforms.api_server import check_api_server_requirements; assert check_api_server_requirements(), 'Hermes API server dependencies unavailable'"
 LABEL orbit.runtime.hermes="0.21.6" \
     orbit.runtime.hermes.commit="818c13be1dc4fd28987e1e881a9408224afd4535" \
     orbit.runtime.opencode="1.18.35"

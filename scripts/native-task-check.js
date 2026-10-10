@@ -3,16 +3,25 @@
 // No provider network, real credentials, host shell task, or production home.
 const fs=require('fs'),os=require('os'),path=require('path'),crypto=require('crypto');
 const C=require('../lib/native-containment'),{Home}=require('../lib/home'),{createJobRuns}=require('../lib/job-runs');
+function isTitleRequest(body,state){
+  const text=c=>typeof c==='string'?c:Array.isArray(c)?c.filter(p=>p.type==='text').map(p=>p.text).join(''):'';
+  return state.engine==='opencode'&&!(body.tools||[]).length&&body.messages.some(m=>m.role==='system'&&text(m.content).includes('You are a title generator.'))&&body.messages.some(m=>m.role==='user'&&text(m.content).startsWith('Generate a title for this conversation:\n'));
+}
 function modelReply(body,state){
   if(++state.requests>8)throw Error('Offline fixture model request limit exceeded.');
   if(!Array.isArray(body.messages))throw Error('Unsupported offline model request schema.');
   let message,finish;
-  if(!state.calls){
+  if(isTitleRequest(body,state)){
+    if((state.titleRequests=(state.titleRequests||0)+1)>2)throw Error('Offline title request limit exceeded.');
+    message={role:'assistant',content:'Offline MCP diagnostic'};finish='stop';
+  }else if(!state.calls){
+    state.taskRequests=(state.taskRequests||0)+1;
     const tools=(body.tools||[]).filter(t=>t.type==='function'&&/read_fixture$/.test(t.function?.name||''));
     state.modelTools={functionCount:(body.tools||[]).filter(t=>t.type==='function').length,fixtureCount:tools.length};
     if(tools.length!==1)throw Error('Selected CLI did not expose one Orbit read_fixture MCP tool.');
     message={role:'assistant',content:null,tool_calls:[{id:'orbit-fixture-call',type:'function',function:{name:tools[0].function.name,arguments:'{}'}}]};finish='tool_calls';
   }else{
+    state.taskRequests=(state.taskRequests||0)+1;
     if(state.calls!==1||!JSON.stringify(body.messages).includes(state.marker))throw Error('Selected CLI did not return the real MCP fixture result to its model.');
     message={role:'assistant',content:state.marker};finish='stop';
   }
@@ -28,7 +37,7 @@ async function check(image,engine){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-native-task-')),home=new Home(path.join(root,'home')).ensure();
   const actor='fixture-'+engine;home.createAgent({name:actor});const agent=home.getAgent(actor),job=home.createJob(actor,'Offline MCP task');
   const workspace=home.p('workspace',actor,'.native',job.id);fs.mkdirSync(workspace,{recursive:true});
-  const state={marker:'ORBIT_FIXTURE_'+crypto.randomUUID(),requests:0,calls:0,mcp:[],phase:'initialization'};fs.writeFileSync(path.join(workspace,'fixture.txt'),state.marker);
+  const state={engine,marker:'ORBIT_FIXTURE_'+crypto.randomUUID(),requests:0,calls:0,mcp:[],phase:'initialization'};fs.writeFileSync(path.join(workspace,'fixture.txt'),state.marker);
   const controller=new AbortController(),runs=createJobRuns(),run=runs.begin(actor,job.id,controller.signal);
   home.updateJob(actor,job.id,{workspaceDir:workspace,isolation:'native_container',status:'running',runId:run.runId});
   const auth=require('../lib/gateway-auth').createActorAuth({key:crypto.randomBytes(32).toString('hex'),isActiveActor:a=>a===actor,generationFor:a=>runs.generationFor(a)});
@@ -47,9 +56,9 @@ async function check(image,engine){
         if(url!=='http://127.0.0.1:1/v1/chat/completions'||options.method!=='POST')throw Error('Offline fixture refused an unexpected endpoint.');
         return modelReply(JSON.parse(options.body),state); // Never fetch an external provider.
       }});
-    const result=await container.execute('Use the Orbit read_fixture MCP tool once. Return exactly the marker from that tool. Do not use other tools or modify files.',{onProgress:p=>{if(p.phase)state.phase=p.phase;for(const key of ['mcpStatus','childExited','exitCode','healthStatus'])if(key in p)(state.runtimeDetails||={})[key]=p[key];}});
+    const result=await container.execute('Use the Orbit read_fixture MCP tool once. Return exactly the marker from that tool. Do not use other tools or modify files.',{onProgress:p=>{if(p.phase)state.phase=p.phase;for(const key of ['mcpStatus','childExited','exitCode','healthStatus','startup'])if(key in p)(state.runtimeDetails||={})[key]=p[key];}});
     const saved=home.findJob(job.id);
-    const checks={nativeResponse:result.trim()===state.marker,owningActorMcp:state.calls===1,modelReceivedToolResult:state.requests>=2,unchangedInput:fs.readFileSync(path.join(workspace,'fixture.txt'),'utf8')===state.marker,checkpointSaved:!!saved.nativeCheckpoint,containerStopped:saved.containment?.status==='stopped'};
+    const checks={nativeResponse:result.trim()===state.marker,owningActorMcp:state.calls===1,modelReceivedToolResult:state.taskRequests>=2,unchangedInput:fs.readFileSync(path.join(workspace,'fixture.txt'),'utf8')===state.marker,checkpointSaved:!!saved.nativeCheckpoint,containerStopped:saved.containment?.status==='stopped'};
     report={engine,ok:Object.values(checks).every(Boolean),image,checks,modelFixtureRequests:state.requests};
   }catch(e){report={engine,ok:false,image,stage:'native_task',error:String(e.message).slice(0,300),modelFixtureRequests:state.requests,mcpCalls:state.calls};}
   finally{
@@ -57,7 +66,7 @@ async function check(image,engine){
     runs.end(run);await server.stop();const status=home.findJob(job.id)?.containment?.status;
     if(!status||status==='stopped')fs.rmSync(root,{recursive:true,force:true});else report={...report,ok:false,retainedDiagnosticHome:root};
   }
-  return {...report,diagnostics:{runtimePhase:state.phase,mcp:state.mcp,...(state.runtimeDetails?{runtimeDetails:state.runtimeDetails}:{}),...(state.modelTools?{modelTools:state.modelTools}:{})},scope:'Real contained native CLI, local deterministic model, owning-actor existing MCP and file checkpoint; no live provider, billing or human approval proof.'};
+  return {...report,diagnostics:{runtimePhase:state.phase,mcp:state.mcp,modelRequests:{task:state.taskRequests||0,title:state.titleRequests||0},...(state.runtimeDetails?{runtimeDetails:state.runtimeDetails}:{}),...(state.modelTools?{modelTools:state.modelTools}:{})},scope:'Real contained native CLI, local deterministic model, owning-actor existing MCP and file checkpoint; no live provider, billing or human approval proof.'};
 }
 async function main(){
   const image=process.argv[2];if(!/^sha256:[a-f0-9]{64}$/.test(image||''))throw Error('Supply an installed immutable image ID.');

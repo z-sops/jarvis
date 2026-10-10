@@ -75,3 +75,20 @@ Validation follow-up: expanded Node suite570 total/567 pass/0 fail/3 real-Hermes
 
 
 The mounted runner now sets gateway.multiplex_profiles=false for its isolated Hermes single-worker home: the pinned gateway defaults to multiplexing and otherwise reloads credentials under a profile scope that need not contain the generated environment-only API-server key. It also checks OpenCode's fixed Orbit MCP connection with native mcp list before task submission. These changes require no image rebuild. The reported6a29d22 Windows task failures remain the latest actual task evidence until retested; CLI/isolation passes and local SDK relay checks are not native task success. Raw CLI logs stay inside the disposable runtime; only fixed readiness categories and bounded health/exit details are returned.
+
+
+## Native task fixture and relay correction — 2026-10-10
+
+- Actual Windows e43ea1f result remains FAILED for both engines: Hermes alive without health response; OpenCode readiness connected but task fixture stopped on a zero-tool request. No native task, provider or approval PASS.
+- Pinned OpenCode runs a separate title-generation request with no tools. The fixture now recognizes only its bounded known title pattern, returns a synthetic title, and counts task evidence separately. All other missing-tool requests still fail; title generation never satisfies MCP/result/file evidence. Its involvement in the actual Windows failure is plausible, not yet proven by a successful retry.
+- A held broker request reproduced a real relay defect: concurrent MCP returned400. The relay now admits at most8 requests, rejects excess with429, and preserves serialized host processing, checkpoints and failure latch. Offline regression passes; native compatibility remains pending.
+- Hermes startup diagnostics project fixed states/milestones from bounded regular private logs/state; raw logs and unknown strings cannot cross the boundary. The host independently validates the projection.
+- Recipe gap: upstream API server requires aiohttp; the original web/mcp/pty/cron extras do not explicitly provide it and import alone tolerated absence. Add the pinned upstream sms extra (aiohttp dependency only; no SMS service enabled) and assert API-server requirements in offline build smoke. Existing image dependency availability remains unverified; a new image is not built automatically.
+
+Before rebuilding, the existing candidate can be checked without downloads, credentials or provider calls:
+
+```powershell
+docker --host npipe:////./pipe/dockerDesktopLinuxEngine run --rm --network none --read-only --user 10001:10001 --cap-drop ALL --security-opt no-new-privileges --pids-limit 64 --memory 512m --cpus 1 --env PYTHONPATH=/opt/hermes --env PYTHONDONTWRITEBYTECODE=1 --entrypoint /opt/hermes/.venv/bin/python sha256:80eebf6352fc1290a6ed7111803007b921d303855008a800abf2c0a70682148a -c "import aiohttp; from gateway.platforms.api_server import check_api_server_requirements; assert check_api_server_requirements(); print('Hermes API dependency check passed')"
+```
+
+Failure here identifies packaging readiness, not every startup cause. Rebuilding via the existing reviewed PowerShell wrapper downloads/installs dependencies inside a new image and requires installation approval. Existing immutable image remains available; record and test the new image ID separately.

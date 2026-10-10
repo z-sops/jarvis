@@ -9,7 +9,13 @@
     "version": "0.21.6",
     "repository": "https://github.com/NousResearch/hermes-agent.git",
     "commit": "818c13be1dc4fd28987e1e881a9408224afd4535",
-    "extras": ["web", "mcp", "pty", "cron"]
+    "extras": [
+      "web",
+      "mcp",
+      "pty",
+      "cron",
+      "sms"
+    ]
   },
   "artifacts": {
     "python": {

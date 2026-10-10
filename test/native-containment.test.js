@@ -28,6 +28,11 @@ test('native readiness diagnostics discard arbitrary logs, exit strings and inva
   const c=await start(t,r,d,(m,emit)=>{if(m.type==='init'){emit({type:'runtime_phase',phase:'opencode_mcp',mcpStatus:'failed',childExited:true,exitCode:'SECRET_TOKEN',healthStatus:900,message:'PRIVATE_PATH'});emit({type:'failure',phase:'opencode_mcp',issue:'mcp_invalid_response'});}});
   await assert.rejects(c.execute('Goal',{onProgress:p=>progress=p}),/opencode_mcp; mcp_invalid_response/);assert.deepEqual(progress,{phase:'opencode_mcp',mcpStatus:'failed',childExited:true});assert.equal(r.home.findJob(r.job.id).containment.status,'stopped');
 });
+test('host revalidates native startup state and milestone diagnostics instead of forwarding arbitrary fields',async t=>{
+  const r=rig(t),d=fakeDocker();let progress;
+  const c=await start(t,r,d,(m,emit)=>{if(m.type==='init'){emit({type:'runtime_phase',phase:'hermes_health',startup:{gatewayState:'starting',apiPresent:false,apiState:'PRIVATE_TOKEN',apiError:'PRIVATE_TOKEN',logIssue:'unknown',startupMilestones:{mcpRegistered:true,gatewayStarting:'PRIVATE_TOKEN',untrusted:'PRIVATE_TOKEN'},raw:'PRIVATE_TOKEN'}});emit({type:'failure',phase:'hermes_health'});}});
+  await assert.rejects(c.execute('Goal',{onProgress:p=>progress=p}),/hermes_health/);assert.deepEqual(progress.startup,{gatewayState:'starting',apiPresent:false,logIssue:'unknown',startupMilestones:{mcpRegistered:true}});assert.ok(!JSON.stringify(progress).includes('PRIVATE_'));
+});
 test('checkpoint regular files use a write-enabled flush handle required by Windows',async t=>{
   const r=rig(t),d=fakeDocker(),open=fs.openSync,flush=fs.fsyncSync,close=fs.closeSync,handles=new Map();let flushed=0;
   fs.openSync=function(file,flags,...args){const fd=open.call(fs,file,flags,...args);if(String(file).includes('native-candidates')&&path.basename(String(file))==='proof.txt')handles.set(fd,flags);return fd;};

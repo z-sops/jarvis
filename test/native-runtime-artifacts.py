@@ -55,6 +55,11 @@ class ArtifactTests(unittest.TestCase):
         self.assertIn('--base-version ' + lock['hermes']['version'], dockerfile)
         self.assertIn('--frozen', dockerfile)
         self.assertIn('RUN --network=none', dockerfile)
+        for extra in lock['hermes']['extras']:
+            self.assertIn('--extra ' + extra, dockerfile)
+        self.assertIn('sms', lock['hermes']['extras'])
+        self.assertIn('import openai,fastapi,uvicorn,mcp,aiohttp', dockerfile)
+        self.assertIn('assert check_api_server_requirements()', dockerfile)
         for value in lock['artifacts'].values():
             self.assertRegex(value['sha256'], r'^[a-f0-9]{64}$')
             self.assertTrue(value['url'].startswith('https://github.com/'))
