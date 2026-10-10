@@ -536,3 +536,5 @@ Last updated: 2026-10-09 (Asia/Karachi)
 - Publication: preparing reviewed source/test/doc/log changes for existing draft PR1; expected parent cb72c07621de7a59b36f575ab2e65128651a39eb. Final release suite and exact lease/blob confirmation follow.
 
 - Final release verification: npm test498 total/495 pass/0 fail/3 real-Hermes skips,52672.764561ms,exit0 (native-release-suite.log), after all functional/UI changes. Native broker24/24 and18 JavaScript syntax checks passed; actual Linux Electron10/10, no renderer errors, with final worker-budget labels and native-continuity checkbox persisted. Preparing24 source/test/doc/log paths against verified parent cb72c07621de7a59b36f575ab2e65128651a39eb.
+
+- Publication confirmed: source/test/doc/log commit bcec396ae080dd915f40ba4e95cef786bc91c749 published on existing draft PR1 with expected-head lease; all24 blob hashes matched reviewed bytes. Final release498/495/0/3, native broker24/24,18 syntax checks and10 actual Linux Electron checks recorded. Main remains unmerged/undeployed. This confirmation is recorded in the following log-only commit.
