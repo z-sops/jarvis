@@ -20,6 +20,22 @@ test('cancel stops the owned container and never copies an incomplete candidate'
 test('changed workspace and changed reviewer source refuse candidate application',async t=>{const source=[{path:'source/a.txt',bytes:1,sha256:'a'.repeat(64)}];assert.throws(()=>C.validateCandidate([{...source[0],sha256:'b'.repeat(64)}],source,true),/review source/);const r=rig(t),d=fakeDocker(),c=await start(t,r,d,(m,emit)=>{if(m.type==='init'){fs.writeFileSync(path.join(r.ws,'external.txt'),'changed');emit({type:'manifest',files:[]});emit({type:'complete'});}});await assert.rejects(c.execute('Goal'),/Workspace changed/);assert.equal(fs.readFileSync(path.join(r.ws,'external.txt'),'utf8'),'changed');});
 test('restart cleanup is ownership-bound and cannot stop an unrelated container',async t=>{const r=rig(t),d=fakeDocker(),c=await start(t,r,d,()=>{});await c.close();const state=r.home.findJob(r.job.id).containment;r.home.updateJob('alex',r.job.id,{status:'interrupted',containment:{...state,status:'cleanup_unknown'}});await C.reconcile(r.home,d.runner);assert.equal(r.home.findJob(r.job.id).containment.status,'stopped');let killed=0;await assert.rejects(C.stopOwned(async a=>{if(a[0]==='inspect')return {code:0,stdout:JSON.stringify([{Image:image,Config:{Labels:{'orbit.native.owner':'different'}}}])};killed++;return {code:0,stdout:''};},state),/identity/);assert.equal(killed,0);});
 function snapshot(emit,content,kind='checkpoint') {const b=Buffer.from(content);emit({type:'manifest',kind,files:[{path:'proof.txt',bytes:b.length,sha256:sha(b)}]});emit({type:'file',path:'proof.txt',offset:0,data:b.toString('base64')});emit({type:'complete',kind});}
+test('checkpoint regular files use a write-enabled flush handle required by Windows',async t=>{
+  const r=rig(t),d=fakeDocker(),open=fs.openSync,flush=fs.fsyncSync,close=fs.closeSync,handles=new Map();let flushed=0;
+  fs.openSync=function(file,flags,...args){const fd=open.call(fs,file,flags,...args);if(String(file).includes('native-candidates')&&path.basename(String(file))==='proof.txt')handles.set(fd,flags);return fd;};
+  fs.fsyncSync=function(fd){if(handles.has(fd)){if(handles.get(fd)!=='r+')throw Object.assign(Error('EPERM: operation not permitted, fsync'),{code:'EPERM'});flushed++;}return flush.call(fs,fd);};
+  fs.closeSync=function(fd){handles.delete(fd);return close.call(fs,fd);};
+  try{const c=await start(t,r,d,(m,emit)=>{if(m.type==='init')snapshot(emit,'Durable artifact','final');});await c.execute('Goal');assert.equal(flushed,1);assert.ok(r.home.findJob(r.job.id).nativeCheckpoint);assert.equal(fs.readFileSync(path.join(r.ws,'proof.txt'),'utf8'),'Durable artifact');}
+  finally{fs.openSync=open;fs.fsyncSync=flush;fs.closeSync=close;}
+});
+test('regular-file flush failure prevents checkpoint publication, broker requests and candidate application',async t=>{
+  const r=rig(t),d=fakeDocker(),open=fs.openSync,flush=fs.fsyncSync,close=fs.closeSync,handles=new Set();let fetched=0;
+  fs.openSync=function(file,...args){const fd=open.call(fs,file,...args);if(String(file).includes('native-candidates')&&path.basename(String(file))==='proof.txt')handles.add(fd);return fd;};
+  fs.fsyncSync=function(fd){if(handles.has(fd))throw Object.assign(Error('fixture regular-file flush failed'),{code:'EIO'});return flush.call(fs,fd);};
+  fs.closeSync=function(fd){handles.delete(fd);return close.call(fs,fd);};
+  try{const c=await start(t,r,d,(m,emit)=>{if(m.type==='init'){snapshot(emit,'Unflushed');emit({type:'broker',id:1,path:'/v1/models',method:'GET',body:''});}},{fetchImpl:async()=>{fetched++;return new Response('{}');}});await assert.rejects(c.execute('Goal'),/regular-file flush failed/);assert.equal(fetched,0);assert.equal(r.home.findJob(r.job.id).nativeCheckpoint,undefined);assert.equal(fs.existsSync(path.join(r.ws,'proof.txt')),false);assert.equal(r.home.findJob(r.job.id).containment.status,'stopped');}
+  finally{fs.openSync=open;fs.fsyncSync=flush;fs.closeSync=close;}
+});
 test('internet failure retains a durable checkpoint; explicit retry restores it without replaying requests',async t=>{
   const r=rig(t),d=fakeDocker();let fetches=0;
   const c=await start(t,r,d,(m,emit)=>{if(m.type==='init'){snapshot(emit,'Saved before network loss');emit({type:'broker',id:1,path:'/v1/chat/completions',method:'POST',body:'{}'});}},{fetchImpl:async()=>{fetches++;assert.ok(r.home.findJob(r.job.id).nativeCheckpoint);throw Error('fixture internet failure');}});

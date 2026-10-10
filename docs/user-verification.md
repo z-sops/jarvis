@@ -44,3 +44,11 @@ First actual Windows runtime-image build (checkout de6c019) failed at Hermes pro
 
 ### User Windows native CLI/isolation PASS — 2026-10-10
 Both required contained runtime checks now pass on the user's built runtime candidate: Hermes0.21.6/upstream818c13be and OpenCode1.18.35, all isolation/availability/Node booleans true. Candidate short ID80eebf6352fc; full immutable ID not printed in supplied output. Availability/kernel diagnostic gap is closed for this candidate only. scripts/native-task-check.js now prepares the next real-CLI task/MCP/checkpoint check with a local deterministic model and disposable Home; no real model API/billing/approval/recovery proof is claimed. See containers/native-runtime/README.md.
+
+
+### 2026-10-10 — Actual Windows native task failure and checkpoint flush fix
+The user ran scripts/native-task-check.js after updating to b0aaede on Windows Docker Linux29.5.3 with candidate sha256:80eebf6352fc1290a6ed7111803007b921d303855008a800abf2c0a70682148a. Both engines failed at native_task with EPERM: operation not permitted, fsync; Hermes made zero synthetic model requests, OpenCode one, and neither made an MCP call. Earlier CLI/isolation PASS remains valid; task/MCP compatibility is not established.
+
+Checkpoint regular files were opened read-only before fsync. Windows FlushFileBuffers requires GENERIC_WRITE (Microsoft API documentation); changed only these regular-file handles to r+ without truncation. Mandatory file flushing remains fail-closed. A regression also found queued protocol frames could continue after the first checkpoint error: the existing frame processor now rejects further frames after failure/closure, preventing queued broker or MCP actions. Offline regressions reproduce the original Windows handle requirement and prove a file flush failure prevents checkpoint publication, broker submission and candidate application.
+
+Focused checks:31/31; expanded Node suite:567 total,564 pass,0 fail,3 real-Hermes skips. JavaScript syntax checks pass. These are remote offline fixtures, not a Windows retest. Update the clean verification checkout and rerun native-task-check.js with the same immutable image; no rebuild/install/provider call is needed for this host-side fix. Physical power-loss/directory durability and production provider/budget/approval/crash evidence remain separate.
