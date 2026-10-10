@@ -1,6 +1,6 @@
 # Candidate native runtime image
 
-Status: recipe implemented; image build, native gateway startup, and real task/provider/MCP compatibility **unverified**. No dependencies were installed while preparing this recipe. This adds build tooling only; Orbit still uses its existing containment runner, broker, jobs and gateway.
+Status: user-reported Windows candidate image build and both CLI/isolation checks **passed**. Real native task/provider/MCP compatibility remains **unverified**. No dependencies were installed in the remote coding environment. This adds build tooling only; Orbit still uses its existing containment runner, broker, jobs and gateway.
 
 The user's installed Python3.11/Node20 base passed real Windows isolation diagnostics but lacked both selected CLIs. This recipe installs OpenCode1.18.35 (official Linux x64 baseline binary) and Hermes0.21.6 (exact source commit818c13be1dc4fd28987e1e881a9408224afd4535) into a separate image. The baseline OpenCode artifact avoids an AVX2 CPU requirement. Hermes's release lock selects Python>=3.14, so its isolated interpreter is Python3.14.7+20260901; the existing base interpreter is retained only for build staging. Python and uv0.12.3 artifact URLs/hashes come from that Hermes commit's pm/lock.json. OpenCode archive SHA256 comes from the official GitHub release asset digest. See runtime-lock.json.
 
