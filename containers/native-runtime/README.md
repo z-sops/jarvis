@@ -42,3 +42,15 @@ Official references inspected 2026-10-10:
 
 ## First Windows build evidence — 2026-10-10
 The user ran checkout de6c019 on Docker Desktop. Base resolution, checksum-verified artifacts and the pinned Git source step succeeded; dependency sync failed because --no-editable asked uv to build a Hermes wheel, which upstream setup.py rejects. The recipe now uses --no-install-project, matching the dependency-only intent of upstream Docker assembly. Existing source wrapper is retained. This fixes the reproduced recipe cause, but the corrected image build/startup is not yet verified. Repeat the existing build wrapper after a clean fast-forward; Docker may reuse the completed prior layers. Do not disable the upstream guard or use HERMES_NIX_BUILD as a workaround.
+
+## Windows CLI/isolation PASS and offline native task diagnostic
+On 2026-10-10 the user reported built image orbit-native-runtime:hermes0.21.6-opencode1.18.35 (short ID80eebf6352fc,3.81GB). Both checkRuntime results passed every required boolean: Hermes Agent v0.21.6 (upstream818c13be), OpenCode1.18.35. This supersedes image build/CLI availability as unverified for that user-tested candidate; its full immutable ID was not supplied in the output. Real task/provider/MCP behavior is still separate.
+
+The new scripts/native-task-check.js accepts the installed full sha256 image ID. It creates a disposable synthetic Home and one job at a time, starts the existing owned container, uses a deterministic in-process OpenAI-compatible model fixture (including SSE), and routes a read_fixture tool through the existing actor/run-authenticated Orbit MCP server. It checks the real CLI returns that actual tool result to its model, emits the fixture marker, preserves input, saves a file checkpoint and stops the container. Eight synthetic model requests maximum and a90-second native task deadline per engine. No real credentials or external model fetch; production Home/settings remain separate. Input fixtures are synthetic and deleted only after owned cleanup is confirmed; uncertain cleanup retains the diagnostic home for inspection.
+
+```powershell
+$image = docker --host npipe:////./pipe/dockerDesktopLinuxEngine image inspect orbit-native-runtime:hermes0.21.6-opencode1.18.35 --format '{{.Id}}'
+if ($LASTEXITCODE -eq 0) { node .\scripts\native-task-check.js $image }
+```
+
+This exercises actual native CLI/MCP/file-checkpoint plumbing with a local model fixture. It does not prove AI reasoning, live provider compatibility, real token billing/budget enforcement, human approvals, browser actions, cancellation/restart or physical power-loss recovery. The host model broker is intentionally replaced by a deterministic fixture here; production broker policy remains a separate evidence gate. Native task diagnostic itself has not been executed remotely (Docker unavailable). Offline fixture/containment regression:29/29 pass.
