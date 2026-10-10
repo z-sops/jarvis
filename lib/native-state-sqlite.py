@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import sqlite3
 import stat
 import sys
@@ -13,6 +14,9 @@ import time
 LIMIT = 8 * 1024 * 1024
 engine, mode, root = sys.argv[1:4]
 root = pathlib.Path(root).resolve()
+selected_session = sys.argv[4] if len(sys.argv) > 4 else None
+if selected_session is not None and not re.fullmatch(r"[a-zA-Z0-9_-]{1,256}", selected_session):
+    raise ValueError("Unsafe selected session")
 if engine not in ("hermes", "opencode") or mode not in ("capture", "restore"):
     raise ValueError("Unsupported state adapter")
 paths = ["hermes/state.db", "hermes/memories/MEMORY.md", "hermes/memories/USER.md"] if engine == "hermes" else ["data/opencode/opencode.db"]
@@ -99,7 +103,7 @@ def sanitize(db):
         cm = columns(db, "messages")
         if {"active", "display_metadata"}.issubset(cm):
             cleared += db.execute("UPDATE messages SET active=0 WHERE role='user' AND active=1 AND json_valid(display_metadata) AND json_extract(display_metadata,'$._queued_prompt')=1").rowcount
-        row = db.execute("SELECT id FROM sessions WHERE source='api_server' ORDER BY started_at DESC LIMIT 1").fetchone()
+        row = db.execute("SELECT id FROM sessions WHERE source='api_server' AND id=?", (selected_session,)).fetchone() if selected_session else db.execute("SELECT id FROM sessions WHERE source='api_server' ORDER BY started_at DESC LIMIT 1").fetchone()
         sid = row[0] if row else None
         calls, results = set(), set()
         if sid:
@@ -144,6 +148,7 @@ else:
     bundle = json.loads(sys.stdin.read(16 * 1024 * 1024 + 1))
     if bundle.get("engine") != engine or bundle.get("adapter") != 1 or bundle.get("pendingEffects") != 0:
         raise ValueError("Unresolved native state")
+    selected_session = bundle.get("sessionId")
     total, seen = 0, set()
     for entry in bundle["files"]:
         rel = entry["path"]

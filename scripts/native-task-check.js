@@ -37,6 +37,7 @@ function modelReply(body,state){
     message={role:'assistant',content:null,tool_calls:[{id,type:'function',function:{name,arguments:JSON.stringify(args)}}]};finish='tool_calls';
   }else{
     state.taskRequests=(state.taskRequests||0)+1;
+    if(state.resuming)state.resumedModelHistory={messages:body.messages.length,priorMarkerPresent:JSON.stringify(body.messages.slice(0,-1)).includes(state.marker),toolMessages:body.messages.filter(m=>m.role==='tool').length};
     if(state.calls!==1||!JSON.stringify(body.messages).includes(state.marker))throw Error('Selected CLI did not return the real MCP fixture result to its model.');
     message={role:'assistant',content:state.marker};finish='stop';
   }
@@ -46,6 +47,7 @@ function modelReply(body,state){
   const chunk=(d,f,u)=>({id:'fixture',object:'chat.completion.chunk',created:1,model:'orbit-fixture',choices:[{index:0,delta:d,finish_reason:f}],...(u?{usage:u}:{})});
   return new Response([chunk(delta,null),chunk({},finish,usage)].map(x=>'data: '+JSON.stringify(x)+'\n\n').join('')+'data: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}});
 }
+function gatewayForRun(gateway,auth,actor){const token=auth.tokenForActor(actor);if(!token)throw Error('Current diagnostic run has no scoped gateway credential.');return {...gateway,token};}
 async function check(image,engine,privateContinuity=false){
   const preflight=await C.checkRuntime({nativeContainerImage:image},engine);
   if(!preflight.ok)return {engine,ok:false,image,stage:'runtime',error:preflight.error};
@@ -83,23 +85,24 @@ async function check(image,engine,privateContinuity=false){
       currentJobId=next.id;
       const restarted=new Home(home.root).ensure();restarted.secretStorage=home.secretStorage;restarted.recoverJobs();C.restoreCheckpoint(restarted,restarted.findJob(next.id),context);
       run=runs.begin(actor,next.id,controller.signal);restarted.updateJob(actor,next.id,{status:'running',runId:run.runId});
-      container=await C.start({...launch,home:restarted,job:restarted.findJob(next.id),run});
-      const resumed=await container.execute('Return the marker from your previous tool result. Do not call any tools or change files.');
+      state.resuming=true;
+      container=await C.start({...launch,home:restarted,job:restarted.findJob(next.id),run,gateway:gatewayForRun(gateway,auth,actor)});
+      const resumed=await container.execute('Return the marker from your previous tool result. Do not call any tools or change files.',{onProgress:p=>{if(p.phase)state.phase=p.phase;for(const key of ['mcpStatus','childExited','exitCode','healthStatus','startup'])if(key in p)(state.runtimeDetails||={})[key]=p[key];}});
       const resumedJob=restarted.findJob(next.id),second=C.readPrivateState(restarted,resumedJob,context);
       checks.privateSessionRestored=second.sessionId===first.sessionId;checks.nativeHistoryReachedModel=resumed.trim()===state.marker&&state.calls===1;checks.retryContainerStopped=resumedJob.containment?.status==='stopped';
     }
     report={engine,ok:Object.values(checks).every(Boolean),image,checks,modelFixtureRequests:state.requests};
-  }catch(e){report={engine,ok:false,image,stage:'native_task',error:String(e.message).slice(0,300),modelFixtureRequests:state.requests,mcpCalls:state.calls};}
+  }catch(e){report={engine,ok:false,image,stage:state.resuming?'native_resume':'native_task',error:String(e.message).slice(0,300),modelFixtureRequests:state.requests,mcpCalls:state.calls};}
   finally{
     try{await container?.close();}catch{report={...report,ok:false,error:'Container cleanup is unknown; retain diagnostic home and restore Docker.'};}
     runs.end(run);await server.stop();const status=home.findJob(currentJobId)?.containment?.status;
     if(!status||status==='stopped')fs.rmSync(root,{recursive:true,force:true});else report={...report,ok:false,retainedDiagnosticHome:root};
   }
-  return {...report,diagnostics:{runtimePhase:state.phase,mcp:state.mcp,modelRequests:{task:state.taskRequests||0,title:state.titleRequests||0},...(state.runtimeDetails?{runtimeDetails:state.runtimeDetails}:{}),...(state.modelTools?{modelTools:state.modelTools}:{})},scope:privateContinuity?'Real contained native CLI and explicit private-session restart with ephemeral fixture encryption/local deterministic model; no physical power-cut, OS-keystore, live provider, billing or arbitrary plugin proof.':'Real contained native CLI, local deterministic model, owning-actor existing MCP and file checkpoint; no live provider, billing or human approval proof.'};
+  return {...report,diagnostics:{runtimePhase:state.phase,mcp:state.mcp,modelRequests:{task:state.taskRequests||0,title:state.titleRequests||0},...(state.runtimeDetails?{runtimeDetails:state.runtimeDetails}:{}),...(state.modelTools?{modelTools:state.modelTools}:{}),...(state.resumedModelHistory?{resumedModelHistory:state.resumedModelHistory}:{})},scope:privateContinuity?'Real contained native CLI and explicit private-session restart with ephemeral fixture encryption/local deterministic model; no physical power-cut, OS-keystore, live provider, billing or arbitrary plugin proof.':'Real contained native CLI, local deterministic model, owning-actor existing MCP and file checkpoint; no live provider, billing or human approval proof.'};
 }
 async function main(){
   const image=process.argv[2];if(!/^sha256:[a-f0-9]{64}$/.test(image||''))throw Error('Supply an installed immutable image ID.');
   for(const engine of ['hermes','opencode']){const report=await check(image,engine,process.argv[3]==='--private-continuity');console.log(JSON.stringify(report,null,2));if(!report.ok)process.exitCode=1;}
 }
 if(require.main===module)main().catch(e=>{console.error(String(e.message).slice(0,300));process.exitCode=1;});
-module.exports={modelReply,check};
+module.exports={modelReply,check,gatewayForRun};

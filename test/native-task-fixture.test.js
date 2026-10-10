@@ -93,3 +93,9 @@ test('deferred native search refuses wrong actor, invented names, missing eviden
   assert.throws(()=>modelReply({tools,messages:[{role:'tool',tool_call_id:'orbit-fixture-search',content:'{'}]},{...state}),/invalid native search/);
   assert.throws(()=>modelReply({tools,messages:[]},{...state,engine:'opencode',searchIssued:false}),/did not expose/);
 });
+test('offline native restart rotates actor token and old credential remains rejected',()=>{
+ const {createJobRuns}=require('../lib/job-runs'),{createActorAuth}=require('../lib/gateway-auth'),{gatewayForRun}=require('../scripts/native-task-check');
+ const runs=createJobRuns(),ctl=new AbortController(),auth=createActorAuth({key:'a'.repeat(64),isActiveActor:a=>a==='alex',generationFor:runs.generationFor});
+ const first=runs.begin('alex','job-1',ctl.signal),g={url:'http://127.0.0.1:1/mcp',token:auth.tokenForActor('alex')};runs.end(first);const second=runs.begin('alex','job-2',ctl.signal),fresh=gatewayForRun(g,auth,'alex');assert.notEqual(fresh.token,g.token);assert.equal(auth.authenticate('alex',g.token),false);assert.equal(auth.authenticate('alex',fresh.token),true);runs.end(second);assert.throws(()=>gatewayForRun(g,auth,'alex'),/scoped/);
+});
+test('resumed fixture reports history health without exposing transcript or marker',()=>{const state={engine:'hermes',marker:'PRIVATE_MARKER',requests:0,calls:1,resuming:true};assert.throws(()=>modelReply({messages:[{role:'user',content:'Resume'}],stream:false},state),/fixture result/);assert.deepEqual(state.resumedModelHistory,{messages:1,priorMarkerPresent:false,toolMessages:0});assert.ok(!JSON.stringify(state.resumedModelHistory).includes(state.marker));});
