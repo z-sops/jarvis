@@ -650,3 +650,8 @@ Validation this turn: reproduced relay400 before correction; focused41/41 pass; 
 Final validation: Python artifact/recipe4/4 pass; five changed JavaScript files pass syntax checks. No image build/install performed.
 
 Published code/recipe correction to existing draft PR1: 99c5a24d2289d168128f9f7b369058bbd973d437. All13 changed Git blobs matched local hashes before publication. Main remains unmerged/undeployed. Dependency check on the existing Windows image and refreshed native task retry are the next evidence; rebuilding requires the explicit build invocation/installation approval.
+
+
+## Windows Hermes API dependency confirmed missing — 2026-10-10
+
+User executed the hardened offline dependency probe on immutable image sha256:80eebf6352fc1290a6ed7111803007b921d303855008a800abf2c0a70682148a. Python failed at import aiohttp with ModuleNotFoundError. Missing API dependency is now observed evidence, not a hypothesis; it is a startup prerequisite blocker, not proof that every Hermes startup failure is resolved. Corrected frozen extras and API requirement assertion were published in99c5a24/758c78f. Next action: update the separate Windows verification clone, explicitly build the reviewed candidate image, retain its new immutable ID, then rerun CLI/isolation and actual deterministic native-task checks. Downloads/install occur only inside the candidate build. No paid provider or original application/settings modification. Both native tasks remain unverified/failed until actual retest. No new code changes or redundant suite rerun for this evidence-only update.
