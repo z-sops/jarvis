@@ -45,13 +45,26 @@ test('input mount is a fixed filtered copy, excludes Git metadata and cannot gai
   const c=await start(t,r,d,()=>{});assert.notEqual(c.state.inputDir,r.ws);assert.equal(fs.readFileSync(path.join(c.state.inputDir,'proof.txt'),'utf8'),'Approved input');assert.equal(fs.existsSync(path.join(c.state.inputDir,'.git')),false);
   fs.writeFileSync(path.join(r.ws,'late.txt'),'Later host file');assert.equal(fs.existsSync(path.join(c.state.inputDir,'late.txt')),false);assert.equal(fs.statSync(c.state.inputDir).mode&0o777,0o755);await c.close();assert.equal(fs.existsSync(c.state.inputDir),false);
 });
+const runtimeChecks=()=>Object.fromEntries(['nonRoot','noCapabilities','noNewPrivileges','readOnlyInput','readOnlyRoot','noDockerSocket','onlyLoopback','externalTcpBlocked','hostCanaryHidden','hostLoopbackHidden','cliFound','cliExitedSuccessfully','cliVersionSupported','cliAvailable','supportedNode'].map(key=>[key,true]));
 test('contained runtime diagnostic checks selected CLI without model calls or host fallback',async()=>{
-  const d=fakeDocker(),runner=async args=>args[0]==='start'?{code:0,stdout:JSON.stringify({type:'isolation',checks:{nonRoot:true,cliAvailable:true,supportedNode:true},cliVersion:'1.2.3'})+'\n'}:d.runner(args);
+  const d=fakeDocker(),runner=async args=>args[0]==='start'?{code:0,stdout:JSON.stringify({type:'isolation',checks:runtimeChecks(),cliVersion:'1.2.3'})+'\n'}:d.runner(args);
   const r=await C.checkRuntime({nativeContainerImage:image},'opencode',runner);assert.equal(r.ok,true);assert.equal(r.version,'1.2.3');assert.ok(d.calls.some(a=>a.includes('--isolation-check')&&a.at(-1)==='opencode'));assert.ok(d.calls.some(a=>a[0]==='rm'));assert.ok(!d.calls.some(a=>a[0]==='pull'));assert.equal((await C.checkRuntime({nativeContainerImage:'latest'},'opencode',runner)).ok,false);
 });
 test('failed runtime diagnostic cannot produce a passing status and still cleans its owned container',async()=>{
-  const d=fakeDocker(),runner=async args=>args[0]==='start'?{code:1,stdout:JSON.stringify({type:'isolation',checks:{cliAvailable:false}})+'\n'}:d.runner(args);
+  const d=fakeDocker(),runner=async args=>args[0]==='start'?{code:1,stdout:JSON.stringify({type:'isolation',checks:{...runtimeChecks(),cliAvailable:false}})+'\n'}:d.runner(args);
   const r=await C.checkRuntime({nativeContainerImage:image},'hermes',runner);assert.equal(r.ok,false);assert.match(r.error,/check failed/);assert.ok(d.calls.some(a=>a[0]==='rm'));
+});
+test('runtime diagnostic distinguishes missing CLI, failed invocation, unsupported versions and isolation failures',async()=>{
+  for(const [patch,pattern] of [[{cliFound:false,cliExitedSuccessfully:false,cliVersionSupported:false,cliAvailable:false},/not found/],[{cliExitedSuccessfully:false,cliAvailable:false},/failed or timed out/],[{cliVersionSupported:false,cliAvailable:false},/unsupported or unrecognized/],[{supportedNode:false},/Node.js 20/],[{noCapabilities:false,cliFound:false},/isolation check failed/]]){
+    const d=fakeDocker(),checks={...runtimeChecks(),...patch},runner=async args=>args[0]==='start'?{code:1,stdout:JSON.stringify({type:'isolation',checks})}:d.runner(args);
+    const r=await C.checkRuntime({nativeContainerImage:image},'hermes',runner);assert.equal(r.ok,false);assert.match(r.error,pattern);assert.deepEqual(r.checks,checks);assert.ok(d.calls.some(a=>a[0]==='rm'));
+  }
+});
+test('runtime diagnostic refuses empty, incomplete and non-boolean reports without exposing unknown fields',async()=>{
+  for(const checks of [{},{...runtimeChecks(),cliFound:1},{...runtimeChecks(),readOnlyRoot:undefined}]){
+    const d=fakeDocker(),runner=async args=>args[0]==='start'?{code:0,stdout:JSON.stringify({type:'isolation',checks:{...checks,privateDetail:'SECRET'}})}:d.runner(args);
+    const r=await C.checkRuntime({nativeContainerImage:image},'opencode',runner);assert.equal(r.ok,false);assert.match(r.error,/missing required boolean/);assert.ok(!JSON.stringify(r).includes('SECRET'));assert.ok(d.calls.some(a=>a[0]==='rm'));
+  }
 });
 test('contained MCP forwards only the owning actor route; host actor token never enters container init',async t=>{
   const r=rig(t),d=fakeDocker();let forwarded;
