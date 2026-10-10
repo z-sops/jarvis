@@ -282,3 +282,5 @@ For a real-machine check, use `npm run test:containment -- <installed-sha256-ima
 
 
 Windows checkpoint follow-up: candidate CLI/isolation checks passed, but both real native task diagnostics stopped at a regular-file fsync EPERM before MCP execution. Regular checkpoint files now use a non-truncating write-enabled flush handle; flushing remains mandatory and failed/closed protocol sessions cannot submit queued requests. This host-side correction does not require an image rebuild. The actual Windows native task retest remains pending; see the verification checklist for exact evidence.
+
+Windows follow-up on6bbd6bb: fsync blocker no longer appears, but Hermes startup and OpenCode MCP discovery still fail. The task diagnostic now reports only bounded safe phase/protocol/count evidence; optional stateless MCP methods return405 and fixed-token OpenCode MCP has OAuth disabled. Those compatibility corrections need a real retest; native task PASS remains open. No image rebuild required.

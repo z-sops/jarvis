@@ -635,3 +635,9 @@ Zee asked for his crew to be able to run on OpenCode (opencode.ai), the open-sou
 - Actual user diagnostic on b0aaede failed both native tasks with fsync EPERM before any MCP call. Preserve the earlier CLI/isolation PASS but do not claim task/MCP operation. Full tested image ID is recorded in project-update.md.
 - Windows FlushFileBuffers needs a write-enabled file handle: validated regular checkpoint files use r+ (no truncation), mandatory fsync before metadata/job pointer. Never swallow regular-file flush errors. Windows directory-flush limitations and physical power-loss remain separate.
 - After the first protocol/checkpoint failure or closure, no queued frame may submit broker/MCP actions. Existing failure latch/frame processor is reused. Offline regression reproduces the original handle error and verifies failure prevents publication/submission/output apply. No runtime image rebuild or new install needed; actual Windows task retest pending.
+
+
+## Native startup/discovery diagnostics — 2026-10-10
+- Actual user retry on6bbd6bb clears prior fsync error but both native tasks still fail: Hermes generic runtime, OpenCode missing fixture tool; zero actual MCP calls. Never label this native task PASS.
+- Existing stateless relay returns405/Allow:POST for optional MCP GET/DELETE without forwarding; fixed-token OpenCode MCP disables OAuth. Original400 was a compatibility gap, not independently established as this failure's cause.
+- Runtime emits only allowlisted phases and fixed failure categories, never raw CLI logs/paths/secrets. Task diagnostic records bounded known RPC methods/status/counts, not arguments/bodies. Preserve full containment, actor/run checks and checkpoint failure latch. No speculative Hermes install or runtime network changes. Actual refreshed Windows diagnostic needed for exact startup cause; no image rebuild for mounted runner changes.

@@ -1,5 +1,14 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),{modelReply}=require('../scripts/native-task-check');
+const {relayPolicy,classifyRuntimeIssue}=require('../lib/native-container-runner');
+test('contained stateless MCP relay rejects optional GET/DELETE with405 without forwarding or OAuth',()=>{
+  assert.equal(relayPolicy('/mcp','GET',true,true),405);assert.equal(relayPolicy('/mcp','DELETE',true,true),405);assert.equal(relayPolicy('/mcp','POST',true,true),200);
+  assert.equal(relayPolicy('/mcp','POST',false,true),401);assert.equal(relayPolicy('/mcp','POST',true,false),400);assert.equal(relayPolicy('/other','POST',true,true),400);
+  assert.equal(relayPolicy('/v1/chat/completions','POST',true,false),200);
+});
+test('native stderr yields only fixed diagnostic categories, never arbitrary text or secrets',()=>{
+  assert.equal(classifyRuntimeIssue('ModuleNotFoundError: private-value'),'missing_dependency');assert.equal(classifyRuntimeIssue('EROFS private-path'),'readonly_runtime_write');assert.equal(classifyRuntimeIssue('Permission denied secret-token'),'permission_denied');assert.equal(classifyRuntimeIssue('MCP connection failed private-url'),'mcp_connection');assert.equal(classifyRuntimeIssue('secret-token'),'unknown');
+});
 test('offline native fixture requires actual MCP discovery and returned tool evidence',async()=>{
   const state={marker:'SYNTHETIC_MARKER',requests:0,calls:0};
   assert.throws(()=>modelReply({messages:[],tools:[]},state),/did not expose/);
