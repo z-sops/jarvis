@@ -23,6 +23,11 @@ function snapshot(emit,content,kind='checkpoint') {const b=Buffer.from(content);
 test('native failure diagnostics accept only fixed stages and categories and do not publish logs',async t=>{
   for(const [phase,issue,want] of [['hermes_health','missing_dependency',/hermes_health; missing_dependency/],['PRIVATE_PATH','SECRET_TOKEN',/unknown; unknown/]]){const r=rig(t),d=fakeDocker();let progress;const c=await start(t,r,d,(m,emit)=>{if(m.type==='init'){emit({type:'runtime_phase',phase:'hermes_health'});emit({type:'failure',phase,issue,message:'SECRET_TOKEN'});}});await assert.rejects(c.execute('Goal',{onProgress:p=>progress=p}),want);assert.equal(progress.phase,'hermes_health');assert.equal(r.home.findJob(r.job.id).containment.status,'stopped');}
 });
+test('native readiness diagnostics discard arbitrary logs, exit strings and invalid HTTP status',async t=>{
+  const r=rig(t),d=fakeDocker();let progress;
+  const c=await start(t,r,d,(m,emit)=>{if(m.type==='init'){emit({type:'runtime_phase',phase:'opencode_mcp',mcpStatus:'failed',childExited:true,exitCode:'SECRET_TOKEN',healthStatus:900,message:'PRIVATE_PATH'});emit({type:'failure',phase:'opencode_mcp',issue:'mcp_invalid_response'});}});
+  await assert.rejects(c.execute('Goal',{onProgress:p=>progress=p}),/opencode_mcp; mcp_invalid_response/);assert.deepEqual(progress,{phase:'opencode_mcp',mcpStatus:'failed',childExited:true});assert.equal(r.home.findJob(r.job.id).containment.status,'stopped');
+});
 test('checkpoint regular files use a write-enabled flush handle required by Windows',async t=>{
   const r=rig(t),d=fakeDocker(),open=fs.openSync,flush=fs.fsyncSync,close=fs.closeSync,handles=new Map();let flushed=0;
   fs.openSync=function(file,flags,...args){const fd=open.call(fs,file,flags,...args);if(String(file).includes('native-candidates')&&path.basename(String(file))==='proof.txt')handles.set(fd,flags);return fd;};

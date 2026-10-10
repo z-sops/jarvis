@@ -62,3 +62,9 @@ Runner now returns405/Allow:POST for authenticated optional MCP GET/DELETE on th
 Only fixed runtime phase/error-category diagnostics are returned, never native stdout/stderr logs, paths or secrets. Offline task reports bounded known MCP methods/HTTP status/tool counts and model function/fixture counts, without tool arguments or model bodies. Hermes native startup root cause still needs the refreshed real diagnostic; remote Docker/CLIs are unavailable.34 focused offline checks and five syntax checks pass. Update the separate clean verification checkout and rerun the same task script; runner is read-only mounted, so no image rebuild is needed.
 
 Validation follow-up: expanded Node suite570 total/567 pass/0 fail/3 real-Hermes skips (43.4 s); npm test528 total/525 pass/0 fail/3 skips (40.4 s). These are offline fixture regressions, not native Docker task PASS.
+
+
+### Retest native gateway readiness
+The6a29d22 Windows result is not a native task pass: Hermes reached MCP tool discovery but not health/model execution; OpenCode initialized only and offered no tools. Update the clean verification clone with the existing per-command safe.directory and ff-only block, then rerun scripts/native-task-check.js against the same installed immutable image sha256:80eebf6352fc1290a6ed7111803007b921d303855008a800abf2c0a70682148a. Do not rebuild/pull an image, install packages or add live keys for this diagnostic.
+
+Expected new evidence: Hermes progresses beyond health with explicit single-profile configuration or reports bounded childExited/exitCode/healthStatus. OpenCode reports opencode_mcp and connected/failed/unavailable/unknown before task generation; failure must have zero model requests. A passing native task requires the actual owning-actor MCP call, model receipt of its result, unchanged input, durable checkpoint and stopped owned container. Local SDK relay tests do not fulfill that requirement.

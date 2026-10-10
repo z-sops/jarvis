@@ -47,7 +47,7 @@ async function check(image,engine){
         if(url!=='http://127.0.0.1:1/v1/chat/completions'||options.method!=='POST')throw Error('Offline fixture refused an unexpected endpoint.');
         return modelReply(JSON.parse(options.body),state); // Never fetch an external provider.
       }});
-    const result=await container.execute('Use the Orbit read_fixture MCP tool once. Return exactly the marker from that tool. Do not use other tools or modify files.',{onProgress:p=>{if(p.phase)state.phase=p.phase;}});
+    const result=await container.execute('Use the Orbit read_fixture MCP tool once. Return exactly the marker from that tool. Do not use other tools or modify files.',{onProgress:p=>{if(p.phase)state.phase=p.phase;for(const key of ['mcpStatus','childExited','exitCode','healthStatus'])if(key in p)(state.runtimeDetails||={})[key]=p[key];}});
     const saved=home.findJob(job.id);
     const checks={nativeResponse:result.trim()===state.marker,owningActorMcp:state.calls===1,modelReceivedToolResult:state.requests>=2,unchangedInput:fs.readFileSync(path.join(workspace,'fixture.txt'),'utf8')===state.marker,checkpointSaved:!!saved.nativeCheckpoint,containerStopped:saved.containment?.status==='stopped'};
     report={engine,ok:Object.values(checks).every(Boolean),image,checks,modelFixtureRequests:state.requests};
@@ -57,7 +57,7 @@ async function check(image,engine){
     runs.end(run);await server.stop();const status=home.findJob(job.id)?.containment?.status;
     if(!status||status==='stopped')fs.rmSync(root,{recursive:true,force:true});else report={...report,ok:false,retainedDiagnosticHome:root};
   }
-  return {...report,diagnostics:{runtimePhase:state.phase,mcp:state.mcp,...(state.modelTools?{modelTools:state.modelTools}:{})},scope:'Real contained native CLI, local deterministic model, owning-actor existing MCP and file checkpoint; no live provider, billing or human approval proof.'};
+  return {...report,diagnostics:{runtimePhase:state.phase,mcp:state.mcp,...(state.runtimeDetails?{runtimeDetails:state.runtimeDetails}:{}),...(state.modelTools?{modelTools:state.modelTools}:{})},scope:'Real contained native CLI, local deterministic model, owning-actor existing MCP and file checkpoint; no live provider, billing or human approval proof.'};
 }
 async function main(){
   const image=process.argv[2];if(!/^sha256:[a-f0-9]{64}$/.test(image||''))throw Error('Supply an installed immutable image ID.');
