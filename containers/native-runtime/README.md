@@ -4,7 +4,7 @@ Status: recipe implemented; image build, native gateway startup, and real task/p
 
 The user's installed Python3.11/Node20 base passed real Windows isolation diagnostics but lacked both selected CLIs. This recipe installs OpenCode1.18.35 (official Linux x64 baseline binary) and Hermes0.21.6 (exact source commit818c13be1dc4fd28987e1e881a9408224afd4535) into a separate image. The baseline OpenCode artifact avoids an AVX2 CPU requirement. Hermes's release lock selects Python>=3.14, so its isolated interpreter is Python3.14.7+20260901; the existing base interpreter is retained only for build staging. Python and uv0.12.3 artifact URLs/hashes come from that Hermes commit's pm/lock.json. OpenCode archive SHA256 comes from the official GitHub release asset digest. See runtime-lock.json.
 
-Hermes uses its frozen upstream uv.lock with web/MCP/PTY/cron extras. This pins application dependency resolution; it does not establish byte-for-byte reproducible image builds or fully pinned upstream build-backend requirements. The source retains upstream licenses inside the image. No third-party application source is added to the Jarvis repository.
+Hermes dependencies use its frozen upstream uv.lock with web/MCP/PTY/cron extras and --no-install-project. Hermes itself runs from the pinned source through the fixed PYTHONPATH/interpreter wrapper; no project wheel is built. The upstream setup.py explicitly blocks wheels outside Nix; no bypass variable is used. This pins application dependency resolution; it does not establish byte-for-byte reproducible image builds or fully pinned upstream build-backend requirements. The source retains upstream licenses inside the image. No third-party application source is added to the Jarvis repository.
 
 ## Review and build
 
@@ -39,3 +39,6 @@ Official references inspected 2026-10-10:
 - https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/pm/lock.json
 - https://github.com/anomalyco/opencode/releases/tag/v1.18.35
 - https://docs.astral.sh/uv/reference/cli/#uv-sync
+
+## First Windows build evidence — 2026-10-10
+The user ran checkout de6c019 on Docker Desktop. Base resolution, checksum-verified artifacts and the pinned Git source step succeeded; dependency sync failed because --no-editable asked uv to build a Hermes wheel, which upstream setup.py rejects. The recipe now uses --no-install-project, matching the dependency-only intent of upstream Docker assembly. Existing source wrapper is retained. This fixes the reproduced recipe cause, but the corrected image build/startup is not yet verified. Repeat the existing build wrapper after a clean fast-forward; Docker may reuse the completed prior layers. Do not disable the upstream guard or use HERMES_NIX_BUILD as a workaround.

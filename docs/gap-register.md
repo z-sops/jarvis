@@ -101,3 +101,5 @@ User-reported diagnostic on refreshed checkout faa4a8e: Hermes and OpenCode both
 
 ### Candidate native runtime recipe — 2026-10-10
 Build tooling now prepares the missing CLIs in a separate Linuxamd64 image: pinned Hermes commit/Python3.14/uv/OpenCode release with artifact checksums, frozen application dependency lock, fixed-PATH wrapper and existing contained diagnostic. This is implemented but image build/native startup/task/MCP behavior remains unverified; no dependencies installed while preparing it. See containers/native-runtime/README.md for consent, scope, offline evidence gates and limitations.
+
+First actual Windows runtime-image build (checkout de6c019) failed at Hermes project wheel generation: upstream setup.py blocks wheels outside Nix. Verified artifact download and pinned source steps completed. Recipe corrected to frozen dependency-only --no-install-project with the existing source wrapper; upstream build guard remains intact. Corrected image build and following native checks still require user-machine execution.

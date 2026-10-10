@@ -11,7 +11,9 @@ RUN command -v git && git init /opt/hermes && \
     git -C /opt/hermes checkout --detach FETCH_HEAD && \
     test "$(git -C /opt/hermes rev-parse HEAD)" = 818c13be1dc4fd28987e1e881a9408224afd4535
 WORKDIR /opt/hermes
-RUN /opt/orbit-image-build/uv sync --frozen --no-dev --no-editable \
+# Hermes blocks project wheels; install locked dependencies only.
+# Its exact source tree is loaded by the fixed PYTHONPATH wrapper below.
+RUN /opt/orbit-image-build/uv sync --frozen --no-dev --no-install-project \
     --python /opt/orbit-python/bin/python3 --no-python-downloads \
     --extra web --extra mcp --extra pty --extra cron
 RUN /opt/hermes/.venv/bin/python scripts/write_install_stamp.py \
