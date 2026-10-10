@@ -216,6 +216,8 @@
       h('summary', {}, dot(jobTone(j.status)), h('span', {}, clip(String(j.task || ''), 70))),
       h('p', { class: 'of-job-state' }, jobLabel(j)),
       j.nativeContinuity ? h('p', {}, 'Native model history: ' + j.nativeContinuity.requests + ' requests; ' + (j.nativeContinuity.restored ? 'restored' : 'saved') + '. Pending tool outcomes: ' + (j.nativeContinuity.pendingTools?.length || 0) + '.') : null,
+      j.containment ? h('p', {}, 'Native container: '+j.containment.status+'. '+(j.containment.status==='cleanup_unknown'?'Restore Docker and restart Orbit before retrying.':'Direct network and host writes are blocked.')) : null,
+      j.nativeCheckpoint ? h('p', {}, 'Saved file checkpoint: '+j.nativeCheckpoint.at+'. Explicit retry restores this snapshot after cleanup; inspect uncertain actions first.') : null,
       j.workspaceDir ? h('p', {}, 'Isolated project folder: ' + j.workspaceDir) : null,
       v?.revision ? h('p', {}, 'Project content fingerprint: ' + v.revision.sha256.slice(0, 16) + ' · ' + v.revision.files + ' files. This is not independent QA evidence.') : null,
       j.qa?.required ? h('p', {}, 'QA gate required. Reviewer: ' + (j.qa.reviewJobId || 'not queued') + '. Host tests: ' + (j.qa.test?.status || 'not run') + '. Human acceptance is still required.') : null,

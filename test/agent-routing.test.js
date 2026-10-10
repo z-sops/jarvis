@@ -22,7 +22,7 @@ function rig() {
   const home = new Home(path.join(dir, 'BridgeHome')).ensure();
   // Crew default: builtin (so a worker with no override never touches OpenCode by accident).
   const cfg = { aiName: 'Nova', engine: 'builtin', opencodePath: bin, workerProvider: 'custom', workerModel: 'crew-default-model', workerApiKey: 'crew-key', workerBaseUrl: 'http://127.0.0.1:1/v1' };
-  const opencode = new OpenCodeEngine({ home, getCfg: () => cfg });
+  const opencode = new OpenCodeEngine({ requireContainment: false, home, getCfg: () => cfg });
   const bus = new EventEmitter();
   const workers = createWorkers({ home, getCfg: () => cfg, gemini: { runLoop: async ({ contents }) => ({ text: 'builtin: ' + contents[0].parts[0].text }) }, tools: { declarationsFor: () => [], exec: async () => ({}) }, bus, opencode });
   return { home, cfg, workers, bus };

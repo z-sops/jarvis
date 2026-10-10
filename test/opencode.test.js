@@ -44,7 +44,7 @@ function engineFor(cfgExtra = {}) {
   const bin = launcher(dir);
   const home = new Home(path.join(dir, 'BridgeHome')).ensure();
   const cfg = { aiName: 'Nova', engine: 'opencode', opencodePath: bin, workerProvider: 'custom', workerModel: 'mock-model', workerApiKey: 'mock-key', workerBaseUrl: 'http://127.0.0.1:1/v1', ...cfgExtra };
-  return { engine: new OpenCodeEngine({ home, getCfg: () => cfg }), home, cfg };
+  return { engine: new OpenCodeEngine({ requireContainment: false, home, getCfg: () => cfg }), home, cfg };
 }
 
 test('detect() runs the configured opencode command', async () => {

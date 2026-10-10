@@ -18,7 +18,7 @@ test('a broken telemetry listener never retries or breaks a successful Gemini re
   await gm.generate({ apiKey: 'fixture', textModel: 'fixture' }, {}, undefined, undefined, undefined, undefined, () => { throw new Error('listener'); }); assert.equal(calls, 1);
 });
 function engine() {
-  const e = new HermesEngine({ home: {}, getCfg: () => ({}) }); e.ensureServer = async () => ({ busy: 0, key: 'fixture', port: 1 }); e.writeSoul = () => {}; return e;
+  const e = new HermesEngine({ requireContainment: false, home: {}, getCfg: () => ({}) }); e.ensureServer = async () => ({ busy: 0, key: 'fixture', port: 1 }); e.writeSoul = () => {}; return e;
 }
 test('Hermes connection loss after dispatch is not replayed or used to restart/repost a job', async t => {
   const previous = global.fetch; t.after(() => { global.fetch = previous; }); let calls = 0, restarts = 0; const e = engine(); e.stop = () => { restarts++; };

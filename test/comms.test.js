@@ -37,7 +37,7 @@ const has = hasHermes();
 test('real Hermes gateway: starts, applies per-channel tools and holds fatal state on a bad token', { skip: !has && 'hermes is not installed here', timeout: 280000 }, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bridge-g-')); const home = new Home(path.join(root, 'BridgeHome')).ensure();
   let cfg = { aiName: 'Nova', gender: 'female', userName: 'Zee', userTitle: 'CEO', lang: 'mix', hermesPath: hermesCmd(), workerProvider: 'custom', workerModel: 'mock', workerApiKey: 'mock-key-1234567890', workerBaseUrl: 'http://127.0.0.1:9/v1', comms: {} };
-  const engine = new HermesEngine({ home, getCfg: () => cfg }); const bus = new EventEmitter(); const events = []; bus.on('comms:event', e => events.push(e.text));
+  const engine = new HermesEngine({ requireContainment: false, home, getCfg: () => cfg }); const bus = new EventEmitter(); const events = []; bus.on('comms:event', e => events.push(e.text));
   const hub = new CommsHub({ home, getCfg: () => cfg, setCfg: p => Object.assign(cfg, p), hermes: engine, bus });
   const tools = platform => spawnSync(hermesCmd(), ['-p', 'comms', 'tools', 'list', '--platform', platform], { env: engine.env(), encoding: 'utf8', timeout: 120000 }).stdout.replace(/[^\t\n\r\x20-\x7e]/g, '');
   const enabled = (out, name) => new RegExp('enabled\\s+' + name + '\\b').test(out);

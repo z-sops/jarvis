@@ -78,3 +78,15 @@ The five broad requirements remain partially implemented. Offline fixtures estab
 | Crash-consistent linked retry records | Implemented and verified offline with recoverable intents | Source intent, child history/budget/receipts and plan ownership repair; injected crash after child creation, idempotent second startup, no automatic enqueue. Invalid linkage blocks. Not a single atomic filesystem transaction or exhaustive machine power-loss proof. |
 
 The earlier blanket refusal of budgeted native jobs is superseded for supported broker paths. Broader token budgets and complete continuity remain partial until private/native side paths and the live/Windows checks are covered. Native OS containment is still an engineering gap, not merely a credential blocker.
+
+## Native containment and outage slice — 2026-10-10
+
+| Capability | Current status | Remaining proof or capability |
+| --- | --- | --- |
+| Whole Hermes/OpenCode crew containment | Implemented; protocol/policy verified offline | Actual Docker kernel check and supported native CLI/provider task on Windows. Installed approved immutable image/Node20+/CLI/offline dependencies required. No host fallback or direct network. |
+| Fixed native input exposure | Implemented and verified offline | Hash-validated input copy omits Git metadata and cannot gain later host files. Real Windows mount/permission behaviour still needs kernel verification. |
+| Native file checkpoints across outages | Implemented and verified offline | Model-boundary/10-second snapshots, flush-before-pointer, explicit same-owner retry, restarted Home retrieval, integrity/conflict refusal. Physical power-cut and Windows directory-flush behaviour unverified; uncheckpointed changes can be lost. |
+| Native runtime diagnostics | Implemented and verified offline; actual Linux UI verified | No model call, image pull or host CLI fallback. Real selected image/kernel/version check is environment-dependent and not yet passed here. |
+| Container-safe MCP/browser access | Implemented and verified offline through the existing actor/run-bound Orbit MCP gateway | Real Hermes/OpenCode client compatibility and live browser/managed permission/cancellation proof remain unverified. Fixed owning-actor endpoint; no host gateway token in child, no arbitrary URL/header/actor, reviewer writes refused. Direct network/dependency downloads remain blocked. |
+
+The native-worker OS boundary now has an implementation; earlier blanket descriptions of it as absent are superseded within this scope. It is not verified OS enforcement without a real daemon. Broader application containment, native private-session databases, cross-provider conversion, non-Node QA and product/planning/router gaps remain open.

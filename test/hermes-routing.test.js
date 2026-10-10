@@ -19,7 +19,7 @@ test('a per-agent cfgOverride merged onto the crew cfg changes which model/key H
 
 test('HermesEngine wires cfgOverride through ensureServer/_start/writeProfile/runTask', () => {
   const { HermesEngine } = require('../lib/hermes');
-  const engine = new HermesEngine({ home: { root: '/tmp/does-not-matter', p: () => '/tmp/does-not-matter' }, getCfg: () => ({ workerProvider: 'gemini', apiKey: 'K', textModel: 'm' }) });
+  const engine = new HermesEngine({ requireContainment: false, home: { root: '/tmp/does-not-matter', p: () => '/tmp/does-not-matter' }, getCfg: () => ({ workerProvider: 'gemini', apiKey: 'K', textModel: 'm' }) });
   // Calling these for real needs a Hermes install (covered, skipped where absent, by test/hermes.test.js).
   // Here we just lock in that the wiring exists, by source inspection, so a future refactor that
   // silently drops cfgOverride fails loudly instead of quietly ignoring a worker's own model choice.

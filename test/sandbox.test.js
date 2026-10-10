@@ -44,7 +44,7 @@ test('the Hermes config: nothing for a normal member; a locked-down Docker conta
 test('a Hermes profile for a sandboxed member really contains the Docker block, and a normal one does not', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-h-')), home = new Home(path.join(root, 'BridgeHome')).ensure();
   const cfg = { aiName: 'Nova', gender: 'female', userName: 'Zee', userTitle: '', lang: 'mix', engine: 'hermes', hermesPath: 'hermes', workerProvider: 'custom', workerModel: 'm', workerApiKey: 'k'.repeat(24), workerBaseUrl: 'http://127.0.0.1:9/v1' };
-  const eng = new HermesEngine({ home, getCfg: () => cfg }); eng.extraYaml = a => ({ agent: '', top: '', env: [], terminal: S.terminalLines(a, { ws: home.p('workspace', a.id), dockerMemMB: 8000 }) });
+  const eng = new HermesEngine({ requireContainment: false, home, getCfg: () => cfg }); eng.extraYaml = a => ({ agent: '', top: '', env: [], terminal: S.terminalLines(a, { ws: home.p('workspace', a.id), dockerMemMB: 8000 }) });
   const alex = home.createAgent({ name: 'Alex', role: 'Developer' }), bob = home.createAgent({ name: 'Bob', role: 'Researcher' }); for (const a of [alex, bob]) fs.mkdirSync(eng.profileDir(a.id), { recursive: true });   // (normally made by hermes profile create)
   const h1 = eng.writeProfile(bob, 1111), y1 = fs.readFileSync(path.join(eng.profileDir(bob.id), 'config.yaml'), 'utf8'); assert.ok(!/backend: docker/.test(y1)); assert.match(y1, /terminal:\n  cwd: /);
   const box = { ...alex, sandbox: { enabled: true, folders: [path.join(root, 'proj')], network: true, memoryMB: 3072, cpu: 2 } }; const h2 = eng.writeProfile(box, 1112), y2 = fs.readFileSync(path.join(eng.profileDir(alex.id), 'config.yaml'), 'utf8');
@@ -56,7 +56,7 @@ test('a Hermes profile for a sandboxed member really contains the Docker block, 
 test('Hermes does not inherit secrets from the Windows environment', () => {
   const src = { PATH: 'C:\\x', SystemRoot: 'C:\\Windows', TEMP: 'C:\\t', GEMINI_API_KEY: 'g', OPENAI_API_KEY: 'o', GITHUB_TOKEN: 't', NPM_TOKEN: 'n', AWS_SECRET_ACCESS_KEY: 's', AWS_ACCESS_KEY_ID: 'a', DB_PASSWORD: 'p', MY_CREDENTIALS: 'c', SSH_AUTH_SOCK: '/s', SESSIONNAME: 'Console', KEYBOARD_LAYOUT: 'us', TOKENIZERS_PARALLELISM: 'false', APPDATA: 'C:\\a', HTTP_PROXY: 'http://p' };
   const out = S.scrubEnv(src); assert.deepEqual(Object.keys(out).sort(), ['APPDATA', 'HTTP_PROXY', 'KEYBOARD_LAYOUT', 'PATH', 'SESSIONNAME', 'SSH_AUTH_SOCK', 'SystemRoot', 'TEMP', 'TOKENIZERS_PARALLELISM'].sort(), 'what Windows and the tools need stays, what looks like a secret goes');
-  assert.deepEqual(S.scrubEnv(null), {}); const eng = new HermesEngine({ home: { root: '/h' }, getCfg: () => ({}) }); process.env.ORBIT_TEST_API_KEY = 'leak'; process.env.ORBIT_TEST_KEEP = 'ok'; const e = eng.env(); assert.equal(e.ORBIT_TEST_API_KEY, undefined); assert.equal(e.ORBIT_TEST_KEEP, 'ok'); assert.ok(e.HERMES_HOME.endsWith('hermes')); delete process.env.ORBIT_TEST_API_KEY; delete process.env.ORBIT_TEST_KEEP;
+  assert.deepEqual(S.scrubEnv(null), {}); const eng = new HermesEngine({ requireContainment: false, home: { root: '/h' }, getCfg: () => ({}) }); process.env.ORBIT_TEST_API_KEY = 'leak'; process.env.ORBIT_TEST_KEEP = 'ok'; const e = eng.env(); assert.equal(e.ORBIT_TEST_API_KEY, undefined); assert.equal(e.ORBIT_TEST_KEEP, 'ok'); assert.ok(e.HERMES_HOME.endsWith('hermes')); delete process.env.ORBIT_TEST_API_KEY; delete process.env.ORBIT_TEST_KEEP;
 });
 
 // A pretend Docker: answers like the real one for the calls the sandbox makes.

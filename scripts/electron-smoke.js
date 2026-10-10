@@ -11,6 +11,7 @@ async function main() {
   const make = (task, status, expectedOutputs = []) => { const j = home.createJob('alex', task, { expectedOutputs }); return home.updateJob('alex', j.id, { status, runId: 'fixture-prior-run', result: 'Fixture report for review' }); };
   const interrupted = make('Previously running job', 'running'), accepted = make('Review a real file', 'review', ['proof.txt']);
   const missing = make('Missing artifact', 'review', ['missing.txt']), report = make('Report only', 'review'), rejected = make('Reject this report', 'review');
+  home.updateJob('alex',interrupted.id,{containment:{status:'stopped'},nativeCheckpoint:{at:'2026-10-10T00:00:00.000Z'}});
   fs.writeFileSync(home.p('workspace', 'alex', 'proof.txt'), 'Fixture artifact');
   for (const j of [accepted, missing, report, rejected]) home.updateJob('alex', j.id, { verification: review.evidence(home, 'alex', j) });
   const projectRoot = path.join(temp, 'project'); fs.mkdirSync(projectRoot);
@@ -41,6 +42,10 @@ async function main() {
       }
     });
     await check('startup recovery persisted without a provider call', async () => { assert.equal(home.findJob(interrupted.id).status, 'interrupted'); });
+    await check('saved native checkpoint and cleanup state are visible through real Office IPC',async()=>{
+      await page.locator('nav[aria-label="Screens"]').getByRole('button',{name:'Office',exact:true}).click();await page.evaluate(()=>window.__office.select('alex'));
+      const card=page.locator('[data-job-id="'+interrupted.id+'"]');await card.locator('summary').click();await card.getByText(/Native container: stopped/).waitFor();await card.getByText(/Saved file checkpoint:/).waitFor();
+    });
     await check('missing output cannot be accepted through real IPC', async () => {
       const result = await page.evaluate(id => bridge.jobs.review(id, 'accept'), missing.id); assert.equal(result.ok, false); assert.match(result.error, /missing/); assert.equal(home.findJob(missing.id).status, 'review');
     });
@@ -85,11 +90,13 @@ async function main() {
     await check('request, model and token budget settings save through real UI and reject invalid IPC input', async () => {
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerMaxRequests: 0 })), /integer/);
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerTimeoutSeconds: 0 })), /integer/);
+      await assert.rejects(page.evaluate(() => bridge.config.save({ nativeContainerImage: 'latest' })), /immutable/);
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerTokenBudget: -1 })), /budget|tokens/i);
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerModelRates: { fixture: { input: -1, output: 1 } } })), /price|rate/i);
       await page.evaluate(() => window.__ui.openSettings());
       const continuity = page.getByRole('checkbox', { name: /Preserve native model history/ });
       await continuity.check();
+      await page.getByRole('textbox', { name: 'Native runtime image ID' }).fill('sha256:' + 'a'.repeat(64));
       const input = page.getByRole('spinbutton', { name: 'Worker model requests per job' }); await input.fill('2');
       await page.getByRole('spinbutton', { name: 'Worker deadline (seconds)' }).fill('30');
       await page.getByRole('spinbutton', { name: 'Worker token budget per job' }).fill('12000');
@@ -104,6 +111,7 @@ async function main() {
       assert.equal(JSON.parse(fs.readFileSync(path.join(temp, 'settings.json'), 'utf8')).workerMaxRequests, 2);
       const saved = await page.evaluate(() => bridge.config.get());
       assert.equal(saved.nativeContinuity, true);
+      assert.equal(saved.nativeContainerImage, 'sha256:' + 'a'.repeat(64));
       assert.equal(saved.workerTimeoutSeconds, 30); assert.equal(saved.workerTokenBudget, 12000); assert.equal(saved.workerCostBudgetUsd, 1); assert.equal(saved.workerMaxOutputTokens, 512); assert.deepEqual(saved.workerModelRates, {fixture:{input:1,output:2}});
     });
     await check('accepted state survives a real renderer reload without exceptions', async () => {

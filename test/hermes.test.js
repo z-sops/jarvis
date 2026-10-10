@@ -34,7 +34,7 @@ test('real Hermes: a crew agent runs a job through its own API server and writes
   await new Promise(r => setTimeout(r, 800));
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bridge-h-')); const home = new Home(path.join(root, 'BridgeHome')).ensure();
   const cfg = { aiName: 'Nova', gender: 'female', userName: 'Zee', userTitle: 'CEO', lang: 'mix', engine: 'hermes', hermesPath: hermesCmd(), workerProvider: 'custom', workerModel: 'mock-model', workerApiKey: 'mock-key-1234567890', workerBaseUrl: `http://127.0.0.1:${port}/v1` };
-  const engine = new HermesEngine({ home, getCfg: () => cfg });
+  const engine = new HermesEngine({ requireContainment: false, home, getCfg: () => cfg });
   try {
     const agent = home.createAgent({ name: 'Alice', role: 'Developer', personality: 'Careful and fast.' });
     const events = [];
@@ -63,7 +63,7 @@ test('workers route jobs to Hermes when the engine is hermes', { skip: !has && '
   await new Promise(r => setTimeout(r, 800));
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bridge-w-')); const home = new Home(path.join(root, 'BridgeHome')).ensure();
   const cfg = { aiName: 'Nova', gender: 'female', userName: 'Zee', userTitle: 'CEO', lang: 'mix', engine: 'hermes', hermesPath: hermesCmd(), workerProvider: 'custom', workerModel: 'mock-model', workerApiKey: 'mock-key-1234567890', workerBaseUrl: `http://127.0.0.1:${port}/v1` };
-  const engine = new HermesEngine({ home, getCfg: () => cfg }); const bus = new EventEmitter();
+  const engine = new HermesEngine({ requireContainment: false, home, getCfg: () => cfg }); const bus = new EventEmitter();
   const workers = createWorkers({ home, getCfg: () => cfg, gemini: { runLoop: async () => { throw new Error('built-in loop must not run'); } }, tools: { declarationsFor: () => [], exec: async () => ({}) }, bus, hermes: engine });
   const seen = []; bus.on('job:progress', e => seen.push(e.tool + ':' + e.status)); const states = []; bus.on('agent:state', e => states.push(e.state));
   try {
@@ -92,7 +92,7 @@ test('detect runs a hermes whose path contains a space', async () => {
     fs.writeFileSync(exe, '#!/bin/sh\necho "Hermes Agent v9.9.9"\n', { mode: 0o755 });
   }
   const cfg = { aiName: 'Nova', gender: 'female', userName: 'Zee', userTitle: 'CEO', lang: 'mix', engine: 'hermes', hermesPath: exe, workerProvider: 'custom', workerModel: 'm', workerApiKey: 'k', workerBaseUrl: 'http://127.0.0.1:1/v1' };
-  const engine = new HermesEngine({ home, getCfg: () => cfg });
+  const engine = new HermesEngine({ requireContainment: false, home, getCfg: () => cfg });
   const d = await engine.detect();
   assert.equal(d.ok, true, JSON.stringify(d));
   assert.match(d.version, /9\.9\.9/);

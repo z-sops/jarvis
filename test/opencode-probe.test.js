@@ -15,7 +15,7 @@ function engine(extra) {
   fs.writeFileSync(fake, "#!/usr/bin/env node\nconst a=process.argv.slice(2).join(' ');if(/Reply with exactly/.test(a)){console.log('pong');}else{setTimeout(()=>{process.stdout.write('part one ');},100);setTimeout(()=>{console.log('done');},900);}\n"); fs.chmodSync(fake, 0o755);
   const cfg = { opencodePath: fake, workerProvider: 'opencode', workerModel: 'x-free', workerApiKey: 'k', ...(extra || {}) };
   const home = { root: dir, p: (...a) => path.join(dir, ...a) };
-  return new OpenCodeEngine({ home, getCfg: () => cfg });
+  return new OpenCodeEngine({ requireContainment: false, home, getCfg: () => cfg });
 }
 
 test('probe: the model check answers ok with its time', { skip }, async () => {
