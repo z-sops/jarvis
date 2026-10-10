@@ -59,3 +59,9 @@ test('native conversion rejects opaque reasoning, unknown requests, pending tool
  r.home.updateJob('alex',x.job.id,{nativeBridge:r.storage.seal(j)});const p=converter.preview(x.job.id,{provider:'openai',model:'fixture'});r.home.updateJob('alex',x.job.id,{jobDecisions:[{origin:'human_recovery_inspection'}]});assert.throws(()=>converter.apply(p.token),/evidence changed/);
  const handlers=new Map();require('../lib/job-control').registerJobControls({home:r.home,workers:{},ipcMain:{handle:(n,f)=>handlers.set(n,f)},isTrusted:()=>false});for(const op of ['preview','apply','cancel'])assert.equal(handlers.get('jobs:native-conversion-'+op)({},x.job.id).ok,false);
 });
+test('reviewed conversion reset binds exact private checkpoint and rejects checkpoint change during preview',async t=>{
+ const r=rig(t),x=await start(t,r);await x.call();x.b.close();x.runs.end(x.run);r.home.updateJob('alex',x.job.id,{status:'cancelled',nativeCheckpoint:{sha256:'first',engineState:{engine:'opencode'}}});
+ const converter=require('../lib/native-conversion').createConversion({home:r.home}),p=converter.preview(x.job.id,{provider:'openai',model:'fixture'});
+ r.home.updateJob('alex',x.job.id,{nativeCheckpoint:{sha256:'second',engineState:{engine:'opencode'}}});assert.throws(()=>converter.apply(p.token),/evidence changed/);
+ const q=converter.preview(x.job.id,{provider:'openai',model:'fixture'});converter.apply(q.token);assert.deepEqual(r.storage.open(r.home.findJob(x.job.id).nativeBridge).privateStateReset,{checkpointSha256:'second',origin:'human_main_window_conversion'});
+});

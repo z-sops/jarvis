@@ -11,7 +11,7 @@ async function main() {
   const make = (task, status, expectedOutputs = []) => { const j = home.createJob('alex', task, { expectedOutputs }); return home.updateJob('alex', j.id, { status, runId: 'fixture-prior-run', result: 'Fixture report for review' }); };
   const interrupted = make('Previously running job', 'running'), accepted = make('Review a real file', 'review', ['proof.txt']);
   const missing = make('Missing artifact', 'review', ['missing.txt']), report = make('Report only', 'review'), rejected = make('Reject this report', 'review');
-  home.updateJob('alex',interrupted.id,{containment:{status:'stopped'},nativeCheckpoint:{at:'2026-10-10T00:00:00.000Z'}});
+  home.updateJob('alex',interrupted.id,{containment:{status:'stopped'},nativeCheckpoint:{at:'2026-10-10T00:00:00.000Z',engineState:{engine:'opencode',sessionPresent:true,pendingEffects:0,retiredQueueRows:1}}});
   fs.writeFileSync(home.p('workspace', 'alex', 'proof.txt'), 'Fixture artifact');
   for (const j of [accepted, missing, report, rejected]) home.updateJob('alex', j.id, { verification: review.evidence(home, 'alex', j) });
   const projectRoot = path.join(temp, 'project'); fs.mkdirSync(projectRoot);
@@ -44,7 +44,7 @@ async function main() {
     await check('startup recovery persisted without a provider call', async () => { assert.equal(home.findJob(interrupted.id).status, 'interrupted'); });
     await check('saved native checkpoint and cleanup state are visible through real Office IPC',async()=>{
       await page.locator('nav[aria-label="Screens"]').getByRole('button',{name:'Office',exact:true}).click();await page.evaluate(()=>window.__office.select('alex'));
-      const card=page.locator('[data-job-id="'+interrupted.id+'"]');await card.locator('summary').click();await card.getByText(/Native container: stopped/).waitFor();await card.getByText(/Saved file checkpoint:/).waitFor();
+      const card=page.locator('[data-job-id="'+interrupted.id+'"]');await card.locator('summary').click();await card.getByText(/Native container: stopped/).waitFor();await card.getByText(/Saved file checkpoint:/).waitFor();await card.getByText(/Protected private engine state: opencode/).waitFor();await page.screenshot({path:path.join(out,'private-state-recovery.png'),fullPage:true});
     });
     await check('missing output cannot be accepted through real IPC', async () => {
       const result = await page.evaluate(id => bridge.jobs.review(id, 'accept'), missing.id); assert.equal(result.ok, false); assert.match(result.error, /missing/); assert.equal(home.findJob(missing.id).status, 'review');
@@ -110,7 +110,7 @@ async function main() {
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerModelRates: { fixture: { input: -1, output: 1 } } })), /price|rate/i);
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerRoutes: [{provider:'openrouter',model:'fixture',contextTokens:1024,capabilities:['text','tools']}] })), /supported count adapters/);
       await page.evaluate(() => window.__ui.openSettings());
-      const continuity = page.getByRole('checkbox', { name: /Preserve native model history/ });
+      const continuity = page.getByRole('checkbox', { name: /Preserve protected native history/ });
       await continuity.check();
       await page.getByRole('textbox', { name: 'Native runtime image ID' }).fill('sha256:' + 'a'.repeat(64));
       const input = page.getByRole('spinbutton', { name: 'Worker model requests per job' }); await input.fill('2');

@@ -122,3 +122,26 @@ Existing project cards/Home/Library/job records, provider adapters, budget broke
 - Newly configured independent reviews require schema v2: candidate/goal hashes, satisfied goal assessment/rationale, unique source-file hashes/exact quotes/check reasons and coverage of every requested output. Human acceptance and host tests of the exact candidate remain separate gates. Legacy configured reviews retain prior schema. Exact quotes establish source inspection evidence, not semantic correctness. Offline reviewer fixtures are not live independent model evidence.
 
 Validation: npm 583 total / 580 pass / 0 fail / 3 unavailable-real-Hermes skips; focused QA/router19/19 and planning11/11. Actual Linux Electron44.4.3/Playwright16/16, zero renderer exceptions, including Python approval/test evidence, routed Settings save/unsupported-provider rejection and prior YAML recovery/rollback. No live provider/billing/native CLI/Windows/private-history restore test this turn. Earlier user-provided Windows native offline PASS remains scoped to its original image/task.
+
+### Private native restart proof (offline; no paid model)
+After updating the existing draft checkout, use your already installed image:
+
+```powershell
+node G:\jarvis-containment-check\scripts\native-task-check.js "sha256:018544b25065b555d1a913373bc8164eebe0280794ec8ae92fbfed6acab4e6d8" --private-continuity
+if ($LASTEXITCODE -ne 0) { throw "Private native recovery check failed; send the sanitized output." }
+```
+
+This optional mode creates an isolated synthetic Home, uses ephemeral authenticated fixture encryption, runs the installed CLI against only a deterministic local model/MCP fixture, reloads persisted Home state and explicitly resumes the same native session in a new container. It checks the previous tool result reaches the model without another MCP tool call, the session ID remains unchanged, and owned containers stop. It does not test the real Windows OS key store, paid providers, physical power loss or arbitrary plugin restoration. No image pull/rebuild/install is requested. The ordinary check without the option retains its earlier scope. Recovery under actual power loss still needs separate controlled evidence.
+
+### Acceptance gates requested by owner — do not collapse snapshot PASS into resume PASS
+| Gate | Evidence currently available | Windows acceptance still required |
+| --- | --- | --- |
+| Hermes same ID and previous context | Protected ID binding and source-pinned header; offline DB/history tests | Optional real-CLI diagnostic must pass session ID equality and prior tool-result recognition |
+| OpenCode same ID and TODO | Source-pinned --session and SQLite TODO preservation tests | Real CLI must resume original ID and read a previously created native TODO; current diagnostic checks context/ID, not native TODO commands |
+| Workspace/private same revision | Same hashed checkpoint envelope, complete-transfer barrier, pointer-after-flush | Concurrent filesystem/database consistency is not an application transaction; test cross-state edits at a controlled crash boundary |
+| No saved permissions/keys/queue replay | Sanitized/vacuumed copied DB; configs/keys regenerated; queued rows retired | Real native recovered run must still ask for each relevant action; no fixture-encryption result substitutes for OS-key-store proof |
+| Mismatch refusal | Offline engine/image/provider/job binding checks before workspace restore | Repeat with changed approved image/engine/provider on real stopped job |
+| Uncertain effect not repeated | Offline pending native-tool/background state blocks restore; no automatic job retry | Kill after a real controlled tool dispatch; counter remains unchanged after startup/recovery and explicit inspection |
+| Guardian/approvals/budgets intact | Existing broker tests and full suite; protected journal tail preserved | Actual recovered native run through production broker/gateway must enforce deny/fresh approval and cap before another submission |
+
+Production protection uses Electron safeStorage and refuses unavailable/insecure backends. No plaintext decryption key is written into checkpoint metadata/Home by this implementation. The optional diagnostic keeps an ephemeral AES key only in its running Node process and therefore does **not** verify DPAPI/Windows account lifecycle. Test real key-store availability, locked/unavailable store, corrupt ciphertext, wrong OS-user/key, and store recovery; each unavailable/wrong-key case must leave existing checkpoint intact, block generation/restore and never fall back to plaintext. Do not export the key or real history in diagnostic output.
