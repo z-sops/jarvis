@@ -98,3 +98,6 @@ Both selected native CLI diagnostics failed on the user's installed image with t
 
 ### Selected CLI availability confirmed — 2026-10-10
 User-reported diagnostic on refreshed checkout faa4a8e: Hermes and OpenCode both cliFound=false inside selected immutable image sha256:8f958bdc1b4a422bfafd97cab4f69836401f616ae985d4b57a53d254f5bcb038; all ten isolation checks and supportedNode passed. Neither selected executable is discoverable through the runtime's fixed container PATH. This supersedes the previous unknown reason, without implying either CLI is missing from the host or every image location. A reviewed pinned CLI runtime image is required before native integration checks; installation/build permission has not been assumed.
+
+### Candidate native runtime recipe — 2026-10-10
+Build tooling now prepares the missing CLIs in a separate Linuxamd64 image: pinned Hermes commit/Python3.14/uv/OpenCode release with artifact checksums, frozen application dependency lock, fixed-PATH wrapper and existing contained diagnostic. This is implemented but image build/native startup/task/MCP behavior remains unverified; no dependencies installed while preparing it. See containers/native-runtime/README.md for consent, scope, offline evidence gates and limitations.

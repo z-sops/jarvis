@@ -1,0 +1,4 @@
+*
+!Dockerfile
+!runtime-lock.json
+!install-artifacts.py
