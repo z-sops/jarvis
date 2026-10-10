@@ -88,10 +88,12 @@ async function main() {
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerTokenBudget: -1 })), /budget|tokens/i);
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerModelRates: { fixture: { input: -1, output: 1 } } })), /price|rate/i);
       await page.evaluate(() => window.__ui.openSettings());
-      const input = page.getByRole('spinbutton', { name: 'Built-in requests per job' }); await input.fill('2');
+      const continuity = page.getByRole('checkbox', { name: /Preserve native model history/ });
+      await continuity.check();
+      const input = page.getByRole('spinbutton', { name: 'Worker model requests per job' }); await input.fill('2');
       await page.getByRole('spinbutton', { name: 'Worker deadline (seconds)' }).fill('30');
-      await page.getByRole('spinbutton', { name: 'Built-in token budget per job' }).fill('12000');
-      await page.getByRole('spinbutton', { name: 'Built-in token cost budget (USD)' }).fill('1');
+      await page.getByRole('spinbutton', { name: 'Worker token budget per job' }).fill('12000');
+      await page.getByRole('spinbutton', { name: 'Worker token cost budget (USD)' }).fill('1');
       await page.getByRole('spinbutton', { name: 'Reserved output tokens per request' }).fill('512');
       await page.getByRole('textbox', { name: 'Model token prices (USD per million)' }).fill('{"fixture":{"input":1,"output":2}}');
       await page.screenshot({ path: path.join(out, 'request-cap-settings.png'), fullPage: true });
@@ -101,6 +103,7 @@ async function main() {
       assert.equal((await page.evaluate(() => bridge.config.get())).workerMaxRequests, 2);
       assert.equal(JSON.parse(fs.readFileSync(path.join(temp, 'settings.json'), 'utf8')).workerMaxRequests, 2);
       const saved = await page.evaluate(() => bridge.config.get());
+      assert.equal(saved.nativeContinuity, true);
       assert.equal(saved.workerTimeoutSeconds, 30); assert.equal(saved.workerTokenBudget, 12000); assert.equal(saved.workerCostBudgetUsd, 1); assert.equal(saved.workerMaxOutputTokens, 512); assert.deepEqual(saved.workerModelRates, {fixture:{input:1,output:2}});
     });
     await check('accepted state survives a real renderer reload without exceptions', async () => {

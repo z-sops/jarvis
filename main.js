@@ -51,12 +51,12 @@ bus.on('job:storage-error', ({ agent, jobId, error }) => {
 function showWindow() { if (!win) return; if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
 function askUser(req) {
   return new Promise(resolve => {
-    const { signal, ...display } = req;
+    const { signal, onDecision, ...display } = req;
     if (signal?.aborted) return resolve('deny');
     const id = Math.random().toString(36).slice(2, 10);
     let settled = false, timer;
-    const settle = answer => { if (settled) return; settled = true; pending.delete(id); clearTimeout(timer); signal?.removeEventListener('abort', expire); resolve(answer); };
-    const expire = () => { if (!settled) { send('permission:expired', { id }); settle('deny'); } };
+    const settle = (answer, origin = 'human_main_window') => { if (settled) return; settled = true; pending.delete(id); clearTimeout(timer); signal?.removeEventListener('abort', expire); try { onDecision?.({ id, origin, decision: answer, at: new Date().toISOString() }); } catch { answer = 'deny'; } resolve(answer); };
+    const expire = () => { if (!settled) { send('permission:expired', { id }); settle('deny', 'permission_timeout_or_abort'); } };
     pending.set(id, settle);
     showWindow();
     send('permission', { id, ...display });
@@ -68,7 +68,11 @@ function askUser(req) {
 
 async function ask(req) {
   runs.assertCurrent();
-  const answer = await askUser(req);
+  const run = runs.current();
+  const answer = await askUser({ ...req, signal: req.signal || run?.signal, onDecision: receipt => {
+    require('./lib/permission-history').record(home,runs,run,req,receipt);
+    req.onDecision?.(receipt);
+  } });
   runs.assertCurrent();
   return answer;
 }
@@ -82,7 +86,7 @@ const panels = require('./lib/panels');
 const usage = panels.makeUsage({ home });
 const audit = panels.makeAudit({ home, bus });
 gemini.setUsageHook(u => usage.add(u));
-const workers = createWorkers({ home, getCfg: store.get, gemini, tools, bus, hermes, usage, opencode, runs, getGuidance: () => runtime.guidance, getPlanner: () => runtime.planner });
+const workers = createWorkers({ askNative: ask, home, getCfg: store.get, gemini, tools, bus, hermes, usage, opencode, runs, getGuidance: () => runtime.guidance, getPlanner: () => runtime.planner });
 const qa = require('./lib/job-qa').createQA({ home, workers, ask, bus });
 workers.qaPending = qa.hasPending;
 Object.assign(runtime, { dispatch: workers.dispatch, cancel: workers.cancel, stateOf: workers.stateOf });
@@ -223,14 +227,14 @@ ipcMain.handle('tool:exec', (_e, name, args) => tools.exec(String(name), args ||
 ipcMain.handle('agents:list', () => home.listAgents().map(a => ({ ...a, ...workers.stateOf(a.id) })));
 ipcMain.handle('agents:create', (_e, a) => tools.exec('create_agent', a, 'commander'));
 // These decisions exist only on the trusted application UI bridge, never in model tool declarations.
-require('./lib/job-control').registerJobControls({ ipcMain, workers, qa,
+require('./lib/job-control').registerJobControls({ ipcMain, workers, qa, home,
   isTrusted: e => !!win && !win.isDestroyed() && e.sender === win.webContents && e.senderFrame === win.webContents.mainFrame });
 ipcMain.handle('agents:inspect', (_e, id) => {
   const isC = id === COMMANDER; const agent = isC ? { id: COMMANDER, name: store.get().aiName, role: 'Chief of staff' } : home.getAgent(id);
   if (!agent) return null;
   const rd = f => { try { return fs.readFileSync(path.join(home.agentDir(agent.id), f), 'utf8'); } catch { return ''; } };
   const recentJobs = home.listJobs(agent.id, 20);
-  return { agent, activity: workers.activityOf(agent.id) || recentJobs.find(j => j.activity)?.activity || null, folder: home.agentDir(agent.id), soul: rd('brain/soul.md'), skills: home.readSkills(agent.id).map(s => s.name), jobsError: home.recoveryFaults.get(agent.id), jobs: recentJobs.map(j => ({ id: j.id, status: j.status, task: j.task, result: j.result, error: j.error, recoveryNeeded: j.recoveryNeeded, managed: j.managed, guidance: j.guidance, remoteOutcomes: j.remoteOutcomes, expectedOutputs: j.expectedOutputs, verification: j.verification, qa: j.qa, reviewTarget: j.reviewTarget, completionKind: j.completionKind, acceptedAt: j.acceptedAt, dependencies: j.dependencies, workspaceDir: j.workspaceDir, isolation: j.isolation, selectedSkills: (j.selectedSkills || []).map(s => ({ slug: s.slug, selectedBy: s.selectedBy })) })), memory: home.readMemory(agent.id, 600) };
+  return { agent, activity: workers.activityOf(agent.id) || recentJobs.find(j => j.activity)?.activity || null, folder: home.agentDir(agent.id), soul: rd('brain/soul.md'), skills: home.readSkills(agent.id).map(s => s.name), jobsError: home.recoveryFaults.get(agent.id), jobs: recentJobs.map(j => ({ id: j.id, status: j.status, task: j.task, result: j.result, error: j.error, recoveryNeeded: j.recoveryNeeded, nativeContinuity: j.nativeContinuity, managed: j.managed, guidance: j.guidance, remoteOutcomes: j.remoteOutcomes, expectedOutputs: j.expectedOutputs, verification: j.verification, qa: j.qa, reviewTarget: j.reviewTarget, completionKind: j.completionKind, acceptedAt: j.acceptedAt, dependencies: j.dependencies, workspaceDir: j.workspaceDir, isolation: j.isolation, selectedSkills: (j.selectedSkills || []).map(s => ({ slug: s.slug, selectedBy: s.selectedBy })) })), memory: home.readMemory(agent.id, 600) };
 });
 ipcMain.handle('agents:update', (_e, id, patch) => { try { return { ok: true, agent: home.updateAgent(id, patch || {}) }; } catch (e) { return { ok: false, error: e.message }; } });
 ipcMain.handle('hermes:check', async (_e, opts) => { try { return { steps: await hermes.check(opts || {}) }; } catch (e) { return { steps: [{ name: 'Check', ok: false, detail: e.message }] }; } });

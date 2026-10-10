@@ -1,0 +1,6 @@
+'use strict';
+// Fixture CLI, never a real provider. Reads the actual generated OpenCode config/environment.
+const fs=require('fs'),path=require('path');
+const args=process.argv.slice(2);
+if(args[0]==='--version'){console.log('OpenCode 1.99.9 (broker fixture)');process.exit(0);}
+(async()=>{const cwd=args[args.indexOf('--dir')+1],cfg=JSON.parse(fs.readFileSync(path.join(cwd,'opencode.json'))),model=cfg.model.replace(/^custom\//,''),base=cfg.provider.custom.options.baseURL;if(!base.startsWith('http://127.0.0.1:'))throw Error('Fixture permits local broker only');if(process.env.GEMINI_API_KEY)throw Error('Upstream key reached native fixture');const res=await fetch(base+'/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+process.env.BRIDGE_CREW_KEY,'Content-Type':'application/json'},body:JSON.stringify({model,messages:[{role:'user',content:args[1]}],stream:true})});if(!res.ok)throw Error('Broker refused fixture');const text=await res.text();let answer='';for(const line of text.split('\n'))if(line.startsWith('data: ')&&line!=='data: [DONE]')answer+=JSON.parse(line.slice(6)).choices?.[0]?.delta?.content||'';console.log(JSON.stringify({type:'text',part:{text:answer}}));})().catch(e=>{console.error(e.message);process.exitCode=1;});

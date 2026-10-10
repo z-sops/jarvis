@@ -198,6 +198,16 @@
       if (!window.confirm('Retry this job? Inspect existing files first. An earlier external action may already have happened.')) return Promise.resolve({ ok: true });
       return bridge.jobs.retry(j.id);
     }));
+    if (bridge.jobs?.inspectNative && ['interrupted','failed','cancelled','rejected'].includes(j.status) && Array.isArray(j.nativeContinuity?.pendingTools) && j.nativeContinuity.pendingTools.length) actions.push(act('Record inspected native outcomes', () => {
+      const outcomes=[];
+      for (const c of j.nativeContinuity.pendingTools) {
+        const outcome=window.prompt('Inspect the effects of '+c.tool+' ('+c.id+'). Outcome: completed, failed, or not_executed. This does not grant permission to repeat it.');
+        if(outcome===null)return Promise.resolve({ok:true});
+        const evidence=window.prompt('Describe the evidence you inspected for '+c.tool+'.');
+        if(evidence===null)return Promise.resolve({ok:true});outcomes.push({id:c.id,outcome,evidence});
+      }
+      return bridge.jobs.inspectNative(j.id,outcomes);
+    }));
     const remote = j.remoteOutcomes || [], pendingRemote = remote.some(e => e.delivery !== 'synced');
     if (bridge.jobs?.syncOutcome && pendingRemote) actions.push(act('Sync NeuralOps outcome', () => bridge.jobs.syncOutcome(j.id)));
     const v = j.verification;
@@ -205,6 +215,7 @@
     return h('details', { class: 'of-job', 'data-job-id': j.id },
       h('summary', {}, dot(jobTone(j.status)), h('span', {}, clip(String(j.task || ''), 70))),
       h('p', { class: 'of-job-state' }, jobLabel(j)),
+      j.nativeContinuity ? h('p', {}, 'Native model history: ' + j.nativeContinuity.requests + ' requests; ' + (j.nativeContinuity.restored ? 'restored' : 'saved') + '. Pending tool outcomes: ' + (j.nativeContinuity.pendingTools?.length || 0) + '.') : null,
       j.workspaceDir ? h('p', {}, 'Isolated project folder: ' + j.workspaceDir) : null,
       v?.revision ? h('p', {}, 'Project content fingerprint: ' + v.revision.sha256.slice(0, 16) + ' · ' + v.revision.files + ' files. This is not independent QA evidence.') : null,
       j.qa?.required ? h('p', {}, 'QA gate required. Reviewer: ' + (j.qa.reviewJobId || 'not queued') + '. Host tests: ' + (j.qa.test?.status || 'not run') + '. Human acceptance is still required.') : null,

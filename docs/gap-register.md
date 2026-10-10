@@ -1,4 +1,4 @@
-# Orbit gap register — 2026-10-09
+# Orbit gap register — 2026-10-10
 
 This register describes verified boundaries, not overall production readiness. Existing architecture stays in place. Reference products are discussion inputs, not integration decisions. Before introducing another framework, document existing behavior, end-to-end evidence, the actual gap, whether an extension suffices, and dependency/integration risk.
 
@@ -66,3 +66,15 @@ External Hermes profiles/.env files, native engine credential stores, process en
 | Native security | OpenCode 1.x isolated config/env and shell/outside denial; Hermes manual-approval profile/cwd/cancellation fixes; passive unknown-state telemetry | Real CLI enforcement, Windows process-tree behavior and OS sandbox escape resistance; worktrees are not sandboxes |
 
 The five broad requirements remain partially implemented. Offline fixtures establish the listed execution paths, not live engine behavior or full product completion.
+
+
+## Native budgets and continuity slice
+
+| Capability | Status | Evidence and boundary |
+| --- | --- | --- |
+| Native pre-generation token/cost/request limits | Implemented and verified offline for supported broker traffic | Real loopback HTTP + Gemini/OpenAI/Anthropic fixture endpoints; full converted input count, persisted maximum-output reservation, actual usage reconciliation, immutable continuation policy, missing usage/storage/cancel/concurrency refusal. Actual OpenCode adapter spawns fixture CLI; actual Hermes request/SSE transport calls fixture local API. Live engine compatibility remains unverified. Unsupported providers/features still refuse. Provider count is not exact billing assurance; OS-level bypass is outside scope. |
+| Native host model conversation restore | Implemented and verified offline | Encrypted messages, system changes, tool IDs/results and opaque reasoning/signatures restored through existing jobs; trimming/switches/ambiguous tools block. Native private session databases, plugin/TODO/UI state, cross-provider conversion and automatic pause/resume remain incomplete. |
+| Human approval provenance | Implemented and verified offline within host job prompts and broker tool gates | Origin/receipt ID/job/run/prompt hash before permission returns; exact native tool argument hashes before delivery; cancellation/storage failure refuse. Receipts survive retry as history, never grants. A compromised trusted renderer, engine-internal/unmediated approval and OS-user tampering are outside this proof. |
+| Crash-consistent linked retry records | Implemented and verified offline with recoverable intents | Source intent, child history/budget/receipts and plan ownership repair; injected crash after child creation, idempotent second startup, no automatic enqueue. Invalid linkage blocks. Not a single atomic filesystem transaction or exhaustive machine power-loss proof. |
+
+The earlier blanket refusal of budgeted native jobs is superseded for supported broker paths. Broader token budgets and complete continuity remain partial until private/native side paths and the live/Windows checks are covered. Native OS containment is still an engineering gap, not merely a credential blocker.
