@@ -190,3 +190,8 @@ textarea { resize: vertical; }
 .wanote { color: var(--dim); font-size: 13px; }
 .ccard-err { display: block; margin: 6px 0 0; color: #ff9088; font-size: 12px; }
 .modal.comms { width: min(640px, 94vw); }
+
+/* Versioned crew configuration uses the existing settings modal. */
+.crew-config-body textarea { width: 100%; font-family: var(--mono, monospace); resize: vertical; }
+.crew-config-body pre { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.crew-config .modal-actions { flex-wrap: wrap; }

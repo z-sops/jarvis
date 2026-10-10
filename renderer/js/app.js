@@ -179,6 +179,67 @@
     const m = modal('Permission needed', body, [deny, h('button', { class: 'btn primary', onclick: () => answer('once') }, 'Allow once'), p.allowSession ? h('button', { class: 'btn primary alt', onclick: () => answer('session') }, (p.sessionLabel || 'Allow this folder for the session')) : null], { role: 'alertdialog', cls: 'perm', attrs: { 'data-perm': p.id } });
     m.back.addEventListener('keydown', e => { if (e.key === 'Escape') answer('deny'); }); deny.focus();
   }
+  async function openCrewConfig() {
+    let token = null, revision = null, unresolved = [], generation = 0;
+    const text = h('textarea', { rows: 16, spellcheck: 'false', 'aria-label': 'Crew YAML', maxlength: 65536 });
+    const status = h('p', { role: 'status' }), diff = h('pre', { class: 'perm-detail', 'aria-label': 'Configuration diff' });
+    const history = h('pre', { class: 'perm-detail', 'aria-label': 'Incomplete import history' });
+    const inspected = h('input', { type: 'checkbox' });
+    const ackLabel = h('label', { class: 'check inline', hidden: true }, inspected, h('span', {}, 'I inspected the current configuration and incomplete import history'));
+    const apply = h('button', { class: 'btn primary', disabled: true, onclick: async () => {
+      const selected = token; invalidate(); text.disabled = true;
+      try {
+        const r = await bridge.crewConfig.apply(selected); if (!r.ok) throw new Error(r.error);
+        await refreshAgents(); await reload(); status.textContent = `Applied and verified ${r.changed} field change(s).`;
+      } catch (e) { status.textContent = errText(e); }
+      finally { text.disabled = false; }
+    } }, 'Apply reviewed changes');
+    const ack = h('button', { class: 'btn ghost', hidden: true, disabled: true, onclick: async () => {
+      ack.disabled = true;
+      try {
+        const r = await bridge.crewConfig.acknowledge({ revision, receiptIds: unresolved.map(e => e.id) });
+        if (!r.ok) throw new Error(r.error); await reload(); status.textContent = 'Inspection recorded. Preview a new import to make further changes.';
+      } catch (e) { status.textContent = errText(e); }
+    } }, 'Record inspection');
+    function invalidate() { generation++; token = null; apply.disabled = true; diff.textContent = ''; }
+    text.addEventListener('input', invalidate);
+    inspected.addEventListener('change', () => { ack.disabled = !inspected.checked; });
+    async function reload() {
+      invalidate(); const n = generation;
+      const r = await bridge.crewConfig.export(); if (!r.ok) throw new Error(r.error);
+      if (n !== generation) return;
+      text.value = r.text; revision = r.revision; unresolved = r.unresolved;
+      history.textContent = unresolved.length ? JSON.stringify(unresolved, null, 2) : '';
+      ackLabel.hidden = ack.hidden = !unresolved.length; inspected.checked = false; ack.disabled = true;
+      status.textContent = unresolved.length ? 'Incomplete import: inspect the current export and history. No automatic replay occurred.' : 'Current stored configuration. Edit or load YAML, then preview the changes.';
+    }
+    const file = h('input', { type: 'file', accept: '.yaml,.yml', 'aria-label': 'Load crew YAML' });
+    file.addEventListener('change', async () => {
+      invalidate(); const n = generation, f = file.files[0]; if (!f) return;
+      if (f.size > 65536) { status.textContent = 'File is larger than 64 KiB.'; return; }
+      try { const value = await f.text(); if (n === generation) { text.value = value; status.textContent = 'File loaded for preview. Nothing has been applied.'; } }
+      catch { status.textContent = 'File could not be read.'; }
+    });
+    const body = h('div', { class: 'crew-config-body' }, h('p', {}, 'Versioned configuration for existing workers: engine, provider, model, context and shared Library assignments. Create workers through Add crew. Credentials, permissions, jobs and runtime status stay outside YAML.'),
+      h('label', { class: 'field' }, h('span', {}, 'Load YAML file'), file), text, status, diff, history, ackLabel, ack);
+    const m = modal('Crew configuration', body, [h('button', { class: 'btn ghost', onclick: async () => { try { await reload(); } catch (e) { status.textContent = errText(e); } } }, 'Reload from Orbit'),
+      h('button', { class: 'btn ghost', onclick: async () => {
+        try {
+          const r = await bridge.crewConfig.export(); if (!r.ok) throw new Error(r.error);
+          const url = URL.createObjectURL(new Blob([r.text], { type: 'application/yaml' }));
+          const a = h('a', { href: url, download: 'orbit-crew.yaml' }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch (e) { status.textContent = errText(e); }
+      } }, 'Export stored YAML'), h('button', { class: 'btn ghost', onclick: async () => {
+        invalidate(); const n = generation, value = text.value;
+        try {
+          const r = await bridge.crewConfig.preview(value); if (!r.ok) throw new Error(r.error);
+          if (n !== generation || value !== text.value) return;
+          token = r.token; diff.textContent = r.changes.length ? JSON.stringify(r.changes, null, 2) : 'No changes.';
+          apply.disabled = !r.changes.length; status.textContent = 'Preview only. Apply explicitly within five minutes; queued or running jobs block changes.';
+        } catch (e) { if (n === generation) status.textContent = errText(e); }
+      } }, 'Preview changes'), apply, h('button', { class: 'btn ghost', onclick: () => m.close() }, 'Close')], { cls: 'settings crew-config' });
+    try { await reload(); } catch (e) { status.textContent = errText(e); }
+  }
   function openSettings() {
     const d = { ...cfg }; const f = (label, el, note) => h('label', { class: 'field' }, h('span', {}, label), el, note ? h('small', {}, note) : null);
     const inp = (k, opts = {}) => { const i = h('input', { value: d[k] ?? '', ...opts }); i.addEventListener('input', () => (d[k] = i.value.trim())); return i; };
@@ -196,6 +257,7 @@
       f('Thinking model', inp('textModel'), 'Used for typed chat and crew agents.'), f('Voice model', inp('liveModel'), 'Model names change often. If voice is refused, check Google’s current Live model name.'),
       f('Close voice after', sel('idleMinutes', [[5, '5 minutes of quiet'], [10, '10 minutes of quiet'], [30, '30 minutes of quiet'], [0, 'Never']].map(([a, b]) => [+a, b]), () => (d.idleMinutes = +d.idleMinutes))),
       h('h3', { class: 'set-h' }, 'Crew engine'),
+      h('div', { class: 'set-h' }, h('button', { class: 'btn ghost', onclick: () => { m.close(); openCrewConfig(); } }, 'Crew configuration (YAML)')),
       f('Engine', sel('engine', [['builtin', 'Built-in (light, Gemini only)'], ['hermes', 'Hermes Agent (real coding tools)'], ['opencode', 'OpenCode (open-source coding agent)']]), 'Native crew jobs require the approved Docker Linux image below. Direct internet, host folders and unrestricted integrations are blocked.'),
       f('Hermes command', inp('hermesPath', { placeholder: 'hermes' }), 'Host command for Hermes communication services. Native crew jobs use Hermes installed inside the approved image.'),
       f('OpenCode command', inp('opencodePath', { placeholder: 'opencode' }), 'Legacy host command. Native crew jobs use OpenCode installed inside the approved image.'),
@@ -334,7 +396,7 @@
   // ---------- start ----------
   async function main() {
     if (bridge.startup) bridge.startup.mark('page script starts'); cfg = await bridge.config.get(); SFX.enable(cfg.sfx);
-    scene = new Scene($('#scene')); presence = new Presence($('#presence')); if (bridge.startup) bridge.startup.mark('3D scene and orb created'); window.__ui = { openComms, get scene() { return scene; }, get town() { return town; }, get presence() { return presence; }, addMsg, logActivity, showPermission, openSettings, onTool, refreshAgents, cue };
+    scene = new Scene($('#scene')); presence = new Presence($('#presence')); if (bridge.startup) bridge.startup.mark('3D scene and orb created'); window.__ui = { openComms, get scene() { return scene; }, get town() { return town; }, get presence() { return presence; }, addMsg, logActivity, showPermission, openSettings, openCrewConfig, onTool, refreshAgents, cue };
     $('#w-min').onclick = () => bridge.win.minimize(); $('#w-max').onclick = () => bridge.win.maximize(); $('#w-hide').onclick = () => bridge.win.hide(); $('#w-quit').onclick = () => (window.__shutdown ? __shutdown.begin() : bridge.win.quit());
     addEventListener('keydown', e => { if (e.key === 'F11') bridge.win.fullscreen(); });
     bindBus();

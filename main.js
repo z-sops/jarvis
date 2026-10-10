@@ -229,6 +229,9 @@ ipcMain.handle('agents:create', (_e, a) => tools.exec('create_agent', a, 'comman
 // These decisions exist only on the trusted application UI bridge, never in model tool declarations.
 require('./lib/job-control').registerJobControls({ ipcMain, workers, qa, home,
   isTrusted: e => !!win && !win.isDestroyed() && e.sender === win.webContents && e.senderFrame === win.webContents.mainFrame });
+require('./lib/crew-config').register({ ipcMain, home, bus, getCfg: store.get,
+  isBusy: () => workers.hasPending() || qa.hasPending() || chat.active(),
+  isTrusted: e => !!win && !win.isDestroyed() && e.sender === win.webContents && e.senderFrame === win.webContents.mainFrame });
 ipcMain.handle('agents:inspect', (_e, id) => {
   const isC = id === COMMANDER; const agent = isC ? { id: COMMANDER, name: store.get().aiName, role: 'Chief of staff' } : home.getAgent(id);
   if (!agent) return null;

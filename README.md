@@ -287,3 +287,7 @@ Windows follow-up on6bbd6bb: fsync blocker no longer appears, but Hermes startup
 
 
 Native gateway readiness: isolated Hermes workers explicitly use a single-profile gateway, preserving the generated API-server environment key under the pinned runtime. OpenCode with configured MCP checks the fixed Orbit server's connection before submitting a task; missing/failed/unknown readiness stops before model generation. Native task diagnostics return bounded status/health/exit fields rather than CLI logs. Real SDK loopback relay verification is separate from real contained CLI task verification, which remains pending after the reported Windows failures.
+
+
+## Versioned crew YAML
+Settings → Crew configuration (YAML) exports existing worker engine/model/context and shared Library assignments. Import is bounded, revision-checked, previewed and explicitly applied through the trusted UI. Accepted Home/Library state remains authoritative; YAML never carries credentials, permissions or job/runtime state. Incomplete imports block further imports and worker execution until current-state inspection; no restart replay. See [crew configuration](docs/crew-configuration.md) for scope and recovery.
