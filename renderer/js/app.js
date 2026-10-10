@@ -191,7 +191,7 @@
       const selected = token; invalidate(false); text.disabled = true;
       try {
         const r = await bridge.crewConfig.apply(selected); if (!r.ok) throw new Error(r.error);
-        await refreshAgents(); await reload(); status.textContent = `Applied and verified ${r.changed} field change(s).`;
+        await refreshAgents(); await reload(); status.textContent = `${r.operation === 'rollback' ? 'Rollback applied' : 'Applied'} and verified ${r.changed} field change(s).`;
       } catch (e) { status.textContent = errText(e); }
       finally { text.disabled = false; }
     } }, 'Apply reviewed changes');
@@ -202,7 +202,7 @@
         if (!r.ok) throw new Error(r.error); await reload(); status.textContent = 'Inspection recorded. Preview a new import to make further changes.';
       } catch (e) { status.textContent = errText(e); }
     } }, 'Record inspection');
-    function invalidate(cancel = true) { const old = token; generation++; token = null; apply.disabled = true; diff.textContent = ''; if (old && cancel !== false) bridge.crewConfig.cancel(old).catch(() => {}); }
+    function invalidate(cancel = true) { const old = token; generation++; token = null; apply.disabled = true; apply.textContent = 'Apply reviewed changes'; diff.textContent = ''; if (old && cancel !== false) bridge.crewConfig.cancel(old).catch(() => {}); }
     text.addEventListener('input', invalidate);
     inspected.addEventListener('change', () => { ack.disabled = !inspected.checked; });
     async function reload() {
@@ -221,7 +221,18 @@
           h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Worker'), h('th', {}, 'Persisted configuration'), h('th', {}, 'Progress recorded'))),
             h('tbody', {}, r.workers.map(w => h('tr', {}, h('td', {}, w.id), h('td', {}, labels[w.status] || 'Unknown'), h('td', {}, w.progressRecorded ? 'Yes' : 'No'))))),
           r.legacyIntentWithoutWorkerHashes ? h('p', {}, 'Older intent lacks per-worker hashes. Worker outcomes cannot be inferred.') : null,
-          h('p', {}, 'Automatic rollback is unavailable; rollback safety has not been established. Explicit inspection is required.')].filter(Boolean);
+          h('p', {}, 'Full-state rollback safety has not been established. Automatic rollback is unavailable. Public settings may be reversed only after reviewing the diff.'),
+          h('button', { class: 'btn ghost', disabled: unresolved.length !== 1 || e.operation === 'rollback', onclick: async () => {
+            invalidate(); const n = generation;
+            try {
+              const result = await bridge.crewConfig.previewRollback({ revision, receiptId: e.id });
+              if (!result.ok) throw new Error(result.error);
+              if (n !== generation) { bridge.crewConfig.cancel(result.token).catch(() => {}); return; }
+              token = result.token; diff.textContent = result.changes.length ? JSON.stringify(result.changes, null, 2) : 'No settings need rollback. Record inspection instead.';
+              apply.disabled = !result.changes.length; apply.textContent = 'Apply reviewed rollback';
+              status.textContent = 'Review this reverse diff. Only public worker settings and Library assignments will be restored; drift and active jobs block rollback.';
+            } catch (error) { if (n === generation) status.textContent = errText(error); }
+          } }, 'Preview settings rollback')].filter(Boolean);
       }));
       ackLabel.hidden = ack.hidden = !unresolved.length; inspected.checked = false; ack.disabled = true;
       status.textContent = unresolved.length ? 'Incomplete import: inspect the current export and history. No automatic replay occurred.' : 'Current stored configuration. Edit or load YAML, then preview the changes.';

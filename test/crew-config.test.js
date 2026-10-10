@@ -102,7 +102,7 @@ test('symlinked configuration targets cannot redirect writes outside home', t =>
 });
 test('IPC requires trusted main window for reads, previews, apply and acknowledgement', t => {
   const r = rig(t), handlers = new Map(); register({ home: r.home, getCfg: () => r.cfg, ipcMain: { handle: (n, f) => handlers.set(n, f) }, isTrusted: e => e.trusted === true });
-  for (const op of ['export', 'preview', 'apply', 'cancel', 'acknowledge']) assert.equal(handlers.get('crew-config:' + op)({}, 'ignored').ok, false);
+  for (const op of ['export', 'preview', 'previewRollback', 'apply', 'cancel', 'acknowledge']) assert.equal(handlers.get('crew-config:' + op)({}, 'ignored').ok, false);
   const exported = handlers.get('crew-config:export')({ trusted: true }); assert.equal(exported.ok, true);
   const d = parse(exported.text); d.workers[0].config.workerModel = 'fixture';
   const p = handlers.get('crew-config:preview')({ trusted: true }, yaml.dump(d)); assert.equal(p.ok, true);
@@ -167,4 +167,66 @@ test('abrupt process exit reconciles five-worker partial state and unrecorded su
     r.home.updateAgent('dave', { workerModel: 'outside-intent' }); assert.equal(restarted.export().unresolved[0].reconciliation.workers[3].status, 'drifted');
     assert.throws(() => restarted.acknowledge({ revision: ex.revision, receiptIds: ex.unresolved.map(e => e.id) }), /revision changed/);
   }
+});
+function interrupted(t) {
+  const r = rig(t), original = r.library.setAssignment.bind(r.library);
+  r.home.updateAgent('alex', { workerApiKey: 'protected-fixture', allowCode: false });
+  r.library.setAssignment = () => { throw new Error('fixture failure'); };
+  assert.throws(() => r.service.apply(r.service.preview(edited(r, d => { d.workers[0].config.workerModel = 'fixture-model'; d.workers[0].skills = ['code-review']; })).token));
+  r.library.setAssignment = original;
+  const ex = r.service.export(); r.input = { revision: ex.revision, receiptId: ex.unresolved[0].id };
+  return r;
+}
+test('reviewed rollback restores only public settings, verifies stored state and resolves linked receipts together', t => {
+  const r = interrupted(t), job = r.home.createJob('alex', 'Preserve interrupted work'); r.home.updateJob('alex', job.id, { status: 'interrupted' });
+  const before = fs.readFileSync(r.home.p('logs', 'crew-config.json'));
+  const p = r.service.previewRollback(r.input); assert.equal(p.operation, 'rollback'); assert.equal(p.changes.length, 1);
+  assert.deepEqual(fs.readFileSync(r.home.p('logs', 'crew-config.json')), before);
+  const result = r.service.apply(p.token); assert.equal(result.operation, 'rollback'); assert.equal(r.home.getAgent('alex').workerModel, undefined);
+  assert.equal(r.home.getAgent('alex').workerApiKey, 'protected-fixture'); assert.equal(r.home.getAgent('alex').allowCode, false);
+  assert.equal(r.home.findJob(job.id).status, 'interrupted'); assert.deepEqual(r.library.assignmentFor('alex').skills, []);
+  const events = JSON.parse(fs.readFileSync(r.home.p('logs', 'crew-config.json'))).events;
+  assert.equal(events[0].status, 'rolled_back'); assert.equal(events[0].rollbackReceiptId, events[1].id); assert.equal(events[1].sourceReceiptId, events[0].id);
+  assert.equal(events[1].status, 'applied'); assert.equal(r.service.export().unresolved.length, 0);
+  assert.doesNotThrow(() => require('../lib/crew-config').assertReady(r.home));
+});
+test('rollback refuses drift, stale state/history, cancellation and active jobs before writes', t => {
+  const r = interrupted(t), p = r.service.previewRollback(r.input); r.home.updateAgent('bob', { workerModel: 'later' });
+  assert.throws(() => r.service.apply(p.token), /revision changed/); r.home.updateAgent('bob', { workerModel: null });
+  r.input.revision = r.service.export().revision;
+  const p2 = r.service.previewRollback(r.input); r.service.cancel(p2.token); assert.throws(() => r.service.apply(p2.token), /already used/);
+  const p3 = r.service.previewRollback(r.input), file = r.home.p('logs', 'crew-config.json'), j = JSON.parse(fs.readFileSync(file)); j.events[0].at = 'changed'; atomicWrite(file, j);
+  assert.throws(() => r.service.apply(p3.token), /history changed/);
+  const job = r.home.createJob('bob', 'Queued'); assert.throws(() => r.service.previewRollback(r.input), /Queued or running/); r.home.updateJob('bob', job.id, { status: 'cancelled' });
+  r.home.updateAgent('alex', { workerModel: 'outside-intent' }); r.input.revision = r.service.export().revision;
+  assert.throws(() => r.service.previewRollback(r.input), /drift/); assert.equal(r.home.getAgent('alex').workerModel, 'outside-intent');
+});
+test('rollback rejects malformed, legacy and missing-catalog intent without granting new settings', t => {
+  for (const mutation of [j => { delete j.events[0].workers; }, j => { j.events[0].changes[0].field = 'workerApiKey'; }, j => { j.events[0].workers[0].beforeHash = '0'.repeat(64); }]) {
+    const r = interrupted(t), file = r.home.p('logs', 'crew-config.json'), j = JSON.parse(fs.readFileSync(file)); mutation(j); atomicWrite(file, j);
+    assert.throws(() => r.service.previewRollback(r.input)); assert.equal(r.home.getAgent('alex').workerModel, 'fixture-model');
+  }
+  const r = rig(t); r.library.setAssignment('alex', { skills: ['code-review'] });
+  const oldSet = r.library.setAssignment.bind(r.library); r.library.setAssignment = () => { throw new Error('fixture'); };
+  assert.throws(() => r.service.apply(r.service.preview(edited(r, d => { d.workers[0].config.workerModel = 'fixture-model'; d.workers[0].skills = []; })).token));
+  r.library.setAssignment = oldSet; fs.renameSync(r.library.p('skills', 'code-review'), path.join(r.home.root, 'removed-skill'));
+  const ex = r.service.export(); assert.throws(() => r.service.previewRollback({ revision: ex.revision, receiptId: ex.unresolved[0].id }), /does not exist/);
+});
+test('rollback terminal flush failure keeps original and reversal quarantined after restart', t => {
+  const r = interrupted(t), service = createCrewConfig({ home: r.home, library: r.library, getCfg: () => r.cfg, write: (file, j) => {
+    if (j.events[0].status === 'rolled_back') throw new Error('fixture terminal flush'); atomicWrite(file, j);
+  } });
+  assert.throws(() => service.apply(service.previewRollback(r.input).token), /not fully verified/);
+  const restarted = createCrewConfig({ home: r.home, getCfg: () => r.cfg }), ex = restarted.export();
+  assert.equal(ex.unresolved.length, 2); assert.equal(ex.unresolved[0].status, 'partial'); assert.equal(ex.unresolved[1].operation, 'rollback');
+  assert.equal(r.home.getAgent('alex').workerModel, undefined); assert.throws(() => require('../lib/crew-config').assertReady(r.home));
+  assert.throws(() => restarted.previewRollback({ revision: ex.revision, receiptId: ex.unresolved[0].id }), /one original/);
+});
+test('abrupt rollback process exit leaves linked durable intents and current-state reconciliation without replay', t => {
+  const r = interrupted(t);
+  const code = `const {Home}=require('./lib/home');const {Library}=require('./lib/library');const {createCrewConfig}=require('./lib/crew-config');const i=JSON.parse(require('fs').readFileSync(0,'utf8')),home=new Home(i.root),library=new Library(home);library.setAssignment=()=>process.exit(47);const s=createCrewConfig({home,library,getCfg:()=>i.cfg});s.apply(s.previewRollback(i.input).token);`;
+  assert.throws(() => require('child_process').execFileSync(process.execPath, ['-e', code], { cwd: path.resolve(__dirname, '..'), input: JSON.stringify({root:r.home.root,cfg:r.cfg,input:r.input}), timeout:10000, stdio:['pipe','pipe','pipe'] }), e => e.status === 47);
+  const file = r.home.p('logs','crew-config.json'), before = fs.readFileSync(file), ex = createCrewConfig({home:new Home(r.home.root),getCfg:()=>r.cfg}).export();
+  assert.equal(ex.unresolved.length,2); assert.equal(ex.unresolved[1].status,'prepared'); assert.equal(ex.unresolved[1].reconciliation.workers[0].status,'matches_requested');
+  assert.deepEqual(fs.readFileSync(file),before); assert.throws(()=>require('../lib/crew-config').assertReady(r.home));
 });

@@ -184,6 +184,24 @@ async function main() {
       assert.equal(JSON.parse(fs.readFileSync(home.p('logs', 'crew-config.json'))).events.at(-1).status, 'acknowledged');
       await page.getByRole('dialog', { name: 'Crew configuration', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
     });
+    await check('interrupted YAML settings rollback previews a reverse diff and requires explicit trusted Apply', async () => {
+      const ledger = JSON.parse(fs.readFileSync(home.p('logs', 'crew-config.json')));
+      ledger.events.push({ ...ledger.events[0], id: 'fixture-rollback-import', status: 'partial', appliedWorkers: ['alex'] });
+      require('../lib/job-storage').atomicWrite(home.p('logs', 'crew-config.json'), ledger);
+      await page.evaluate(() => window.__ui.openCrewConfig());
+      await page.getByRole('status').filter({ hasText: /Incomplete import/ }).waitFor();
+      await page.getByRole('button', { name: 'Preview settings rollback', exact: true }).click();
+      await page.getByRole('status').filter({ hasText: /Review this reverse diff/ }).waitFor();
+      assert.equal(home.getAgent('alex').workerModel, 'fixture-ui-model');
+      const apply = page.getByRole('button', { name: 'Apply reviewed rollback', exact: true }); assert.equal(await apply.isDisabled(), false);
+      await page.getByLabel('Configuration diff', { exact: true }).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: path.join(out, 'crew-yaml-rollback.png'), fullPage: true });
+      await apply.click(); await page.getByRole('status').filter({ hasText: /Rollback applied and verified 1 field/ }).waitFor();
+      assert.equal(home.getAgent('alex').workerModel, undefined); assert.equal(home.getAgent('alex').workerContext, 8192);
+      const stored = JSON.parse(fs.readFileSync(home.p('logs', 'crew-config.json')));
+      assert.equal(stored.events.at(-2).status, 'rolled_back'); assert.equal(stored.events.at(-1).operation, 'rollback');
+      await page.getByRole('dialog', { name: 'Crew configuration', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
+    });
     await check('accepted state survives a real renderer reload without exceptions', async () => {
       await page.reload(); await page.waitForFunction(() => document.body.classList.contains('revealed'));
       assert.equal(home.findJob(accepted.id).acceptedBy, 'human'); assert.deepEqual(errors, []);
