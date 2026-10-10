@@ -74,3 +74,22 @@ test('offline native fixture bounds model loops and supports bounded OpenAI SSE'
   const state={marker:'SYNTHETIC_MARKER',requests:0,calls:1};const text=await modelReply({stream:true,messages:[{role:'tool',content:state.marker}]},state).text();assert.match(text,/chat.completion.chunk/);assert.match(text,/SYNTHETIC_MARKER/);assert.ok(text.endsWith('data: [DONE]\n\n'));
   state.requests=8;assert.throws(()=>modelReply({messages:[]},state),/limit exceeded/);
 });
+test('Hermes fixture searches native deferred tools and requires actual MCP execution before completing',async()=>{
+  const tools=['tool_search','tool_call'].map(name=>({type:'function',function:{name}}));
+  const state={engine:'hermes',marker:'REAL_MCP_MARKER',requests:0,calls:0};
+  const first=(await modelReply({tools,messages:[]},state).json()).choices[0].message.tool_calls[0];assert.equal(first.function.name,'tool_search');assert.deepEqual(JSON.parse(first.function.arguments),{queries:['orbit read_fixture'],limit:5});
+  const result={tools:{mcp__orbit__read_fixture:{required:[]}},results:[{matches:['mcp__orbit__read_fixture']}]};
+  const messages=[{role:'tool',tool_call_id:first.id,content:JSON.stringify(result)}];
+  const second=(await modelReply({tools,messages},state).json()).choices[0].message.tool_calls[0];assert.equal(second.function.name,'tool_call');assert.deepEqual(JSON.parse(second.function.arguments),{calls:[{name:'mcp__orbit__read_fixture',arguments:{}}]});
+  assert.throws(()=>modelReply({tools,messages},state),/did not execute/);assert.equal(state.calls,0);
+  state.calls=1;assert.throws(()=>modelReply({tools,messages},state),/did not return/);
+  const done=await modelReply({tools,messages:[{role:'tool',content:state.marker}]},state).json();assert.equal(done.choices[0].message.content,state.marker);
+});
+test('deferred native search refuses wrong actor, invented names, missing evidence and required arguments',()=>{
+  const tools=['tool_search','tool_call'].map(name=>({type:'function',function:{name}}));
+  const state={engine:'hermes',requests:0,calls:0,searchIssued:true};
+  for(const result of [{tools:{mcp__bob__read_fixture:{required:[]}},results:[{matches:['mcp__bob__read_fixture']}]},{tools:{mcp__orbit__read_fixture:{required:[]}},results:[]},{tools:{mcp__orbit__read_fixture:{required:['secret']}},results:[{matches:['mcp__orbit__read_fixture']}]}])assert.throws(()=>modelReply({tools,messages:[{role:'tool',tool_call_id:'orbit-fixture-search',content:JSON.stringify(result)}]},{...state}),/did not discover/);
+  assert.throws(()=>modelReply({tools,messages:[]},{...state}),/requires one/);
+  assert.throws(()=>modelReply({tools,messages:[{role:'tool',tool_call_id:'orbit-fixture-search',content:'{'}]},{...state}),/invalid native search/);
+  assert.throws(()=>modelReply({tools,messages:[]},{...state,engine:'opencode',searchIssued:false}),/did not expose/);
+});

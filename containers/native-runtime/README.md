@@ -92,3 +92,12 @@ docker --host npipe:////./pipe/dockerDesktopLinuxEngine run --rm --network none 
 ```
 
 Failure here identifies packaging readiness, not every startup cause. Rebuilding via the existing reviewed PowerShell wrapper downloads/installs dependencies inside a new image and requires installation approval. Existing immutable image remains available; record and test the new image ID separately.
+
+
+## Actual Windows OpenCode task PASS; Hermes deferred-tool fixture — 2026-10-10
+
+- User updated separate verification clone to5639e16 and rebuilt reviewed image successfully. New immutable ID: sha256:018544b25065b555d1a913373bc8164eebe0280794ec8ae92fbfed6acab4e6d8. Both engines passed all15 CLI/isolation checks; offline build API dependency assertion passed.
+- OpenCode real contained native task PASSED all6: native response, owning-actor MCP, model received tool result, unchanged input, saved checkpoint and stopped container. Actual MCP tools/call200 observed. Three deterministic model requests comprised2 task +1 title. This verifies this offline task only; no live provider/billing/human approval proof.
+- Hermes API health now200, gateway running/api connected and MCP registration observed. Startup dependency blocker cleared in this run. Task still FAILED:17 exposed functions,0 direct fixture names,1 deterministic model request,0 MCP calls. Do not claim Hermes task PASS.
+- Pinned Hermes818c13be tools/tool_search.py defaults MCP deferral on: model sees tool_search/tool_call bridges instead of direct MCP names. Original diagnostic demanded an eager fixture schema and falsely rejected this supported surface. Fixture now requests bounded native search, validates one scoped mcp__orbit__read_fixture catalog match with no required arguments, then invokes the real native tool_call bridge. No invented catalog, marker or MCP result. Wrong server, missing evidence, required arguments, repeated bridge without execution and absent actual marker all fail. Actual Windows bridge compatibility remains pending.
+- Production engine/tool discovery settings and permissions are unchanged. No image rebuild required for this mounted diagnostic correction. Keep resource/network/actor/run/checkpoint/approval controls.

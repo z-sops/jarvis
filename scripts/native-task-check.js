@@ -17,9 +17,24 @@ function modelReply(body,state){
   }else if(!state.calls){
     state.taskRequests=(state.taskRequests||0)+1;
     const tools=(body.tools||[]).filter(t=>t.type==='function'&&/read_fixture$/.test(t.function?.name||''));
-    state.modelTools={functionCount:(body.tools||[]).filter(t=>t.type==='function').length,fixtureCount:tools.length};
-    if(tools.length!==1)throw Error('Selected CLI did not expose one Orbit read_fixture MCP tool.');
-    message={role:'assistant',content:null,tool_calls:[{id:'orbit-fixture-call',type:'function',function:{name:tools[0].function.name,arguments:'{}'}}]};finish='tool_calls';
+    const functions=(body.tools||[]).filter(t=>t.type==='function');
+    const has=n=>functions.filter(t=>t.function?.name===n).length===1;
+    state.modelTools={functionCount:functions.length,fixtureCount:tools.length,searchAvailable:has('tool_search'),callAvailable:has('tool_call')};
+    let name,args={},id='orbit-fixture-call';
+    if(tools.length===1)name=tools[0].function.name;
+    else if(tools.length===0&&state.engine==='hermes'&&has('tool_search')&&has('tool_call')){
+      if(!state.searchIssued){state.searchIssued=true;name='tool_search';args={queries:['orbit read_fixture'],limit:5};id='orbit-fixture-search';}
+      else{
+        if(state.bridgeIssued)throw Error('Offline fixture MCP bridge did not execute its owning-actor tool.');
+        const replies=body.messages.filter(m=>m.role==='tool'&&m.tool_call_id==='orbit-fixture-search');
+        if(replies.length!==1||typeof replies[0].content!=='string'||replies[0].content.length>65536)throw Error('Offline fixture requires one bounded native search result.');
+        let catalog;try{catalog=JSON.parse(replies[0].content);}catch{throw Error('Offline fixture received invalid native search result.');}
+        const names=Object.keys(catalog.tools||{}).filter(n=>n==='mcp__orbit__read_fixture'&&catalog.results?.some(r=>Array.isArray(r.matches)&&r.matches.includes(n)));
+        if(names.length!==1||!Array.isArray(catalog.tools[names[0]].required)||catalog.tools[names[0]].required.length)throw Error('Native search did not discover the scoped zero-argument Orbit fixture tool.');
+        state.bridgeIssued=true;name='tool_call';args={calls:[{name:names[0],arguments:{}}]};
+      }
+    }else throw Error('Selected CLI did not expose one Orbit read_fixture MCP tool.');
+    message={role:'assistant',content:null,tool_calls:[{id,type:'function',function:{name,arguments:JSON.stringify(args)}}]};finish='tool_calls';
   }else{
     state.taskRequests=(state.taskRequests||0)+1;
     if(state.calls!==1||!JSON.stringify(body.messages).includes(state.marker))throw Error('Selected CLI did not return the real MCP fixture result to its model.');
