@@ -291,3 +291,6 @@ Native gateway readiness: isolated Hermes workers explicitly use a single-profil
 
 ## Versioned crew YAML
 Settings → Crew configuration (YAML) exports existing worker engine/model/context and shared Library assignments. Import is bounded, revision-checked, previewed and explicitly applied through the trusted UI. Accepted Home/Library state remains authoritative; YAML never carries credentials, permissions or job/runtime state. Incomplete imports block further imports and worker execution until current-state inspection; no restart replay. See [crew configuration](docs/crew-configuration.md) for scope and recovery.
+
+
+Advanced planning now exposes supplied constraints and approved staffing; native workers can opt into explicit three-provider routing and trusted visible-history conversion. QA adds selected Python unittest files and goal/source-bound independent review reports. These are bounded improvements, not complete business feasibility, all-provider routing or private native session restoration. See the 2026-10-10 entry in docs/gap-register.md for validation and remaining limits.

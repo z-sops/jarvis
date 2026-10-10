@@ -17,7 +17,7 @@ async function main() {
   const projectRoot = path.join(temp, 'project'); fs.mkdirSync(projectRoot);
   const git = args => require('child_process').execFileSync('git', args, { cwd: projectRoot, stdio: ['ignore', 'pipe', 'pipe'] });
   git(['init']); fs.writeFileSync(path.join(projectRoot, 'code.txt'), 'Fixture code');
-  fs.writeFileSync(path.join(projectRoot, 'check.test.cjs'), "const {test}=require('node:test');test('fixture',()=>{});\n"); git(['add', '.']);
+  fs.writeFileSync(path.join(projectRoot, 'check.test.cjs'), "const {test}=require('node:test');test('fixture',()=>{});\n"); fs.writeFileSync(path.join(projectRoot, 'check_test.py'), 'import unittest\nclass Fixture(unittest.TestCase):\n def test_declared(self): self.assertEqual(2+2,4)\n'); git(['add', '.']);
   git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'Fixture']);
   const projectJob = make('Project fingerprint fixture', 'review', ['code.txt']);
   const isolated = await require('../lib/job-contract').prepareWorkspace(home, 'alex', { ...projectJob, projectRoot });
@@ -81,6 +81,21 @@ async function main() {
       await card.getByText(/Host tests: passed/).waitFor();
       await page.screenshot({ path: path.join(out, 'qa-evidence.png'), fullPage: true });
     });
+    await check('Python QA runs declared unittest cases through real preload and fresh human approval', async () => {
+      const configured = await page.evaluate(id => bridge.jobs.configureQA(id, ['check_test.py']), projectJob.id);
+      assert.equal(configured.ok, true); assert.equal(configured.job.qa.runner, 'python_unittest');
+      await page.evaluate(id => { window.__qaPython = bridge.jobs.runQATests(id); }, projectJob.id);
+      await page.getByRole('alertdialog').waitFor();
+      await page.getByText(/Runner: python_unittest/).waitFor();
+      await page.getByRole('button', { name: 'Allow once', exact: true }).click();
+      const result = await page.evaluate(() => window.__qaPython);
+      assert.equal(result.ok, true); assert.equal(result.job.qa.test.status, 'passed');
+      assert.equal(result.job.qa.test.tests, 1); assert.equal(result.job.qa.test.source, 'orbit_host_python_unittest');
+      const card = page.locator('[data-job-id="' + projectJob.id + '"]');
+      if (!(await card.evaluate(el => el.open))) await card.locator('summary').click();
+      await card.getByText(/Host tests: passed/).waitFor();
+      await page.screenshot({ path: path.join(out, 'python-qa-evidence.png'), fullPage: true });
+    });
     await check('human rejection and invalid dispatch use real main-process handlers', async () => {
       assert.equal((await page.evaluate(id => bridge.jobs.review(id, 'reject'), rejected.id)).ok, true);
       assert.equal(home.findJob(rejected.id).status, 'rejected');
@@ -93,6 +108,7 @@ async function main() {
       await assert.rejects(page.evaluate(() => bridge.config.save({ nativeContainerImage: 'latest' })), /immutable/);
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerTokenBudget: -1 })), /budget|tokens/i);
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerModelRates: { fixture: { input: -1, output: 1 } } })), /price|rate/i);
+      await assert.rejects(page.evaluate(() => bridge.config.save({ workerRoutes: [{provider:'openrouter',model:'fixture',contextTokens:1024,capabilities:['text','tools']}] })), /supported count adapters/);
       await page.evaluate(() => window.__ui.openSettings());
       const continuity = page.getByRole('checkbox', { name: /Preserve native model history/ });
       await continuity.check();
@@ -103,6 +119,7 @@ async function main() {
       await page.getByRole('spinbutton', { name: 'Worker token cost budget (USD)' }).fill('1');
       await page.getByRole('spinbutton', { name: 'Reserved output tokens per request' }).fill('512');
       await page.getByRole('textbox', { name: 'Model token prices (USD per million)' }).fill('{"fixture":{"input":1,"output":2}}');
+      await page.getByRole('textbox', { name: 'Native model routes (JSON)' }).fill(JSON.stringify([{provider:'openai',model:'fixture',contextTokens:32000,capabilities:['text','tools']}]));
       await page.screenshot({ path: path.join(out, 'request-cap-settings.png'), fullPage: true });
       await page.getByRole('button', { name: 'Save', exact: true }).click();
       await page.waitForFunction(() => !document.querySelector('.settings') || !!document.querySelector('.settings .ob-err')?.textContent);
@@ -110,6 +127,7 @@ async function main() {
       assert.equal((await page.evaluate(() => bridge.config.get())).workerMaxRequests, 2);
       assert.equal(JSON.parse(fs.readFileSync(path.join(temp, 'settings.json'), 'utf8')).workerMaxRequests, 2);
       const saved = await page.evaluate(() => bridge.config.get());
+      assert.equal(saved.workerRoutes[0].model, 'fixture'); assert.equal(saved.workerRoutes[0].provider, 'openai');
       assert.equal(saved.nativeContinuity, true);
       assert.equal(saved.nativeContainerImage, 'sha256:' + 'a'.repeat(64));
       assert.equal(saved.workerTimeoutSeconds, 30); assert.equal(saved.workerTokenBudget, 12000); assert.equal(saved.workerCostBudgetUsd, 1); assert.equal(saved.workerMaxOutputTokens, 512); assert.deepEqual(saved.workerModelRates, {fixture:{input:1,output:2}});

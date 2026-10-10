@@ -76,3 +76,8 @@ test('disabled empty channel settings remain saveable without an OS key provider
   store.set({comms:{telegram:{enabled:false,token:''},email:{enabled:false,password:''}}});
   const saved=JSON.parse(fs.readFileSync(r.file,'utf8'));assert.equal(saved.comms.telegram.enabled,false);assert.equal(saved._orbitSecrets,undefined);assert.equal(store.get().apiKey,'');
 });
+
+test('router credentials are removed from public settings and retained in protected secrets',()=>{
+ const {splitSettings,mergeSettings}=require('../lib/secret-storage'),settings={apiKey:'',workerApiKey:'',workerRouteCredentials:{openai:'ROUTE_SECRET'},workerRoutes:[{provider:'openai',model:'fixture',contextTokens:4096,capabilities:['text','tools']}]};
+ const split=splitSettings(settings);assert.equal(split.settings.workerRouteCredentials,undefined);assert.equal(split.hasSecrets,true);assert.doesNotMatch(JSON.stringify(split.settings),/ROUTE_SECRET/);assert.deepEqual(mergeSettings(split.settings,split.secrets),{...settings,comms:{}});
+});

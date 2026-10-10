@@ -184,7 +184,7 @@
     if (bridge.jobs && j.status === 'review') actions.push(act('Accept result', () => bridge.jobs.review(j.id, 'accept')), act('Reject result', () => bridge.jobs.review(j.id, 'reject')));
     if (bridge.jobs?.configureQA && j.status === 'review' && j.isolation === 'git_worktree') {
       actions.push(act(j.qa?.required ? 'Select QA test files' : 'Enable QA gate', () => {
-        const files = window.prompt('Workspace-relative JavaScript test files, one per line. Running them later requires approval and uses your OS permissions.', (j.qa?.tests || []).join('\n'));
+        const files = window.prompt('Workspace-relative JavaScript tests or Python unittest files, one per line; do not mix runners. Running them later requires approval and uses your OS permissions.', (j.qa?.tests || []).join('\n'));
         return files === null ? Promise.resolve({ ok: true }) : bridge.jobs.configureQA(j.id, files.split(/\r?\n/).map(s => s.trim()).filter(Boolean));
       }));
       if (j.qa?.tests?.length) {
@@ -197,6 +197,16 @@
     if (bridge.jobs && (['interrupted', 'failed', 'cancelled', 'rejected'].includes(j.status) || j.status === 'queued' && j.recoveryNeeded)) actions.push(act('Retry job', () => {
       if (!window.confirm('Retry this job? Inspect existing files first. An earlier external action may already have happened.')) return Promise.resolve({ ok: true });
       return bridge.jobs.retry(j.id);
+    }));
+    if (bridge.jobs?.previewNativeConversion && j.nativeContinuity && ['interrupted','failed','cancelled','rejected'].includes(j.status)) actions.push(act('Review provider/model conversion', async () => {
+      const provider = window.prompt('Target provider: gemini, openai or anthropic. Visible broker history only; private CLI state is not restored.');
+      if (provider === null) return {ok:true};
+      const model = window.prompt('Target model ID. Configure matching worker credentials/model before explicit Retry; original budget policy must remain valid.');
+      if (model === null) return {ok:true};
+      const preview = await bridge.jobs.previewNativeConversion(j.id,{provider:provider.trim(),model:model.trim()});
+      if (!preview.ok) return preview;
+      if (!window.confirm(`Convert ${preview.messages} visible history messages from ${preview.source.provider}/${preview.source.model} to ${preview.target.provider}/${preview.target.model}? Old approvals remain historical; no job starts automatically.`)) { await bridge.jobs.cancelNativeConversion(preview.token); return {ok:true}; }
+      return bridge.jobs.applyNativeConversion(preview.token);
     }));
     if (bridge.jobs?.inspectNative && ['interrupted','failed','cancelled','rejected'].includes(j.status) && Array.isArray(j.nativeContinuity?.pendingTools) && j.nativeContinuity.pendingTools.length) actions.push(act('Record inspected native outcomes', () => {
       const outcomes=[];
