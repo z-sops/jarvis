@@ -5,24 +5,31 @@ const state=require('../lib/native-engine-state'),{createSecretStorage}=require(
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 const binding={engine:'opencode',image:'synthetic-key-fixture',provider:'fixture',model:'fixture',actor:'fixture',jobId:'fixture',runId:'fixture'};
 const emit=value=>process.stdout.write('ORBIT_KEY_RESULT '+JSON.stringify(value)+'\n');
-const phases=['arguments','electron_ready','storage_available','checkpoint_save','checkpoint_read','checkpoint_decrypt','negative_checks'];
-let childPhase='arguments';
-const childFailure=e=>({phase:childPhase,issue:['EACCES','EPERM','ENOENT','ENOSPC','EIO'].includes(e?.code)?e.code:'operation_failed',electron:/^\d+\.\d+\.\d+$/.test(process.versions?.electron||'')?process.versions.electron:null,node:/^\d+\.\d+\.\d+$/.test(process.versions?.node||'')?process.versions.node:null});
+const phases=['arguments','electron_ready','storage_available','checkpoint_save','checkpoint_read','os_decrypt','payload_json','checkpoint_decrypt','negative_checks'];
+let childPhase='arguments',keyEvidence=null;
+const childFailure=e=>({phase:childPhase,issue:['EACCES','EPERM','ENOENT','ENOSPC','EIO'].includes(e?.code)?e.code:'operation_failed',...(keyEvidence||{}),electron:/^\d+\.\d+\.\d+$/.test(process.versions?.electron||'')?process.versions.electron:null,node:/^\d+\.\d+\.\d+$/.test(process.versions?.node||'')?process.versions.node:null});
 async function child(){
  if(process.platform!=='win32')throw Error('Windows protected fixture required.');
  const phase=process.argv[3],root=process.argv[4];
  if(!['save','restore'].includes(phase)||!root||fs.lstatSync(root).isSymbolicLink())throw Error('Invalid fixture.');
  childPhase='electron_ready';
- const {app,safeStorage}=require('electron');const profile=path.join(root,'electron-profile');fs.mkdirSync(profile,{recursive:true});app.setPath('userData',profile);await app.whenReady();
+ const {app,safeStorage}=require('electron');const profile=path.join(root,'electron-profile');fs.mkdirSync(profile,{recursive:true});app.setPath('userData',profile);app.setPath('sessionData',profile);await app.whenReady();
+ if(path.resolve(app.getPath('sessionData'))!==path.resolve(profile))throw Error('Fixture profile binding changed.');
+ const keyRecord=()=>{try{const f=path.join(profile,'Local State'),st=fs.lstatSync(f);if(!st.isFile()||st.isSymbolicLink()||st.size>1024*1024)return {present:false,key:null};const value=JSON.parse(fs.readFileSync(f)).os_crypt?.encrypted_key;return {present:true,key:typeof value==='string'&&value.length<65536?sha(Buffer.from(value)):null};}catch{return {present:false,key:null};}};
  const storage=createSecretStorage(safeStorage,'win32'),home={secretStorage:storage},file=path.join(root,'checkpoint.json');
  childPhase='storage_available';if(!storage.available())throw Error('OS protected storage unavailable.');
  if(phase==='save'){
   const bytes=Buffer.from('SYNTHETIC_PRIVATE_STATE_NOT_A_REAL_DATABASE');
   const bundle={version:1,adapter:1,engine:'opencode',sessionId:'synthetic-session',pendingEffects:0,retiredQueueRows:0,files:[{path:'data/opencode/opencode.db',bytes:bytes.length,sha256:sha(bytes),data:bytes.toString('base64')}]};
   childPhase='checkpoint_save';require('../lib/job-storage').atomicWrite(file,state.seal(home,bundle,binding));
+  require('../lib/job-storage').atomicWrite(path.join(root,'key-evidence.json'),keyRecord()); // Fingerprint stays private; only booleans are emitted.
   emit({saved:true,protected:true});process.exit(77); // Abrupt app exit after flushed fixture, not a power-cut simulation.
  }
  childPhase='checkpoint_read';const original=fs.readFileSync(file),saved=JSON.parse(original),checks={};
+ const before=JSON.parse(fs.readFileSync(path.join(root,'key-evidence.json'))),after=keyRecord();
+ keyEvidence={localStateAtSave:before.present===true,keyRecordAtSave:!!before.key,localStateAtRestore:after.present,keyRecordAtRestore:!!after.key,keyRecordUnchanged:!!before.key&&before.key===after.key};
+ childPhase='os_decrypt';const plaintext=safeStorage.decryptString(Buffer.from(saved.protected.ciphertext,'base64'));
+ childPhase='payload_json';JSON.parse(plaintext); // Never emit decrypted content or provider error text.
  childPhase='checkpoint_decrypt';
  checks.newProcessDecrypted=state.open(home,saved,binding).sessionId==='synthetic-session';
  childPhase='negative_checks';try{state.open(home,saved,{...binding,actor:'foreign'});checks.foreignBindingBlocked=false;}catch{checks.foreignBindingBlocked=true;}
@@ -41,14 +48,14 @@ else {
  else {
   let root,passed=false,stage='executable',diagnostics=null;
   const parse=result=>{try{const line=(result.stdout||'').split(/\r?\n/).find(x=>x.startsWith('ORBIT_KEY_RESULT '));return line?JSON.parse(line.slice(17)):null;}catch{return null;}};
-  const describe=result=>{const d=parse(result)?.diagnostics;return {exitCode:Number.isInteger(result.status)?result.status:null,signal:['SIGTERM','SIGKILL','SIGABRT'].includes(result.signal)?result.signal:null,spawnIssue:result.error?(['ETIMEDOUT','ENOENT','EACCES','EPERM','ENOBUFS'].includes(result.error.code)?result.error.code:'launch_failed'):null,protocolPresent:!!parse(result),...(d?{childPhase:phases.includes(d.phase)?d.phase:'unknown',childIssue:['EACCES','EPERM','ENOENT','ENOSPC','EIO','operation_failed'].includes(d.issue)?d.issue:'unknown',electron:/^\d+\.\d+\.\d+$/.test(d.electron||'')?d.electron:null,node:/^\d+\.\d+\.\d+$/.test(d.node||'')?d.node:null}:{}),startupIssue:/Cannot find module/.test(result.stderr||'')?'module_unavailable':/SyntaxError/.test(result.stderr||'')?'script_syntax':/is not a function/.test(result.stderr||'')?'runtime_api_mismatch':'unknown'};};
+  const describe=result=>{const d=parse(result)?.diagnostics;return {exitCode:Number.isInteger(result.status)?result.status:null,signal:['SIGTERM','SIGKILL','SIGABRT'].includes(result.signal)?result.signal:null,spawnIssue:result.error?(['ETIMEDOUT','ENOENT','EACCES','EPERM','ENOBUFS'].includes(result.error.code)?result.error.code:'launch_failed'):null,protocolPresent:!!parse(result),...(d?{childPhase:phases.includes(d.phase)?d.phase:'unknown',childIssue:['EACCES','EPERM','ENOENT','ENOSPC','EIO','operation_failed'].includes(d.issue)?d.issue:'unknown',...Object.fromEntries(['localStateAtSave','keyRecordAtSave','localStateAtRestore','keyRecordAtRestore','keyRecordUnchanged'].filter(k=>typeof d[k]==='boolean').map(k=>[k,d[k]])),electron:/^\d+\.\d+\.\d+$/.test(d.electron||'')?d.electron:null,node:/^\d+\.\d+\.\d+$/.test(d.node||'')?d.node:null}:{}),startupIssue:/Cannot find module/.test(result.stderr||'')?'module_unavailable':/SyntaxError/.test(result.stderr||'')?'script_syntax':/is not a function/.test(result.stderr||'')?'runtime_api_mismatch':'unknown'};};
   try{
    const args=process.argv.slice(2);
    if(args.length&&!(args.length===2&&args[0]==='--electron'&&path.isAbsolute(args[1])&&fs.lstatSync(args[1]).isFile()&&!fs.lstatSync(args[1]).isSymbolicLink()))throw Error('Use an existing absolute Electron executable.');
    const binary=args.length?args[1]:require('electron');if(typeof binary!=='string')throw Error('Installed Electron unavailable.');
    root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-keystore-check-'));
    const env={};for(const k of ['PATH','Path','SystemRoot','WINDIR','TEMP','TMP','APPDATA','LOCALAPPDATA','USERPROFILE','HOMEDRIVE','HOMEPATH'])if(process.env[k])env[k]=process.env[k];
-   const run=phase=>cp.spawnSync(binary,[__filename,'--key-child',phase,root],{env,encoding:'utf8',timeout:60000,maxBuffer:1024*1024,windowsHide:true});
+   const run=phase=>cp.spawnSync(binary,[__filename,'--key-child',phase,root,'--user-data-dir='+path.join(root,'electron-profile')],{env,encoding:'utf8',timeout:60000,maxBuffer:1024*1024,windowsHide:true});
    stage='save_process';const saved=run('save');diagnostics=describe(saved);if(saved.error||saved.status!==77)throw Error('Protected checkpoint save/exit failed.');
    stage='restore_process';const restored=run('restore');diagnostics=describe(restored);
    const result=parse(restored);
