@@ -70,6 +70,7 @@
   // ---------- text ----------
   let pendingAttach = null;
   async function sendText(text) {
+    const latencyStart=performance.now();
     text = text.trim();
     if (pendingAttach) {
       text = (text || 'Please take a look at this file.') + `
@@ -82,7 +83,9 @@
     if (live.connected) { live.sendText(sent); return; }
     if (!cfg.apiKey) { addMsg('ai', `My uplink is offline, ${who()}. Add your Gemini key in Settings.`); return; }
     presence.setState('thinking'); $('#hud-status').textContent = 'Thinking'; $('#send').disabled = true;
+    const feedbackMs=performance.now()-latencyStart;
     const r = await bridge.chat.send(sent); addMsg('ai', r.text); $('#send').disabled = false; paintState();
+    if(r.latencyTraceId)bridge.latency?.rendered(r.latencyTraceId,{feedbackMs,replyDomMs:performance.now()-latencyStart}).catch(()=>{});
   }
   async function onReport({ text, agent, ok, secs }) {
     const took = secs != null && window.__chat ? ` in ${__chat.fmtMs(secs * 1000)}` : '';

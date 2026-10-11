@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('bridge', {
   testKey: k => inv('key:test', k),
   openExternal: u => inv('shell:openExternal', u),
   showInFolder: p => inv('shell:showInFolder', p),
+  latency: { get: () => inv('latency:get'), rendered: (id,metrics) => inv('latency:rendered',id,metrics) },
   chat: { send: t => inv('chat:send', t), reset: () => inv('chat:reset'), pickFile: () => inv('chat:pickFile') },
   live: { context: () => inv('live:context'), tool: (n, a) => inv('tool:exec', n, a) },
   agents: { list: () => inv('agents:list'), inspect: id => inv('agents:inspect', id), create: a => inv('agents:create', a), update: (id, patch) => inv('agents:update', id, patch) },

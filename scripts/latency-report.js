@@ -1,0 +1,6 @@
+'use strict';
+// Read-only job summaries, complete bounded inventory. Never start providers or workers.
+const path=require('path'),{Home}=require('../lib/home'),{inventory}=require('../lib/checkpoint-retention'),{summarize}=require('../lib/latency');
+function report(root){if(typeof root!=='string'||!root)throw Error('Supply an existing Orbit Home.');const home=new Home(path.resolve(root));const jobs=inventory(home).jobs,records=jobs.filter(j=>j.latency?.version===1).sort((a,b)=>String(a.finishedAt||a.createdAt).localeCompare(String(b.finishedAt||b.createdAt))).slice(-500).map(j=>j.latency);return {...summarize(records),jobsWithSamples:records.length,jobsWithoutSamples:jobs.length-jobs.filter(j=>j.latency?.version===1).length,scope:'Last500 existing durable worker summaries only. No commander/renderer history inferred; missing samples remain unknown. No new work or files written.'};}
+if(require.main===module){try{if(process.argv.length!==3)throw Error('Supply exactly one existing Orbit Home.');console.log(JSON.stringify(report(process.argv[2]),null,2));}catch{console.error('Latency report unavailable; inspect Home/inventory bounds. No job started.');process.exitCode=1;}}
+module.exports={report};

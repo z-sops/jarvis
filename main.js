@@ -134,8 +134,9 @@ async function slashRun(text) {
   return { kind: 'done', result: { text: reply } };
 }
 async function commanderTurn(text) {
-  chat.begin();
-  try { return await commanderTurnInner(text); } finally { chat.end(); }
+  const latency=require('./lib/latency'),trace=latency.create('commander',{engine:'builtin'});
+  chat.begin();let outcome='failed';
+  try { return await latency.within(trace,async()=>{const result=await commanderTurnInner(text);trace.mark('response_ready');outcome=result.cancelled?'cancelled':result.error?'failed':'success';return {...result,latencyTraceId:trace.id};}); } finally { trace.finish(outcome);chat.end(); }
 }
 async function commanderTurnInner(text) {
   const slash = await slashRun(text); if (slash && slash.kind === 'done') return slash.result; if (slash && slash.kind === 'laila') text = slash.rest;
@@ -162,7 +163,7 @@ ${seen}`;
   try {
     const lastModel = [...hist].reverse().find(m => m && m.role === 'model');
     const recent = lastModel && lastModel.parts ? lastModel.parts.map(p => p.text || '').join(' ') : '';
-    const dec = slash && slash.kind === 'laila' ? null : await decider.routeMessage(text, { crewNames: home.listAgents().map(a => a.name), recent, cfg });
+    const dec = slash && slash.kind === 'laila' ? null : await require('./lib/latency').timed('decision',()=>decider.routeMessage(text, { crewNames: home.listAgents().map(a => a.name), recent, cfg }));
     if (dec) {
       const decId = 'dec' + Math.random().toString(36).slice(2, 6); bus.emit('tool', { callId: decId, actor: 'commander', actorName: cfg.aiName, name: 'decision', args: {}, status: 'start' });
       bus.emit('tool', { callId: decId, actor: 'commander', actorName: cfg.aiName, name: 'decision', args: { route: dec.route, urgency: dec.urgency, by: dec.by + (dec.why ? ' (' + dec.why + ')' : ''), model: dec.model || undefined }, status: dec.by === 'none' ? 'error' : 'done', ms: dec.ms, reason: dec.by === 'none' ? dec.why : undefined });
@@ -220,6 +221,8 @@ ipcMain.handle('key:test', (_e, k) => gemini.testKey(String(k || '')));
 ipcMain.handle('shell:openExternal', (_e, u) => { if (/^https:\/\//.test(u)) shell.openExternal(u); });
 ipcMain.handle('shell:showInFolder', (_e, p) => { if (isInside(home.root, p)) shell.showItemInFolder(p); });
 ipcMain.handle('chat:send', async (_e, text) => { try { return await commanderTurn(String(text)); } catch (e) { return { text: `Something went wrong on my side: ${e.message}`, error: true }; } });
+ipcMain.handle('latency:rendered',(e,id,metrics)=>{if(!win||win.isDestroyed()||e.sender!==win.webContents||e.senderFrame!==win.webContents.mainFrame)throw Error('Use the trusted main window.');return require('./lib/latency').rendered(id,metrics);});
+ipcMain.handle('latency:get', e => { if(!win||win.isDestroyed()||e.sender!==win.webContents||e.senderFrame!==win.webContents.mainFrame)throw Error('Use the trusted main window.');return require('./lib/latency').summarize(); });
 ipcMain.handle('chat:reset', () => { home.saveConversation([]); return true; });
 ipcMain.handle('chat:pickFile', async () => { const r = await dialog.showOpenDialog(win, { properties: ['openFile'], title: 'Attach a file for Laila' }); return r.canceled ? null : r.filePaths[0]; });
 ipcMain.handle('live:context', () => {

@@ -30,9 +30,9 @@ async function benchmark(config,deps={}){
  if(!preflight.ok)return {status:'failed',stage:'runtime',error:preflight.error,config};
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-native-growth-')),home=new Home(path.join(root,'home')).ensure();
  const cfg={storageQuotaMiB:4096,storageReserveMiB:512,storageJobReserveMiB:320,storageKeepDays:30};
- home.storageCheck=o=>A.check(home,cfg,o);
+ home.storageCheck=(jobId,neededBytes=0)=>A.check(home,cfg,{jobId,neededBytes});
  const runner=deps.runner||check,sampler=deps.dockerSample||dockerSample,progress=deps.progress||(()=>{});
- const report={version:1,status:'failed',config,execution:deps.runner?'simulated_test_adapter':'real_native_cli',syntheticAcceptance:true,sequence:'Round-robin sequential tasks, not parallel throughput or production staffing proof.',samples:[],scope:'Disposable Home; local deterministic model, ephemeral in-memory encryption key. Explicit native restart in same parent. No live provider, billing, human approval, TODO/plugin portability, physical outage, OS key lifecycle or full-disk proof. Private fixture recovery cannot be decrypted after benchmark parent exits.'};
+ const report={version:1,status:'failed',config,execution:deps.runner?'simulated_test_adapter':'real_native_cli',syntheticAcceptance:true,sequence:'Round-robin sequential tasks, not parallel throughput or production staffing proof.',samples:[],latencySamples:[],scope:'Disposable Home; local deterministic model, ephemeral in-memory encryption key. Explicit native restart in same parent. No live provider, billing, human approval, TODO/plugin portability, physical outage, OS key lifecycle or full-disk proof. Private fixture recovery cannot be decrypted after benchmark parent exits.'};
  let stage='initial_sample';
  try{
   report.samples.push({stage:'initial',...snapshot(home)});report.dockerBefore=await sampler(home);if(!report.dockerBefore.ok)throw Error('Docker accounting unavailable.');
@@ -40,6 +40,7 @@ async function benchmark(config,deps={}){
   const run=async (index,options={})=>{const bytes=A.reserve(home,cfg);const result=await runner(config.image,config.engine,true,{home,actor:'fixture-worker-'+index%config.workers,runtimeVerified:true,jobOptions:{storageReservationBytes:bytes},...options});
    if(!result.ok)throw Error('Native fixture failed: '+String(result.error||'required checks failed').slice(0,200));
    const required=['nativeResponse','owningActorMcp','modelReceivedToolResult','checkpointSaved','containerStopped','privateSessionSaved','privateSessionRestored','nativeHistoryReachedModel','retryContainerStopped'];if(required.some(k=>result.checks?.[k]!==true))throw Error('Native acceptance evidence incomplete.');
+   if(result.latency)report.latencySamples.push(result.latency);if(result.resumeLatency)report.latencySamples.push(result.resumeLatency);if(Number.isFinite(result.recoveryMs))(report.recoveryMs||=[]).push(result.recoveryMs);
    return result;
   };
   stage='accumulation';
@@ -62,7 +63,7 @@ async function benchmark(config,deps={}){
   }});
   report.postRetirementNativeChecks=probe.checks;report.dockerAfter=await sampler(home);if(!report.dockerAfter.ok)throw Error('Owned container cleanup/accounting not confirmed.');
   report.samples.push({stage:'final',...snapshot(home)});report.durableJobRecords=inventory(home).jobs.length;
-  report.full100JobFixture=config.jobs>=100;report.status='passed_fixture';
+  report.full100JobFixture=config.jobs>=100;report.latencySummary=require('../lib/latency').summarize(report.latencySamples);report.recoveryLatency=require('../lib/latency').percentile(report.recoveryMs||[]);report.status='passed_fixture';
  }catch(e){report.stage=stage;report.error=String(e.message).slice(0,300);}
  // Retain owned fixture and bounded metadata report. No production files or recursive cleanup.
  report.fixtureRetained=true;const reportPath=path.join(root,'report.json');fs.writeFileSync(reportPath,JSON.stringify(report,null,2),{mode:0o600});return {...report,reportPath};

@@ -307,3 +307,5 @@ Storage Guardian foundations: bounded owner-run storage measurement, disposable1
 Storage Guardian: Settings now provides category usage and explicit recovery pin/preview/cancel/release. Default30-day protection never triggers automatic deletion. New/retried crew jobs reserve320MiB and check a configurable4096MiB Home admission quota plus512MiB emergency headroom; native snapshot/input publication rechecks space. This is admission/checkpoint protection, not a universal OS-write quota. See docs/storage-guardian.md for references, interrupted-release reconciliation and actual/native test boundaries. `npm run benchmark:storage-jobs` executes a disposable five-worker120-job SCRIPTED fixture, not a paid/live native workload.
 
 Native accumulated-storage owner fixture: [instructions and limits](docs/native-storage-benchmark.md). Default one-job smoke; actual Windows100-task cases pending.
+
+Latency measurement definitions, read-only reporting and unverified targets: [Latency Observatory](docs/latency-observatory.md). Live end-to-end performance acceptance pending.

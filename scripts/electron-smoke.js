@@ -36,6 +36,12 @@ async function main() {
       await page.waitForFunction(() => document.body.classList.contains('revealed')); assert.equal(await page.title(), 'Orbit');
       assert.equal(await page.evaluate(() => typeof window.require), 'undefined'); assert.equal(await page.evaluate(() => typeof bridge.jobs.review), 'function');
     });
+    await check('latency IPC observes offline reply and validates renderer metrics without provider calls',async()=>{
+      const r=await page.evaluate(()=>bridge.chat.send('/laila Offline fixture'));assert.ok(r.latencyTraceId);
+      assert.equal(await page.evaluate(id=>bridge.latency.rendered(id,{feedbackMs:1,replyDomMs:2}),r.latencyTraceId),true);
+      assert.equal(await page.evaluate(id=>bridge.latency.rendered(id,{feedbackMs:1,replyDomMs:2}),r.latencyTraceId),false);
+      const stats=await page.evaluate(()=>bridge.latency.get());const group=stats.groups['commander/builtin/success/no_provider_span'];assert.ok(group.metrics.elapsedMs.samples>=1);assert.equal(group.metrics.renderer_replyDomMs.p95,2);assert.equal(group.metrics.model_requestUnionMs,undefined);
+    });
     await check('all seven screens in the real Electron window', async () => {
       for (const [label, id] of [['Office', 'office'], ['Workspace', 'workspace'], ['Browser', 'browser'], ['Connectors', 'connectors'], ['Memory', 'memory'], ['Library', 'library'], ['Orbit', 'bridge']]) {
         await page.locator('nav[aria-label="Screens"]').getByRole('button', { name: label, exact: true }).click(); await page.waitForFunction(id => document.body.dataset.view === id, id);
