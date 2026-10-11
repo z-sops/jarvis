@@ -126,13 +126,19 @@ def portable_todos(db, sid):
         supported = True
         todos = [{'id': str(row[0]), 'content': row[1], 'status': row[2]} for row in db.execute('SELECT position,content,status FROM todo WHERE session_id=? ORDER BY position LIMIT 257', (sid,))]
     elif engine == 'hermes':
-        calls = set()
+        calls, completed = set(), set()
         for role, raw_calls, call_id, content in db.execute('SELECT role,tool_calls,tool_call_id,content FROM messages WHERE session_id=? AND active=1 ORDER BY id', (sid,)):
-            if raw_calls:
+            if role == 'assistant' and raw_calls:
                 for call in json.loads(raw_calls):
                     if call.get('function', {}).get('name') == 'todo_list':
-                        calls.add(call.get('id'))
+                        identifier = call.get('id')
+                        if not isinstance(identifier, str) or not identifier or identifier in calls:
+                            raise ValueError('Ambiguous native TODO call identity')
+                        calls.add(identifier)
             if role == 'tool' and call_id in calls and isinstance(content, str) and len(content) < 512000:
+                if call_id in completed:
+                    raise ValueError('Duplicate native TODO result')
+                completed.add(call_id)
                 item = json.loads(content)
                 if isinstance(item.get('todos'), list):
                     todos, supported = item['todos'], True
