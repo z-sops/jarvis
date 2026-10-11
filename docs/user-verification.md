@@ -209,7 +209,7 @@ After a clean fast-forward of the existing draft clone, use an already installed
 ```powershell
 & {
     $repo = "G:/jarvis-containment-check"
-    $electron = "G:/jarvis-claude/node_modules/electron/dist/electron.exe"
+    $electron = "G:/jarvis-claude/bridge-os/node_modules/electron/dist/electron.exe"
     if (!(Test-Path $electron -PathType Leaf)) { throw "Installed Electron unavailable; report this without installing." }
     node "$repo/scripts/windows-keystore-check.js" --electron $electron
     if ($LASTEXITCODE -ne 0) { throw "Protected-store fixture did not pass; send only its JSON result." }
@@ -218,3 +218,8 @@ After a clean fast-forward of the existing draft clone, use an already installed
 This check uses a separate synthetic profile; it does not test production saved credentials, actual OS lock/key-loss or full native crash recovery. A PASS must contain all seven checks; Linux/unavailable dependencies are not PASS. Keep actual native TODO write/restart/restore, unknown mutating effect no-repeat, real Guardian/human approvals and provider charging as separate gates. Prior accepted native controlled-restart evidence remains unchanged.
 
 Final follow-up validation: npm622 total /619 pass /0 fail /3 unavailable-real-Hermes skips, after final guarded paused callback. Actual Electron/Playwright17/17 PASS, zero renderer errors. Final lifecycle/recovery30/30, budget13/13, key-protocol2/2 and preceding focused61/61. Actual Windows DPAPI/keystore diagnostic remains UNRUN; Linux reports unavailable. No real provider billing or approval/Guardian post-crash acceptance asserted. Source publication prepared for the existing draft branch; original main/app profile remains untouched.
+
+## Owner Windows keystore failure — bounded diagnostic follow-up, 2026-10-11
+Owner cleanly fast-forwarded afdc252 to fecd5af. Initial assumed Electron location was missing; read-only search found existing G:/jarvis-claude/bridge-os/node_modules/electron/dist/electron.exe. No install. Actual diagnostic on that executable returned status failed, fixtureRetained true, generic error with no failing stage. This is a FAILED diagnostic execution, not a verified DPAPI/keystore root cause. No native provider/task/Guardian/billing call occurred. Protected-store acceptance remains open; original app profiles were not opened.
+
+Diagnostic-only follow-up exposes fixed parent save_process/restore_process/executable stage, numeric exit code, allowlisted timeout/spawn/signal class, protocol presence and optional allowlisted child phase/fs code/runtime versions. Known startup failures are classified from stderr without forwarding stderr, stack, paths, ciphertext, keys or provider errors. Child failure protocol is flushed before exit; save still exits77 after durable fixture save, negative checks and all seven PASS criteria unchanged. The documentation's existing executable path is corrected to bridge-os. Root cause is intentionally not guessed or claimed fixed; owner rerun required. No production recovery code or dependency change. Targeted diagnostic/protected-store/private-state checks in progress; existing619/17 UI evidence retains its original scope.
