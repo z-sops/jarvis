@@ -264,6 +264,21 @@
       } }, 'Preview changes'), apply, h('button', { class: 'btn ghost', onclick: () => { invalidate(); m.close(); } }, 'Close')], { cls: 'settings crew-config' });
     try { await reload(); } catch (e) { status.textContent = errText(e); }
   }
+  async function openStorageGuardian() {
+    let token=null; const selected=new Set(),status=h('p',{role:'status'}),rows=h('div'),summary=h('p');
+    const take=async promise=>{const r=await promise;if(!r.ok)throw Error(r.error);return r.result;};
+    const invalidate=async()=>{if(token){const old=token;token=null;await take(bridge.storage.cancel(old));}apply.disabled=true;};
+    const reload=async()=>{await invalidate();selected.clear();const r=await take(bridge.storage.inspect());summary.textContent=`Native recovery protected for ${r.keepDays} days. No automatic deletion. ${r.rows.length} recovery records. Home ${r.usage.logicalBytes} logical bytes; free disk ${r.usage.freeBytes??'unknown'} bytes. Categories: ${Object.entries(r.usage.totals).map(([k,v])=>k+': '+v.bytes).join(', ')}. Coverage ${r.usage.coverage.complete?'complete':'incomplete'}.`;
+      rows.replaceChildren(...r.rows.map(row=>{const input=h('input',{type:'checkbox',disabled:!row.eligible,'aria-label':'Select recovery '+row.id});input.addEventListener('change',async()=>{try{await invalidate();input.checked?selected.add(row.id):selected.delete(row.id);}catch(e){status.textContent=errText(e);}});
+        const pin=h('button',{class:'btn ghost',disabled:row.interruptedRelease,onclick:async()=>{try{await take(bridge.storage.pin(row.id,!row.pinned));await reload();}catch(e){status.textContent=errText(e);}}},row.pinned?'Unpin recovery':'Pin recovery');
+        return h('div',{},h('label',{},input,`${row.actor} / ${row.id}: ${row.status}; ${row.eligible?(row.bytes+' logical bytes eligible'):row.blocked}`),pin); }));};
+    const apply=h('button',{class:'btn danger',disabled:true,onclick:async()=>{try{const current=token;token=null;apply.disabled=true;const r=await take(bridge.storage.apply(current));await reload();status.textContent=`Removed ${r.removedLogicalBytes} logical bytes; measured net Home reduction ${r.netManagedLogicalReclaimedBytes} bytes (includes receipts). Allocated reduction ${r.allocatedReclaimedBytes??'unknown'} bytes. Shared free-disk change ${r.observedFreeBytesDelta} bytes is not attributed savings.`;}catch(e){status.textContent=errText(e);}}},'Release previewed native recovery');
+    const preview=h('button',{class:'btn ghost',onclick:async()=>{try{await invalidate();const r=await take(bridge.storage.preview([...selected]));token=r.token;status.textContent=r.warning+' Selected: '+r.jobs.map(j=>j.actor+'/'+j.id+' ('+j.bytes+' bytes)').join(', ');apply.disabled=false;}catch(e){status.textContent=errText(e);}}},'Preview selected release');
+    const close=async()=>{try{await invalidate();m.close();}catch(e){status.textContent=errText(e);}};
+    const m=modal('Storage Guardian',h('div',{},summary,h('p',{},'Active, interrupted, failed, pinned and linked recovery stays protected. An interrupted release needs fresh inspection. Docker images/cache are not removed.'),rows,status),[h('button',{class:'btn ghost',onclick:async()=>{try{await reload();}catch(e){status.textContent=errText(e);}}},'Refresh'),preview,apply,h('button',{class:'btn ghost',onclick:close},'Cancel')]);
+    m.back.addEventListener('keydown',e=>{if(e.key==='Escape')close();});
+    try{await reload();}catch(e){status.textContent=errText(e);}
+  }
   function openSettings() {
     const d = { ...cfg }; const f = (label, el, note) => h('label', { class: 'field' }, h('span', {}, label), el, note ? h('small', {}, note) : null);
     const inp = (k, opts = {}) => { const i = h('input', { value: d[k] ?? '', ...opts }); i.addEventListener('input', () => (d[k] = i.value.trim())); return i; };
@@ -285,6 +300,11 @@
       f('Close voice after', sel('idleMinutes', [[5, '5 minutes of quiet'], [10, '10 minutes of quiet'], [30, '30 minutes of quiet'], [0, 'Never']].map(([a, b]) => [+a, b]), () => (d.idleMinutes = +d.idleMinutes))),
       h('h3', { class: 'set-h' }, 'Crew engine'),
       h('div', { class: 'set-h' }, h('button', { class: 'btn ghost', onclick: () => { m.close(); openCrewConfig(); } }, 'Crew configuration (YAML)')),
+      h('div', {class:'set-h'},h('button',{class:'btn ghost',onclick:()=>{m.close();openStorageGuardian();}},'Storage Guardian')),
+      f('Managed Home quota (MiB)',inp('storageQuotaMiB',{type:'number',min:512,max:1048576,step:1}),'Admission and native snapshot guard; Docker, external databases and unrestricted host writes are separate.'),
+      f('Emergency disk headroom (MiB)',inp('storageReserveMiB',{type:'number',min:128,step:1}),'Kept outside job reservations; does not guarantee writes during physical disk failure.'),
+      f('Per-job storage reservation (MiB)',inp('storageJobReserveMiB',{type:'number',min:320,max:4096,step:1}),'Durable queued/running reservations protect bounded native snapshot/input staging. Conservative accounting can refuse early.'),
+      f('Recovery protection (days)',inp('storageKeepDays',{type:'number',min:30,max:3650,step:1}),'After this period only human-accepted, unlinked, unpinned recovery is eligible for explicit review; never automatic deletion.'),
       f('Engine', sel('engine', [['builtin', 'Built-in (light, Gemini only)'], ['hermes', 'Hermes Agent (real coding tools)'], ['opencode', 'OpenCode (open-source coding agent)']]), 'Native crew jobs require the approved Docker Linux image below. Direct internet, host folders and unrestricted integrations are blocked.'),
       f('Hermes command', inp('hermesPath', { placeholder: 'hermes' }), 'Host command for Hermes communication services. Native crew jobs use Hermes installed inside the approved image.'),
       f('OpenCode command', inp('opencodePath', { placeholder: 'opencode' }), 'Legacy host command. Native crew jobs use OpenCode installed inside the approved image.'),

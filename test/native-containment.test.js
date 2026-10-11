@@ -135,3 +135,8 @@ test('incomplete private checkpoint never publishes a workspace-only recovery po
  const r=rig(t),d=fakeDocker();r.home.secretStorage=privateStorage();const c=await start(t,r,d,(m,emit)=>{if(m.type==='init'){privateSnapshot(emit,'checkpoint',false);emit({type:'failure',phase:'final_snapshot',issue:'native_state_invalid'});}},{cfg:{nativeContainerImage:image,nativeContinuity:true}});
  await assert.rejects(c.execute('Goal'),/native_state_invalid/);assert.equal(r.home.findJob(r.job.id).nativeCheckpoint,undefined);assert.equal(fs.existsSync(path.join(r.ws,'proof.txt')),false);
 });
+
+test('native storage refusal retains the last published checkpoint and removes only its owned container',async t=>{
+ const r=rig(t),d=fakeDocker();let checks=0;r.home.storageCheck=()=>{if(++checks===4)throw Error('fixture low disk');};
+ const c=await start(t,r,d,(m,emit)=>{if(m.type==='init'){snapshot(emit,'Protected checkpoint');snapshot(emit,'Must not publish','final');}});await assert.rejects(c.execute('Goal'),/low disk/);const j=r.home.findJob(r.job.id);assert.ok(j.nativeCheckpoint);assert.equal(fs.readFileSync(r.home.p(...j.nativeCheckpoint.dir.split('/'),'proof.txt'),'utf8'),'Protected checkpoint');assert.equal(j.containment.status,'stopped');assert.ok(d.calls.some(a=>a[0]==='rm'&&a[1]===j.containment.name));assert.ok(!d.calls.some(a=>a.includes('prune')||a[0]==='volume'||a[0]==='rmi'));assert.equal(fs.existsSync(path.join(r.ws,'proof.txt')),false);
+});

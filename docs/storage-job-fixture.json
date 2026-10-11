@@ -1,0 +1,421 @@
+{
+  "version": 1,
+  "workers": 5,
+  "sequentialJobs": 120,
+  "scriptedEngineCalls": 120,
+  "samples": [
+    {
+      "logicalBytes": 4709,
+      "allocatedBytes": 122880,
+      "categories": {
+        "db": {
+          "bytes": 0,
+          "files": 0
+        },
+        "wal": {
+          "bytes": 0,
+          "files": 0
+        },
+        "shm": {
+          "bytes": 0,
+          "files": 0
+        },
+        "events": {
+          "bytes": 0,
+          "files": 0
+        },
+        "jobs": {
+          "bytes": 0,
+          "files": 0
+        },
+        "checkpoints": {
+          "bytes": 0,
+          "files": 0
+        },
+        "knowledge": {
+          "bytes": 0,
+          "files": 0
+        },
+        "vector": {
+          "bytes": 0,
+          "files": 0
+        },
+        "memory": {
+          "bytes": 0,
+          "files": 0
+        },
+        "workspace": {
+          "bytes": 0,
+          "files": 0
+        },
+        "other": {
+          "bytes": 4709,
+          "files": 30
+        }
+      },
+      "coverage": {
+        "complete": true,
+        "bounded": false,
+        "errors": 0,
+        "skippedLinks": 0,
+        "entries": 67
+      }
+    },
+    {
+      "logicalBytes": 3180469,
+      "allocatedBytes": 3502080,
+      "categories": {
+        "db": {
+          "bytes": 0,
+          "files": 0
+        },
+        "wal": {
+          "bytes": 0,
+          "files": 0
+        },
+        "shm": {
+          "bytes": 0,
+          "files": 0
+        },
+        "events": {
+          "bytes": 0,
+          "files": 0
+        },
+        "jobs": {
+          "bytes": 96720,
+          "files": 20
+        },
+        "checkpoints": {
+          "bytes": 3069660,
+          "files": 40
+        },
+        "knowledge": {
+          "bytes": 0,
+          "files": 0
+        },
+        "vector": {
+          "bytes": 0,
+          "files": 0
+        },
+        "memory": {
+          "bytes": 2670,
+          "files": 5
+        },
+        "workspace": {
+          "bytes": 0,
+          "files": 0
+        },
+        "other": {
+          "bytes": 11419,
+          "files": 50
+        }
+      },
+      "coverage": {
+        "complete": true,
+        "bounded": false,
+        "errors": 0,
+        "skippedLinks": 0,
+        "entries": 264
+      }
+    },
+    {
+      "logicalBytes": 6352919,
+      "allocatedBytes": 6819840,
+      "categories": {
+        "db": {
+          "bytes": 0,
+          "files": 0
+        },
+        "wal": {
+          "bytes": 0,
+          "files": 0
+        },
+        "shm": {
+          "bytes": 0,
+          "files": 0
+        },
+        "events": {
+          "bytes": 0,
+          "files": 0
+        },
+        "jobs": {
+          "bytes": 193460,
+          "files": 40
+        },
+        "checkpoints": {
+          "bytes": 6139320,
+          "files": 80
+        },
+        "knowledge": {
+          "bytes": 0,
+          "files": 0
+        },
+        "vector": {
+          "bytes": 0,
+          "files": 0
+        },
+        "memory": {
+          "bytes": 5350,
+          "files": 5
+        },
+        "workspace": {
+          "bytes": 0,
+          "files": 0
+        },
+        "other": {
+          "bytes": 14789,
+          "files": 60
+        }
+      },
+      "coverage": {
+        "complete": true,
+        "bounded": false,
+        "errors": 0,
+        "skippedLinks": 0,
+        "entries": 414
+      }
+    },
+    {
+      "logicalBytes": 9521999,
+      "allocatedBytes": 10096640,
+      "categories": {
+        "db": {
+          "bytes": 0,
+          "files": 0
+        },
+        "wal": {
+          "bytes": 0,
+          "files": 0
+        },
+        "shm": {
+          "bytes": 0,
+          "files": 0
+        },
+        "events": {
+          "bytes": 0,
+          "files": 0
+        },
+        "jobs": {
+          "bytes": 290200,
+          "files": 60
+        },
+        "checkpoints": {
+          "bytes": 9208980,
+          "files": 120
+        },
+        "knowledge": {
+          "bytes": 0,
+          "files": 0
+        },
+        "vector": {
+          "bytes": 0,
+          "files": 0
+        },
+        "memory": {
+          "bytes": 8030,
+          "files": 5
+        },
+        "workspace": {
+          "bytes": 0,
+          "files": 0
+        },
+        "other": {
+          "bytes": 14789,
+          "files": 60
+        }
+      },
+      "coverage": {
+        "complete": true,
+        "bounded": false,
+        "errors": 0,
+        "skippedLinks": 0,
+        "entries": 534
+      }
+    },
+    {
+      "logicalBytes": 12691079,
+      "allocatedBytes": 13373440,
+      "categories": {
+        "db": {
+          "bytes": 0,
+          "files": 0
+        },
+        "wal": {
+          "bytes": 0,
+          "files": 0
+        },
+        "shm": {
+          "bytes": 0,
+          "files": 0
+        },
+        "events": {
+          "bytes": 0,
+          "files": 0
+        },
+        "jobs": {
+          "bytes": 386940,
+          "files": 80
+        },
+        "checkpoints": {
+          "bytes": 12278640,
+          "files": 160
+        },
+        "knowledge": {
+          "bytes": 0,
+          "files": 0
+        },
+        "vector": {
+          "bytes": 0,
+          "files": 0
+        },
+        "memory": {
+          "bytes": 10710,
+          "files": 5
+        },
+        "workspace": {
+          "bytes": 0,
+          "files": 0
+        },
+        "other": {
+          "bytes": 14789,
+          "files": 60
+        }
+      },
+      "coverage": {
+        "complete": true,
+        "bounded": false,
+        "errors": 0,
+        "skippedLinks": 0,
+        "entries": 654
+      }
+    },
+    {
+      "logicalBytes": 15860159,
+      "allocatedBytes": 16650240,
+      "categories": {
+        "db": {
+          "bytes": 0,
+          "files": 0
+        },
+        "wal": {
+          "bytes": 0,
+          "files": 0
+        },
+        "shm": {
+          "bytes": 0,
+          "files": 0
+        },
+        "events": {
+          "bytes": 0,
+          "files": 0
+        },
+        "jobs": {
+          "bytes": 483680,
+          "files": 100
+        },
+        "checkpoints": {
+          "bytes": 15348300,
+          "files": 200
+        },
+        "knowledge": {
+          "bytes": 0,
+          "files": 0
+        },
+        "vector": {
+          "bytes": 0,
+          "files": 0
+        },
+        "memory": {
+          "bytes": 13390,
+          "files": 5
+        },
+        "workspace": {
+          "bytes": 0,
+          "files": 0
+        },
+        "other": {
+          "bytes": 14789,
+          "files": 60
+        }
+      },
+      "coverage": {
+        "complete": true,
+        "bounded": false,
+        "errors": 0,
+        "skippedLinks": 0,
+        "entries": 774
+      }
+    },
+    {
+      "logicalBytes": 19029319,
+      "allocatedBytes": 19927040,
+      "categories": {
+        "db": {
+          "bytes": 0,
+          "files": 0
+        },
+        "wal": {
+          "bytes": 0,
+          "files": 0
+        },
+        "shm": {
+          "bytes": 0,
+          "files": 0
+        },
+        "events": {
+          "bytes": 0,
+          "files": 0
+        },
+        "jobs": {
+          "bytes": 580460,
+          "files": 120
+        },
+        "checkpoints": {
+          "bytes": 18417960,
+          "files": 240
+        },
+        "knowledge": {
+          "bytes": 0,
+          "files": 0
+        },
+        "vector": {
+          "bytes": 0,
+          "files": 0
+        },
+        "memory": {
+          "bytes": 16090,
+          "files": 5
+        },
+        "workspace": {
+          "bytes": 0,
+          "files": 0
+        },
+        "other": {
+          "bytes": 14809,
+          "files": 60
+        }
+      },
+      "coverage": {
+        "complete": true,
+        "bounded": false,
+        "errors": 0,
+        "skippedLinks": 0,
+        "entries": 894
+      }
+    }
+  ],
+  "checkpointBytesByState": {
+    "done": 18417960,
+    "running": 153483,
+    "interrupted": 153483,
+    "failed": 153483
+  },
+  "retention": {
+    "removedLogicalBytes": 18417960,
+    "netManagedLogicalReclaimedBytes": 18370680,
+    "allocatedReclaimedBytes": 18677760
+  },
+  "protectedWorkspaceRestore": true,
+  "protectedPointerUnchanged": true,
+  "scope": "120 actual durable jobs through existing five-worker scheduler; scripted engine and synthetic encrypted checkpoint bytes. Workspace restore uses existing helper after Home restart and retirement. NO real native private session/TODO/provider/Docker/Windows/power-cut proof."
+}
