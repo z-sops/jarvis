@@ -300,3 +300,6 @@ Native continuity now has a version-pinned private SQLite/session/TODO adapter i
 Windows protected writes now require a flushed key record in the selected Electron session profile. The isolated key diagnostic waits up to 30 seconds for initialization before abrupt save/reopen. Earlier immediate cold-key crash FAILED; after-initialization Windows acceptance still requires the owner rerun. See docs/user-verification.md for evidence limits.
 
 Windows keystore fixture now uses parent-owned forced process termination after flushed-save acknowledgement. Earlier process.exit executions were Electron application exits, not forced crash proof. Actual Windows revised acceptance remains pending; see docs/user-verification.md.
+
+
+Storage Guardian foundations: bounded owner-run storage measurement, disposable1/5-worker SQLite growth fixtures and COPY-only archive integrity/compaction checks. No automatic native pruning or aggregate storage quota; actual long-running Windows/native retirement acceptance remains open. See [storage details](docs/storage-guardian.md).

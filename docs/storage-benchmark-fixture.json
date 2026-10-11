@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "status": "passed",
+  "results": [
+    {
+      "workers": 1,
+      "committedMessages": 200,
+      "samples": [
+        {
+          "batch": 0,
+          "bytes": {
+            "db": 0,
+            "wal": 0,
+            "shm": 0,
+            "events": 0,
+            "checkpoints": 0,
+            "knowledge": 0,
+            "vector": 0,
+            "other": 0
+          }
+        },
+        {
+          "batch": 1,
+          "bytes": {
+            "db": 4096,
+            "wal": 119512,
+            "shm": 32768,
+            "events": 52,
+            "checkpoints": 0,
+            "knowledge": 944,
+            "vector": 0,
+            "other": 0
+          }
+        },
+        {
+          "batch": 2,
+          "bytes": {
+            "db": 4096,
+            "wal": 201912,
+            "shm": 32768,
+            "events": 104,
+            "checkpoints": 0,
+            "knowledge": 1888,
+            "vector": 0,
+            "other": 0
+          }
+        },
+        {
+          "batch": 3,
+          "bytes": {
+            "db": 4096,
+            "wal": 280192,
+            "shm": 32768,
+            "events": 156,
+            "checkpoints": 0,
+            "knowledge": 2832,
+            "vector": 0,
+            "other": 0
+          }
+        },
+        {
+          "batch": 4,
+          "bytes": {
+            "db": 4096,
+            "wal": 358472,
+            "shm": 32768,
+            "events": 208,
+            "checkpoints": 0,
+            "knowledge": 3776,
+            "vector": 0,
+            "other": 0
+          }
+        },
+        {
+          "batch": "archive",
+          "bytes": {
+            "db": 4096,
+            "wal": 358472,
+            "shm": 32768,
+            "events": 208,
+            "checkpoints": 295614,
+            "knowledge": 3776,
+            "vector": 0,
+            "other": 0
+          }
+        },
+        {
+          "batch": "writers_closed",
+          "bytes": {
+            "db": 294912,
+            "wal": 0,
+            "shm": 0,
+            "events": 208,
+            "checkpoints": 295614,
+            "knowledge": 3776,
+            "vector": 0,
+            "other": 0
+          }
+        }
+      ]
+    },
+    {
+      "workers": 5,
+      "committedMessages": 1000,
+      "samples": [
+        {
+          "batch": 0,
+          "bytes": {
+            "db": 0,
+            "wal": 0,
+            "shm": 0,
+            "events": 0,
+            "checkpoints": 0,
+            "knowledge": 0,
+            "vector": 0,
+            "other": 0
+          }
+        },
+        {
+          "batch": 1,
+          "bytes": {
+            "db": 20480,
+            "wal": 597560,
+            "shm": 163840,
+            "events": 260,
+            "checkpoints": 0,
+            "knowledge": 4720,
+            "vector": 0,
+            "other": 0
+          }
+        },
+        {
+          "batch": 2,
+          "bytes": {
+            "db": 20480,
+            "wal": 1009560,
+            "shm": 163840,
+            "events": 520,
+            "checkpoints": 0,
+            "knowledge": 9440,
+            "vector": 0,
+            "other": 0
+          }
+        },
+        {
+          "batch": 3,
+          "bytes": {
+            "db": 20480,
+            "wal": 1400960,
+            "shm": 163840,
+            "events": 780,
+            "checkpoints": 0,
+            "knowledge": 14160,
+            "vector": 0,
+            "other": 0
+          }
+        },
+        {
+          "batch": 4,
+          "bytes": {
+            "db": 20480,
+            "wal": 1792360,
+            "shm": 163840,
+            "events": 1040,
+            "checkpoints": 0,
+            "knowledge": 18880,
+            "vector": 0,
+            "other": 0
+          }
+        },
+        {
+          "batch": "archive",
+          "bytes": {
+            "db": 20480,
+            "wal": 1792360,
+            "shm": 163840,
+            "events": 1040,
+            "checkpoints": 1478070,
+            "knowledge": 18880,
+            "vector": 0,
+            "other": 0
+          }
+        },
+        {
+          "batch": "writers_closed",
+          "bytes": {
+            "db": 1474560,
+            "wal": 0,
+            "shm": 0,
+            "events": 1040,
+            "checkpoints": 1478070,
+            "knowledge": 18880,
+            "vector": 0,
+            "other": 0
+          }
+        }
+      ]
+    }
+  ],
+  "scope": "Actual SQLite WAL/SHM and copy-compaction primitives in disposable synthetic workloads. No real agents/providers/native CLI/vector index/Docker/7-day stability proof."
+}
