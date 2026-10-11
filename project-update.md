@@ -861,3 +861,5 @@ The isolated diagnostic triggers one disposable encryption probe, permits a boun
 Validation and publication receipt to follow. No install, live/paid call or original Windows profile/database edit performed here.
 
 Validation: full npm625 total/622 pass/0 fail/3 unavailable-real-Hermes skips. The added final cold-key timeout child test was then included in31/31 targeted checks (full suite discovery had already started). Actual Linux Electron/Playwright17/17 PASS, zero renderer errors; this exercises main on Linux, not its Windows key guard. All six touched JS files passed syntax checks. No actual Windows after-initialization acceptance claimed. Publication prepared for existing draft PR only.
+
+Publication receipt: source7a835b891834bc924d5fa12749bbe19199d212a4 advanced the existing draft branch with expected-head guard; all11 source/document blob hashes matched local bytes. PR description records actual failed cold-key result and distinguishes after-initialization test. Main stays unmerged/undeployed. Owner Windows rerun is required.
