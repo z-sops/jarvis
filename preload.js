@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('bridge', {
   chat: { send: t => inv('chat:send', t), reset: () => inv('chat:reset'), pickFile: () => inv('chat:pickFile') },
   live: { context: () => inv('live:context'), tool: (n, a) => inv('tool:exec', n, a) },
   agents: { list: () => inv('agents:list'), inspect: id => inv('agents:inspect', id), create: a => inv('agents:create', a), update: (id, patch) => inv('agents:update', id, patch) },
+  communication:{inspect:id=>inv('communication:inspect',id),preview:(id,ids)=>inv('communication:preview',id,ids),apply:token=>inv('communication:apply',token),cancel:token=>inv('communication:cancel',token),reconcile:()=>inv('communication:reconcile'),finish:id=>inv('communication:finish',id)},
+  teams:{list:()=>inv('teams:list'),inspect:id=>inv('teams:inspect',id),preview:(id,revision,limit)=>inv('teams:preview',id,revision,limit),apply:token=>inv('teams:apply',token),cancel:token=>inv('teams:cancel',token),draft:(id,provider,question,ids)=>inv('teams:draft',id,provider,question,ids),reply:(id,did,hash,text)=>inv('teams:reply',id,did,hash,text)},
   crewHealth: { get: () => inv('crew:health'), setDesired: (id,desired) => inv('crew:lifecycle',id,desired) },
   storage: {inspect:()=>inv('storage:inspect'),preview:ids=>inv('storage:preview',ids),cancel:token=>inv('storage:cancel',token),pin:(id,value)=>inv('storage:pin',id,value),apply:token=>inv('storage:apply',token)},
   crewConfig: { previewRollback: input => inv('crew-config:previewRollback', input), export: () => inv('crew-config:export'), preview: text => inv('crew-config:preview', text), apply: token => inv('crew-config:apply', token), cancel: token => inv('crew-config:cancel', token), acknowledge: input => inv('crew-config:acknowledge', input) },

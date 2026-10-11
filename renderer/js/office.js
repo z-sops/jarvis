@@ -305,6 +305,17 @@
       r && r.skills && r.skills.length ? sec('Skills', h('div', { class: 'of-chips' }, ...r.skills.slice(0, 12).map(s => h('span', {}, s)))) : null,
       r && r.soul ? sec('Character', h('p', { class: 'of-dim' }, clip(r.soul.replace(/^#.*\n+/, '').split('\n').filter(Boolean).slice(0, 4).join(' '), 260))) : null].filter(Boolean));
     if (!isC) side.appendChild(sec('Observed activity', h('p', { class: 'of-dim of-activity' }, activityText(r?.activity))));
+    if(bridge.communication){
+      const inbox=sec('Agent communication',h('p',{},'Loading inbox…'));side.appendChild(inbox);
+      const paintInbox=async()=>{try{const data=await bridge.communication.inspect(id);if(state.sel!==id||version!==sideVersion)return;if(!data.ok)throw Error(data.error);inbox.replaceChildren(h('h4',{},'Agent communication'),h('p',{},data.scope));
+        const messages=[...data.received.map(m=>({...m,direction:'Received'})),...data.sent.map(m=>({...m,direction:'Sent'}))].sort((a,b)=>b.t.localeCompare(a.t));
+        if(!messages.length)inbox.appendChild(h('p',{},'No reliable messages yet.'));
+        for(const m of messages.slice(0,40))inbox.appendChild(h('div',{class:'of-message'},h('b',{},m.direction+' · '+m.kind+' · '+(m.ack?'Receipt acknowledged':'Awaiting acknowledgement')),h('p',{},m.text),h('small',{},m.from+' → '+m.to+' · '+m.sourceJobId+' · '+(m.targetJobId||'Assistant'))));
+        inbox.appendChild(h('button',{class:'mini',onclick:paintInbox},'Refresh inbox'));
+        if(data.retention?.status==='prepared'){inbox.appendChild(h('p',{role:'alert'},'Interrupted receipt release: '+data.retention.present.length+' still present, '+data.retention.absent.length+' already removed. Nothing is automatically replayed.'));if(!data.retention.present.length)inbox.appendChild(h('button',{class:'mini',onclick:async()=>{const r=await bridge.communication.finish(data.retention.id);if(!r.ok){inbox.appendChild(h('p',{role:'alert'},r.error));return;}await paintInbox();}},'Confirm inspected release'));}
+        if(data.eligible.length)inbox.appendChild(h('button',{class:'mini',onclick:async()=>{let token;try{const p=await bridge.communication.preview(id,data.eligible.slice(0,100));if(!p.ok)throw Error(p.error);token=p.token;const preview=h('div',{'aria-label':'Receipt release preview'},h('p',{},'Release '+p.ids.length+' acknowledged receipts. Payload estimate '+p.bytes+' bytes; actual reclaimed bytes reported after release.'),h('p',{},p.ids.join(', ')));const out=h('small',{role:'status'});inbox.append(preview,out);preview.append(h('button',{class:'mini',onclick:async()=>{await bridge.communication.cancel(token);preview.remove();}},'Cancel release'),h('button',{class:'mini danger',onclick:async()=>{const result=await bridge.communication.apply(token);if(!result.ok){out.textContent=result.error;return;}await paintInbox();inbox.appendChild(h('p',{role:'status'},'Inbox bytes reclaimed: '+result.reclaimedInboxBytes));}},'Apply receipt release'));}catch(e){inbox.appendChild(h('p',{role:'alert'},e.message));}}},'Preview eligible receipt release'));
+      }catch(e){inbox.replaceChildren(h('h4',{},'Agent communication'),h('p',{role:'alert'},e.message));}};await paintInbox();
+    }
     if (engineRow) side.appendChild(engineRow);
     if (healthRow) side.appendChild(healthRow);
     if (!isC && bridge.jobs) {

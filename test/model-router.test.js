@@ -18,3 +18,16 @@ test('route pinning and credential-isolated cache prevent silently switching an 
  await assert.rejects(router.select({...cfg,workerApiKey:'DIFFERENT_KEY'}, {fetchImpl:async()=>response({data:[]})}),/No configured/);
  await assert.rejects(router.select(cfg,{pinned:{provider:'anthropic',model:'b'}}),/no longer matches/);
 });
+test('bounded pagination reaches later configured models; cycles and incomplete catalogs refuse',async()=>{
+ const cfg={apiKey:'PAGINATION_KEY',workerRoutes:[route('gemini','later')]},urls=[];
+ const chosen=await router.select(cfg,{fetchImpl:async url=>{urls.push(url);return response(url.includes('pageToken=')?{models:[{name:'models/later',supportedGenerationMethods:['generateContent']}]}:{models:[],nextPageToken:'page two'});}});assert.equal(chosen.model,'later');assert.match(urls[1],/pageToken=page%20two/);
+ await assert.rejects(router.select({...cfg,apiKey:'CYCLIC_KEY'},{fetchImpl:async()=>response({models:[{name:'models/later',supportedGenerationMethods:['generateContent']}],nextPageToken:'repeat'})}),/No configured/);
+});
+test('explicit context/capabilities and workload-weighted cost determine pre-submission route',async()=>{
+ const cfg={workerProvider:'openai',workerApiKey:'WEIGHTED_KEY',workerRoutes:[route('openai','input-cheap'),{...route('openai','output-cheap'),contextTokens:8192}],workerModelRates:{'input-cheap':{input:1,output:10},'output-cheap':{input:10,output:1}}},fetchImpl=async()=>response({data:[{id:'input-cheap'},{id:'output-cheap'}]});
+ assert.equal((await router.select(cfg,{fetchImpl,inputTokens:100,outputTokens:1})).model,'input-cheap');assert.equal((await router.select(cfg,{fetchImpl,inputTokens:1,outputTokens:100})).model,'output-cheap');assert.equal((await router.select(cfg,{fetchImpl,minContextTokens:5000})).model,'output-cheap');await assert.rejects(router.select(cfg,{fetchImpl,minContextTokens:10000}),/No configured/);
+});
+test('existing built-in worker routes only to Gemini and disables implicit generation fallback',async t=>{
+ const fs=require('fs'),os=require('os'),path=require('path'),{Home}=require('../lib/home'),{EventEmitter}=require('events'),home=new Home(fs.mkdtempSync(path.join(os.tmpdir(),'orbit-builtin-route-'))).ensure();t.after(()=>fs.rmSync(home.root,{recursive:true,force:true}));const agent=home.createAgent({name:'Alex'}),prior=global.fetch;t.after(()=>global.fetch=prior);global.fetch=async()=>response({models:[{name:'models/fixture-routed',supportedGenerationMethods:['generateContent']}]});let observed;
+ const cfg={engine:'builtin',apiKey:'BUILTIN_ROUTE_KEY',textModel:'ignored',workerRoutes:[route('gemini','fixture-routed')]},workers=require('../lib/workers').createWorkers({home,bus:new EventEmitter(),getCfg:()=>cfg,tools:{declarationsFor:()=>[]},gemini:{runLoop:async o=>{observed=o;return {text:'Fixture report'};}}}),job=home.createJob('alex','Task');await workers.run(agent,job);assert.equal(observed.model,'fixture-routed');assert.equal(observed.cfg.geminiNoFallback,true);assert.equal(home.findJob(job.id).builtinRoute.selected.model,'fixture-routed');assert.doesNotMatch(JSON.stringify(home.findJob(job.id).builtinRoute),/BUILTIN_ROUTE_KEY/);
+});

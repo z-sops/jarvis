@@ -94,6 +94,7 @@ const qa = require('./lib/job-qa').createQA({ home, workers, ask, bus });
 workers.qaPending = qa.hasPending;
 Object.assign(runtime, { dispatch: workers.dispatch, cancel: workers.cancel, stateOf: workers.stateOf });
 runtime.planner = require('./lib/project-plan').createPlanner({ home, dispatch: workers.dispatch, bus });
+require('./lib/team-control').register({home,planner:runtime.planner,ipcMain,isTrusted:e=>!!win&&!win.isDestroyed()&&e.sender===win.webContents&&e.senderFrame===win.webContents.mainFrame});
 const chat = panels.chatGuard(bus);
 // Orbit Browser: Orbit's own private browser (isolated sessions). Laila uses it through tools, the crew through a local MCP server.
 const orbitBrowser = require('./lib/browser-panel').create({ electron: { BrowserWindow, session, ipcMain }, home, getCfg: store.get, store, bus, ask, send, runs,
@@ -233,9 +234,11 @@ ipcMain.handle('tool:exec', (_e, name, args) => tools.exec(String(name), args ||
 ipcMain.handle('agents:list', () => home.listAgents().map(a => ({ ...a, ...workers.stateOf(a.id) })));
 ipcMain.handle('agents:create', (_e, a) => tools.exec('create_agent', a, 'commander'));
 // These decisions exist only on the trusted application UI bridge, never in model tool declarations.
+require('./lib/managed-write').register(home,store.get);
 home.storageCheck=(jobId,neededBytes)=>require('./lib/storage-admission').check(home,store.get(),{jobId,neededBytes});
 require('./lib/checkpoint-retention').register({ipcMain,home,getCfg:store.get,isBusy:()=>workers.hasPending()||qa.hasPending()||chat.active(),
   isTrusted:e=>!!win&&!win.isDestroyed()&&e.sender===win.webContents&&e.senderFrame===win.webContents.mainFrame});
+require('./lib/communication-control').register({ipcMain,home,isBusy:()=>workers.hasPending()||qa.hasPending()||chat.active(),isTrusted:e=>!!win&&!win.isDestroyed()&&e.sender===win.webContents&&e.senderFrame===win.webContents.mainFrame});
 require('./lib/job-control').registerJobControls({ ipcMain, workers, qa, home,
   isTrusted: e => !!win && !win.isDestroyed() && e.sender === win.webContents && e.senderFrame === win.webContents.mainFrame });
 require('./lib/crew-config').register({ ipcMain, home, bus, getCfg: store.get,
