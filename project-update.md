@@ -1036,3 +1036,11 @@ Independently inspected installed @electron/asar3.4.1 Filesystem.getNode/searchN
 Update only checker/tests/log; packaged runtime bytes unchanged, so verify existing Windows app.asar before rebuilding installer. Next owner command checks existing package then SHA256 and actual Authenticode status. Windows install/upgrade/complete-project acceptance remains pending. Owner-shared earlier Hermes growth report ended accumulation failure (real fixture tool result not returned); retained as unresolved final-E2E issue, not passing storage acceptance. No paid call, production profile edit, merge, deployment or release publishing.
 
 Windows ASAR fix publication: three source/test/log blobs independently Git-SHA1 matched and published with expected-head lease at c601bf108581fdf21a2a8c55e7b6f68df43d235e. Four focused packaging tests pass; source package check passes. Existing Windows installer must still pass corrected post-build check and actual signature inspection; no installer acceptance claim.
+
+## Owner-reported Windows installer package acceptance — 2026-10-11
+
+Owner updated Windows checkout7540bc6→f03f392 and reran corrected check-release.js --dist against existing installer output. PASS:162 first-party files;3692 archive entries; excluded secret/profile files; nested renderer/font bytes and sanitized manifest match reviewed source. One optional release-denylist warning remains. This is owner-provided console evidence, not independent access to artifact, installed app or complete runtime.
+
+Artifact: Orbit-Beta-Setup-0.1.0-beta.1-x64.exe. Owner SHA256:18285D1777270EB76F2F2864AF9D7F2D04F2D85698A8BBBD61164FCE208458C7. Actual Get-AuthenticodeSignature status:NotSigned. Prior signtool log did not establish a certificate signature. No signed/public-release claim. Existing artifact was built before verifier-only follow-up; packaged application bytes still matched updated source.
+
+Next acceptance: install/launch/close/reopen/uninstall on a disposable Windows test account, preserve existing production Home/account, then owner-deferred complete project/native/live E2E. If Windows security blocks execution, inspect exact warning rather than disabling protection/execution policy. Signing provision remains pending. No install performed by assistant, API call, main merge, deployment or GitHub release.
