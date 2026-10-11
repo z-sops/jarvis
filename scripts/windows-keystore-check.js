@@ -13,7 +13,7 @@ async function child(){
  const phase=process.argv[3],root=process.argv[4];
  if(!['save','restore'].includes(phase)||!root||fs.lstatSync(root).isSymbolicLink())throw Error('Invalid fixture.');
  childPhase='electron_ready';
- const {app,safeStorage}=require('electron');const profile=path.join(root,'electron-profile');fs.mkdirSync(profile,{recursive:true});app.setPath('userData',profile);app.setPath('sessionData',profile);await app.whenReady();
+ const {app,safeStorage}=require('electron');app.on('window-all-closed',()=>{});const profile=path.join(root,'electron-profile');fs.mkdirSync(profile,{recursive:true});app.setPath('userData',profile);app.setPath('sessionData',profile);await app.whenReady();
  if(path.resolve(app.getPath('sessionData'))!==path.resolve(profile))throw Error('Fixture profile binding changed.');
  const keyRecord=flush=>require('../lib/windows-key-state').keyRecord(profile, flush);
  const storage=createSecretStorage(safeStorage,'win32',{beforeSeal:()=>!!keyRecord(true).key}),home={secretStorage:storage},file=path.join(root,'checkpoint.json');
@@ -30,7 +30,9 @@ async function child(){
   const bundle={version:1,adapter:1,engine:'opencode',sessionId:'synthetic-session',pendingEffects:0,retiredQueueRows:0,files:[{path:'data/opencode/opencode.db',bytes:bytes.length,sha256:sha(bytes),data:bytes.toString('base64')}]};
   childPhase='checkpoint_save';require('../lib/job-storage').atomicWrite(file,state.seal(home,bundle,binding));
   require('../lib/job-storage').atomicWrite(path.join(root,'key-evidence.json'),keyRecord()); // Fingerprint stays private; only booleans are emitted.
-  emit({saved:true,protected:true});process.exit(77); // Abrupt app exit after flushed fixture, not a power-cut simulation.
+  emit({saved:true,protected:true,keyPersistent:true});
+  // Electron maps process.exit to app.exit. Stay alive for the owning Node controller to kill us.
+  await new Promise(()=>{});return;
  }
  childPhase='checkpoint_read';const original=fs.readFileSync(file),saved=JSON.parse(original),checks={};
  const before=JSON.parse(fs.readFileSync(path.join(root,'key-evidence.json'))),after=keyRecord();
@@ -48,9 +50,14 @@ async function child(){
  checks.noPlaintextFixture= !original.includes(Buffer.from('SYNTHETIC_PRIVATE_STATE'));
  emit({checks});app.exit(Object.values(checks).every(Boolean)?0:1);
 }
-if(process.argv[2]==='--key-child')child().catch(e=>{const value={error:'Protected fixture operation failed; no secret output.',diagnostics:childFailure(e)};process.stdout.write('ORBIT_KEY_RESULT '+JSON.stringify(value)+'\n',()=>process.exit(1));});
+if(process.argv[2]==='--kill-save'){
+ const binary=process.argv[3],root=process.argv[4];
+ if(process.platform!=='win32'||!binary||!path.isAbsolute(binary)||!root||!path.isAbsolute(root)||fs.lstatSync(root).isSymbolicLink())process.exit(1);
+ else require('../lib/fixture-kill-save').killAfterSave(binary,[__filename,'--key-child','save',root,'--user-data-dir='+path.join(root,'electron-profile')],process.env).then(result=>{emit(result);process.exitCode=result.forcedTermination?77:1;});
+}
+else if(process.argv[2]==='--key-child')child().catch(e=>{const value={error:'Protected fixture operation failed; no secret output.',diagnostics:childFailure(e)};process.stdout.write('ORBIT_KEY_RESULT '+JSON.stringify(value)+'\n',()=>process.exit(1));});
 else {
- const scope='Actual Windows Electron protected storage after a bounded key-initialization wait, then abrupt fixture process exit/reopen; lock is simulated. Earlier immediate cold-start crash failed. Not logout/key-loss, physical outage, native SQLite/workspace crash consistency, live Guardian, provider, approval or billing proof.';
+ const scope='Actual Windows Electron protected storage after bounded key initialization, then parent-owned forced process termination/reopen; lock is simulated. Earlier process.exit tests were application exit, NOT forced crash proof. Not logout/key-loss, physical outage, native SQLite/workspace crash consistency, live Guardian, provider, approval or billing proof.';
  if(process.platform!=='win32'){process.stdout.write(JSON.stringify({status:'unavailable',error:'Run this diagnostic on Windows with existing Electron dependencies.',scope})+'\n');process.exitCode=2;}
  else {
   let root,passed=false,stage='executable',diagnostics=null;
@@ -62,13 +69,13 @@ else {
    const binary=args.length?args[1]:require('electron');if(typeof binary!=='string')throw Error('Installed Electron unavailable.');
    root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-keystore-check-'));
    const env={};for(const k of ['PATH','Path','SystemRoot','WINDIR','TEMP','TMP','APPDATA','LOCALAPPDATA','USERPROFILE','HOMEDRIVE','HOMEPATH'])if(process.env[k])env[k]=process.env[k];
-   const run=phase=>cp.spawnSync(binary,[__filename,'--key-child',phase,root,'--user-data-dir='+path.join(root,'electron-profile')],{env,encoding:'utf8',timeout:60000,maxBuffer:1024*1024,windowsHide:true});
-   stage='save_process';const saved=run('save');diagnostics=describe(saved);if(saved.error||saved.status!==77)throw Error('Protected checkpoint save/exit failed.');
+   const run=phase=>phase==='save'?cp.spawnSync(process.execPath,[__filename,'--kill-save',binary,root],{env,encoding:'utf8',timeout:60000,maxBuffer:1024*1024,windowsHide:true}):cp.spawnSync(binary,[__filename,'--key-child',phase,root,'--user-data-dir='+path.join(root,'electron-profile')],{env,encoding:'utf8',timeout:60000,maxBuffer:1024*1024,windowsHide:true});
+   stage='save_process';const saved=run('save');diagnostics=describe(saved);const saveProof=parse(saved);if(saved.error||saved.status!==77||saveProof?.saved!==true||saveProof?.protected!==true||saveProof?.forcedTermination!==true)throw Error('Protected checkpoint forced save/exit failed.');
    stage='restore_process';const restored=run('restore');diagnostics=describe(restored);
    const result=parse(restored);
    const required=['newProcessDecrypted','foreignBindingBlocked','simulatedLockBlocked','corruptionBlocked','encryptedFileUnchanged','noPlaintextFixture'];
    if(restored.error||restored.status!==0||!result?.checks||required.some(k=>result.checks[k]!==true)||Object.keys(result.checks).length!==required.length)throw Error('Protected checkpoint reopen failed.');
-   passed=true;process.stdout.write(JSON.stringify({status:'passed',checks:{abruptFixtureExit:true,...result.checks},scope},null,2)+'\n');
+   passed=true;process.stdout.write(JSON.stringify({status:'passed',checks:{forcedFixtureTermination:true,...result.checks},scope},null,2)+'\n');
   }catch{process.stdout.write(JSON.stringify({status:'failed',error:'Windows protected fixture failed. Existing app profiles were not opened.',stage,diagnostics,fixtureRetained:!!root,scope})+'\n');process.exitCode=1;}
   finally{if(passed&&root)fs.rmSync(root,{recursive:true});}
  }
