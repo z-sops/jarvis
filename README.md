@@ -317,3 +317,7 @@ Settings → **Team Workspace** observes existing project worker states and prov
 ### Scoped live coordination increment
 
 Laila can preview and ask approval for bounded API discussion turns using existing project records and token/USD reservations. Nested existing leaders delegate only approved direct steps/sub-teams through the existing queue. NeuralOps typed questions/answers/ACK/handoff offers have durable job-owned delivery intents and explicit ledger reconciliation. The companion NeuralOps draft fixes the ACK target/idempotency collision. Kimi/Qwen/DeepSeek catalog/text/usage adapters are added, but strict-budget execution remains refused without verified exact pre-count support. No live provider/deployed remote acceptance is inferred from offline tests. See [live coordination scope](docs/live-team-coordination.md).
+
+## Windows beta build candidate
+
+Version `0.1.0-beta.1` is a testing candidate. See [beta-release.md](docs/beta-release.md) and `scripts/beta-build.ps1` for existing-dependency Windows x64 packaging, exact package verification, checksum and known limitations. No installer/signature/Windows upgrade or complete-project acceptance is claimed by source tests. Existing app identity is retained; use a disposable test account/profile and back up existing Home.
