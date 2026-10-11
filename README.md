@@ -309,3 +309,5 @@ Storage Guardian: Settings now provides category usage and explicit recovery pin
 Native accumulated-storage owner fixture: [instructions and limits](docs/native-storage-benchmark.md). Default one-job smoke; actual Windows100-task cases pending.
 
 Latency measurement definitions, read-only reporting and unverified targets: [Latency Observatory](docs/latency-observatory.md). Live end-to-end performance acceptance pending.
+
+Agent communication now extends existing cross-tags with durable, job-bound messages, explicit receipts and verified interrupted-job retry recovery. Optional Team Leaders can delegate only a finite, freshly human-approved set of existing project steps through the existing queue. External discussion drafts are offline, scoped to explicitly selected reports; live provider collaboration awaits the user-defined flow. See [agent coordination](docs/agent-coordination.md) for tools, authorization and remaining boundaries.
