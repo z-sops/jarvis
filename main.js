@@ -24,7 +24,9 @@ if (!lock) app.quit();
 
 let win = null, tray = null, quitting = false;
 require('./lib/ipc-origin').installMainFrameGuard(ipcMain, () => win);
-const secretStorage = require('./lib/secret-storage').createSecretStorage(require('electron').safeStorage);
+const secretStorage = require('./lib/secret-storage').createSecretStorage(require('electron').safeStorage, process.platform, {
+  beforeSeal: () => !!require('./lib/windows-key-state').keyRecord(app.getPath('sessionData'), true).key
+});
 const store = createStore(path.join(app.getPath('userData'), 'settings.json'), { secretStorage });
 const home = new Home(store.get().homeDir, { secretStorage });
 const bus = new EventEmitter();

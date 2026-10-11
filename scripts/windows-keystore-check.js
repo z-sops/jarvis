@@ -5,7 +5,7 @@ const state=require('../lib/native-engine-state'),{createSecretStorage}=require(
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 const binding={engine:'opencode',image:'synthetic-key-fixture',provider:'fixture',model:'fixture',actor:'fixture',jobId:'fixture',runId:'fixture'};
 const emit=value=>process.stdout.write('ORBIT_KEY_RESULT '+JSON.stringify(value)+'\n');
-const phases=['arguments','electron_ready','storage_available','checkpoint_save','checkpoint_read','os_decrypt','payload_json','checkpoint_decrypt','negative_checks'];
+const phases=['arguments','electron_ready','storage_available','key_persistence','checkpoint_save','checkpoint_read','os_decrypt','payload_json','checkpoint_decrypt','negative_checks'];
 let childPhase='arguments',keyEvidence=null;
 const childFailure=e=>({phase:childPhase,issue:['EACCES','EPERM','ENOENT','ENOSPC','EIO'].includes(e?.code)?e.code:'operation_failed',...(keyEvidence||{}),electron:/^\d+\.\d+\.\d+$/.test(process.versions?.electron||'')?process.versions.electron:null,node:/^\d+\.\d+\.\d+$/.test(process.versions?.node||'')?process.versions.node:null});
 async function child(){
@@ -15,10 +15,17 @@ async function child(){
  childPhase='electron_ready';
  const {app,safeStorage}=require('electron');const profile=path.join(root,'electron-profile');fs.mkdirSync(profile,{recursive:true});app.setPath('userData',profile);app.setPath('sessionData',profile);await app.whenReady();
  if(path.resolve(app.getPath('sessionData'))!==path.resolve(profile))throw Error('Fixture profile binding changed.');
- const keyRecord=()=>{try{const f=path.join(profile,'Local State'),st=fs.lstatSync(f);if(!st.isFile()||st.isSymbolicLink()||st.size>1024*1024)return {present:false,key:null};const value=JSON.parse(fs.readFileSync(f)).os_crypt?.encrypted_key;return {present:true,key:typeof value==='string'&&value.length<65536?sha(Buffer.from(value)):null};}catch{return {present:false,key:null};}};
- const storage=createSecretStorage(safeStorage,'win32'),home={secretStorage:storage},file=path.join(root,'checkpoint.json');
+ const keyRecord=flush=>require('../lib/windows-key-state').keyRecord(profile, flush);
+ const storage=createSecretStorage(safeStorage,'win32',{beforeSeal:()=>!!keyRecord(true).key}),home={secretStorage:storage},file=path.join(root,'checkpoint.json');
  childPhase='storage_available';if(!storage.available())throw Error('OS protected storage unavailable.');
  if(phase==='save'){
+  childPhase='key_persistence';
+  // Trigger only a disposable synthetic encryption, never save a checkpoint before readiness.
+  safeStorage.encryptString('ORBIT_KEY_READINESS_PROBE');
+  const deadline=Date.now()+30000;
+  while(!keyRecord(true).key && Date.now()<deadline) await new Promise(resolve=>setTimeout(resolve,200));
+  const ready=keyRecord(true);keyEvidence={localStateAtSave:ready.present,keyRecordAtSave:!!ready.key};
+  if(!ready.key)throw Error('Protected key record is not persistent.');
   const bytes=Buffer.from('SYNTHETIC_PRIVATE_STATE_NOT_A_REAL_DATABASE');
   const bundle={version:1,adapter:1,engine:'opencode',sessionId:'synthetic-session',pendingEffects:0,retiredQueueRows:0,files:[{path:'data/opencode/opencode.db',bytes:bytes.length,sha256:sha(bytes),data:bytes.toString('base64')}]};
   childPhase='checkpoint_save';require('../lib/job-storage').atomicWrite(file,state.seal(home,bundle,binding));
@@ -43,7 +50,7 @@ async function child(){
 }
 if(process.argv[2]==='--key-child')child().catch(e=>{const value={error:'Protected fixture operation failed; no secret output.',diagnostics:childFailure(e)};process.stdout.write('ORBIT_KEY_RESULT '+JSON.stringify(value)+'\n',()=>process.exit(1));});
 else {
- const scope='Actual Windows Electron protected storage across abrupt fixture process exit/reopen; lock is simulated. Not logout/key-loss, physical outage, native SQLite/workspace crash consistency, live Guardian, provider, approval or billing proof.';
+ const scope='Actual Windows Electron protected storage after a bounded key-initialization wait, then abrupt fixture process exit/reopen; lock is simulated. Earlier immediate cold-start crash failed. Not logout/key-loss, physical outage, native SQLite/workspace crash consistency, live Guardian, provider, approval or billing proof.';
  if(process.platform!=='win32'){process.stdout.write(JSON.stringify({status:'unavailable',error:'Run this diagnostic on Windows with existing Electron dependencies.',scope})+'\n');process.exitCode=2;}
  else {
   let root,passed=false,stage='executable',diagnostics=null;
