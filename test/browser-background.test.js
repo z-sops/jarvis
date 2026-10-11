@@ -11,3 +11,10 @@ test('browser_open can be told to stay in the background (research the user did 
   const g = BT.geminiDecls(); const decl = (g.browser_open || Object.values(g).find(x => x && x.parameters && x.parameters.properties && x.parameters.properties.url)); assert.ok(JSON.stringify(g).includes('background'), 'Laila sees the option too');
   assert.ok(JSON.stringify(BT.mcpTools()).includes('background'), 'and the crew');
 });
+
+test('browser context reads its session user agent without creating a hidden window before localhost permission',async()=>{
+ const {BrowserManager}=require('../lib/browser'),{EventEmitter}=require('events');let windows=0,asks=0,configured;
+ const ses=new EventEmitter();Object.assign(ses,{getUserAgent:()=> 'Mozilla/5.0 Orbit/0.1 Chrome/100.0 Electron/44.4.3 Safari/537.36',setUserAgent:ua=>configured=ua,setPermissionRequestHandler:()=>{},setPermissionCheckHandler:()=>{},webRequest:{onBeforeRequest:()=>{}}});
+ const browser=new BrowserManager({electron:{BrowserWindow:class{constructor(){windows++;throw Error('Unexpected native window before permission');}},session:{fromPartition:()=>ses},ipcMain:new EventEmitter()},home:{p:(...a)=>a.join('/')},getCfg:()=>({}),ask:async()=>{asks++;return 'deny';}});
+ await assert.rejects(browser.open('commander','http://127.0.0.1:9999/'),/did not allow/);assert.equal(windows,0);assert.equal(asks,1);assert.ok(configured.includes('Chrome/100.0'));assert.ok(!configured.includes('Electron/'));browser.dispose();
+});

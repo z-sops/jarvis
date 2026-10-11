@@ -25,16 +25,35 @@ async function main() {
   home.updateJob('alex', projectJob.id, { verification: review.evidence(home, 'alex', projectReady) });
   fs.writeFileSync(path.join(temp, 'settings.json'), JSON.stringify({ commissioned: true, aiName: 'Laila', userName: 'Fixture', homeDir: home.root, launchOnStart: false, sfx: false, autoWake: false, apiKey: '', workerApiKey: '', engine: 'builtin' }));
   const boot = path.join(temp, 'boot.cjs');
-  fs.writeFileSync(boot, `require.cache[require.resolve(${JSON.stringify(path.join(root, 'scripts/shots.js'))})]={exports:()=>{}};require(${JSON.stringify(path.join(root, 'main.js'))});`);
+  fs.writeFileSync(boot, `require('electron').app.disableHardwareAcceleration();require.cache[require.resolve(${JSON.stringify(path.join(root, 'scripts/shots.js'))})]={exports:()=>{}};require(${JSON.stringify(path.join(root, 'main.js'))});`);
   const checks = [], errors = []; let app;
   const check = async (name, fn) => { await fn(); checks.push({ name, status: 'passed' }); console.log('PASS ' + name); };
   try {
-    app = await playwright()._electron.launch({ executablePath: require('electron'), args: ['--no-sandbox', '--ozone-platform=headless', '--headless', '--disable-gpu', boot], env: { ...process.env, BRIDGE_SHOTS: out, BRIDGE_USER_DATA: temp }, timeout: 30000 });
+    app = await playwright()._electron.launch({ executablePath: require('electron'), args: ['--no-sandbox', '--ozone-platform=headless', '--disable-gpu', boot], env: { ...process.env, BRIDGE_SHOTS: out, BRIDGE_USER_DATA: temp }, timeout: 30000 });
+    app.process().on('exit',(code,signal)=>console.log('ELECTRON_EXIT',code,signal));
+    app.process().stdout.on('data',d=>fs.appendFileSync(path.join(out,'main-stdout.log'),d));app.process().stderr.on('data',d=>fs.appendFileSync(path.join(out,'main-stderr.log'),d));
     const page = await app.firstWindow(); page.setDefaultTimeout(15000); page.on('pageerror', e => errors.push(e.message));
-    await page.context().route('**/*', route => /^(file:|data:|blob:)/.test(route.request().url()) ? route.continue() : route.abort());
+    await page.context().route('**/*', route => /^(file:|data:|blob:|http:\/\/127\.0\.0\.1:\d+\/[a-f0-9]{48}\/)/.test(route.request().url()) ? route.continue() : route.abort());
     await check('actual Electron boot and isolated preload bridge', async () => {
       await page.waitForFunction(() => document.body.classList.contains('revealed')); assert.equal(await page.title(), 'Orbit');
-      assert.equal(await page.evaluate(() => typeof window.require), 'undefined'); assert.equal(await page.evaluate(() => typeof bridge.jobs.review), 'function');
+      assert.equal(await page.evaluate(() => typeof window.require), 'undefined'); assert.equal(await page.evaluate(() => typeof bridge.jobs.review), 'function');await page.getByRole('heading',{name:'Recorded usage',exact:true}).waitFor();
+    });
+    await check('static preview uses real localhost approval and native module rendering',async()=>{
+      const folder=home.p('workspace','bob','preview-fixture');fs.mkdirSync(folder,{recursive:true});
+      fs.writeFileSync(path.join(folder,'index.html'),'<title>Orbit preview fixture</title><body>Waiting<script type="module" src="main.js"></script></body>');
+      fs.writeFileSync(path.join(folder,'main.js'),'document.body.append(" MODULE_READY");document.body.style.cssText="margin:0;min-height:100vh;background:rgb(35,107,71);color:white;font-size:36px";');
+      await page.evaluate(folder=>{window.__preview=bridge.live.tool('preview_project',{path:folder});},folder);
+      await page.getByRole('alertdialog').waitFor();await page.getByRole('button',{name:'Deny',exact:true}).click();
+      const denied=await page.evaluate(()=>window.__preview);assert.equal(denied.ok,false);
+      await page.evaluate(folder=>{window.__preview=bridge.live.tool('preview_project',{path:folder});},folder);
+      await page.getByRole('alertdialog').waitFor();await page.getByRole('button',{name:'Allow once',exact:true}).click();
+      const loaded=await page.evaluate(()=>window.__preview);assert.equal(loaded.ok,true,JSON.stringify(loaded));assert.equal(loaded.pageLoaded,true);assert.match(loaded.url,/^http:\/\/127\.0\.0\.1:/);
+      const read=await page.evaluate(()=>bridge.live.tool('browser_read',{}));assert.equal(read.ok,true);assert.match(read.result,/MODULE_READY/);
+      // DOM delivery and the displayed offscreen frame are separate acceptance boundaries.
+      await page.waitForFunction(()=>{const c=document.querySelector('.bw-canvas');if(!c)return false;const p=c.getContext('2d').getImageData(c.width/2,c.height/2,1,1).data;return Math.abs(p[0]-35)<15&&Math.abs(p[1]-107)<15&&Math.abs(p[2]-71)<15;});
+      await page.screenshot({path:path.join(out,'static-project-preview.png'),fullPage:true});
+      await page.evaluate(()=>bridge.stop.all());await assert.rejects(fetch(loaded.url));
+      await page.locator('nav[aria-label="Screens"]').getByRole('button',{name:'Orbit',exact:true}).click();
     });
     await check('latency IPC observes offline reply and validates renderer metrics without provider calls',async()=>{
       const r=await page.evaluate(()=>bridge.chat.send('/laila Offline fixture'));assert.ok(r.latencyTraceId);

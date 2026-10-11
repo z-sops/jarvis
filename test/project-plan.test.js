@@ -55,3 +55,28 @@ test('greedy scheduling does not reject a deadline achievable by reordering inde
 
 
 test('staffing approval revision changes when worker lifecycle or queue load changes',t=>{const r=rig(t);const p=r.planner.create({goal:'g',steps:[{id:'a',task:'a',role:'Designer'}]});r.home.updateAgent('alex',{desiredLifecycle:'paused'});assert.notEqual(r.planner.inspect(p.id).staffingRevision,p.staffingRevision);assert.throws(()=>r.planner.staff(p.id,p.staffingRevision),/changed/);const v=r.planner.inspect(p.id);r.home.createJob('bob','new queue load');assert.notEqual(r.planner.inspect(p.id).staffingRevision,v.staffingRevision);});
+
+test('new Laila proposals block incomplete briefs and refinement is revision-bound with no approval authority',async t=>{
+ const r=rig(t);r.runtime.runs=require('../lib/job-runs').createJobRuns();
+ const tools=require('../lib/tools').createTools({home:r.home,getCfg:()=>({}),runtime:r.runtime,bus:r.bus,ask:async()=>{throw Error('Draft refinement must not invent approval');}});t.after(()=>tools.dispose());
+ const p=await tools.exec('plan_project',input(),'commander');assert.equal(p.ok,true);assert.equal(p.executionReadiness.briefRequired,true);assert.equal(p.executionReadiness.status,'blocked');
+ assert.throws(()=>r.planner.dispatchStep(p.id,'build'),/blocked/);assert.equal(r.home.listJobs('alex',Infinity).length,0);
+ assert.ok(tools.declarationsFor('commander').some(x=>x.name==='refine_project_brief'));assert.ok(!tools.declarationsFor('alex').some(x=>x.name==='refine_project_brief'));
+ assert.throws(()=>r.planner.refineBrief(p.id,'stale',{successCriteria:['Working authenticated API']}),/changed/);
+ const unresolved=r.planner.refineBrief(p.id,p.briefRevision,{successCriteria:['Working authenticated API'],unknowns:['Which authentication provider?']});assert.equal(unresolved.executionReadiness.status,'blocked');assert.throws(()=>r.planner.dispatchStep(p.id,'build'),/blocked/);
+ const refined=await tools.exec('refine_project_brief',{project_id:p.id,revision:unresolved.briefRevision,business:{successCriteria:['Reviewed local API fixture'],unknowns:[]}},'commander');assert.equal(refined.ok,true);assert.equal(refined.executionReadiness.status,'ready_for_proposed_execution');assert.equal(refined.origin,'model_proposal_not_approval');assert.equal(refined.coordinationGrant,undefined);
+ const done=new Promise(resolve=>r.bus.once('job:done',resolve));r.planner.dispatchStep(p.id,'build');await done;
+ assert.throws(()=>r.planner.refineBrief(p.id,r.planner.inspect(p.id).briefRevision,{successCriteria:['Different scope']}),/execution/);
+});
+test('recorded unknowns block worker creation and approved coordination proposals as well as direct dispatch',t=>{
+ const r=rig(t);r.home.createAgent({name:'Lead',role:'Coordinator'});
+ const p=r.planner.create({goal:'Clarify before staffing',teamLeader:'lead',business:{successCriteria:['Customer-reviewed design'],unknowns:['Customer requirements']},steps:[{id:'a',task:'Design',role:'Designer'}]});
+ assert.throws(()=>r.planner.staff(p.id,p.staffingRevision),/constraints/);assert.equal(r.home.listAgents().length,3);
+ const q=r.planner.create({...input(),teamLeader:'lead',business:{successCriteria:['Reviewed API'],unknowns:['Required database']}});assert.throws(()=>r.planner.coordinationProposal(q.id),/blockers/);assert.equal(r.home.listJobs('lead',Infinity).length,0);
+});
+test('accepted report-only steps do not establish project success criteria and false done claims remain unaccepted',async t=>{
+ const r=rig(t),p=r.planner.create({goal:'Evaluate API',business:{successCriteria:['API actually passes independent integration tests']},steps:[{id:'a',task:'Inspect the API',role:'Backend'}]});
+ const done=new Promise(resolve=>r.bus.once('job:done',resolve)),first=r.planner.dispatchStep(p.id,'a');await done;
+ r.home.updateJob('alex',first.job.id,{status:'done',acceptedBy:null,result:'Everything completed!'});assert.equal(r.planner.inspect(p.id).steps[0].status,'unaccepted_completion_claim');assert.equal(r.planner.inspect(p.id).steps[0].accepted,false);
+ r.home.updateJob('alex',first.job.id,{status:'review'});r.workers.decideReview(first.job.id,'accept');const view=r.planner.inspect(p.id);assert.equal(view.status,'human_accepted');assert.equal(view.deliveryAssessment.criteriaVerified,false);assert.equal(view.deliveryAssessment.status,'steps_human_accepted_project_criteria_unverified');
+});

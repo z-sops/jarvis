@@ -162,3 +162,16 @@ test('stopped or expired jobs cannot invoke a remote tool after awaited connecti
     await assert.rejects(p, expiry ? /expired run/ : /Stopped/); assert.equal(calls, 0); assert.equal(u.controllers.size, 0);
   }
 });
+
+test('direct dispatch does not create jobs for exact control messages', t => {
+  const r=rig(t);
+  for(const task of ['stop','Cancel!','your job been cancelled','Your job has been canceled.'])assert.throws(()=>r.workers.dispatch(r.agent.id,task),/control message/);
+  assert.equal(r.home.listJobs(r.agent.id,Infinity).length,0);
+});
+
+test('repeated retries keep one original goal and one recovery brief; broken lineage blocks creation', async t=>{
+ const r=rig(t,async()=>{throw Error('Fixture failure');});let j=r.workers.dispatch(r.agent.id,'Build the full ZuniTech website');await nextReport(r);
+ for(let n=0;n<3;n++){j=r.workers.retryJob(j.id);await nextReport(r);assert.equal((j.task.match(/RECOVERY:/g)||[]).length,1);assert.ok(j.task.startsWith('Build the full ZuniTech website'));}
+ r.home.updateJob(r.agent.id,j.id,{retryLinkReady:false});const count=r.home.listJobs(r.agent.id,Infinity).length;
+ assert.throws(()=>r.workers.retryJob(j.id),/goal lineage/);assert.equal(r.home.listJobs(r.agent.id,Infinity).length,count);
+});

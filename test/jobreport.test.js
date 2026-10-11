@@ -105,3 +105,10 @@ test('a job for several files does not claim the total from a per-file number; a
   assert.match(r, /- write a\.txt \u2014 file already exists \(107 words\)/); assert.match(r, /- write b\.txt\n/);
   const one = { id: 'n', task: 'write 100 words about rome' }; tr.begin('c', one); assert.match(jr.format(tr.snapshot('c'), { name: 'Bob', files }), /nothing by the numbers/);
 });
+
+test('completion notification preserves the report tail and labels omitted evidence and review',()=>{
+  const {completionReport}=require('../lib/jobreport');
+  const r=completionReport({name:'Bob'},{id:'j1',status:'review',task:'Website',result:'a'.repeat(5000)+' RISK: all business copy is placeholder; real device checks pending.'});
+  assert.equal(r.reviewReady,true);assert.equal(r.reportTruncated,true);
+  assert.match(r.text,/RISK: all business copy is placeholder/);assert.match(r.text,/get_job/);assert.match(r.text,/unaccepted report/);assert.match(r.text,/do not announce verified completion/);
+});

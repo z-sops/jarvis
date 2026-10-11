@@ -352,3 +352,11 @@ Final latency validation: npm660 total /657pass /0fail /3 unavailable-real-Herme
 - Keep final native/live/Windows/storage-growth/latency/project-building acceptance in owner-requested later E2E phase. Unit/UI counts do not certify these release gates. See docs/team-workspace.md and project-update.md for actual evidence and failures corrected.
 
 2026-10-11 live coordination increment: finite nested leaders implemented on existing queues; scoped per-turn API discussion with immutable budgets and uncertain-outcome refusal; NeuralOps job-owned questions/answers/ACK/offers and explicit original-act reconciliation. Companion NeuralOps ACK target/idempotency collision fixed; real registry/store plus actual Orbit adapter exercised offline, not deployed HTTP authentication. Kimi/Qwen/DeepSeek fixed catalog/text/usage adapters added; exact pre-count/budgeted generation remains unsupported and refused, not marked complete. Consumer ChatGPT/Claude browser-account collaboration, other regional endpoints, automatic multi-round sending, physical crashes and live full-project acceptance remain outside this increment. No copied reference files/framework/second scheduler. See docs/live-team-coordination.md.
+
+## Real issue and planning transition fixes — 2026-10-11
+
+Implemented: new Laila proposal readiness blocks absent success criteria and recorded unknowns; exact-revision undispatched brief refinement; proposal recheck at dispatch; unaccepted completion-claim labeling and project-wide criteria remain unverified. Existing scheduling, skills, approvals, staffing and review controls reused.
+
+Implemented: static immutable loopback preview, existing localhost approval, module MIME types and disposal; browser session user-agent eliminates an extra pre-approval native window. Legacy OpenCode total/idle/cancellation distinctions; verified original retry goal; control-task refusal; report risk tail and truthful partial usage UI.
+
+Acceptance retained: Windows owner reproduction and rebuilt installer, live Laila requirement/staffing/recovery judgment, full dynamic website QA, complete usage/billing, native live/security/power-loss and final project E2E. A static loaded page and human-accepted report steps do not close those gaps. Exact offline/actual Linux UI counts are recorded in project-update.md.

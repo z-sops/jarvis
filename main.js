@@ -38,11 +38,9 @@ for (const t of ['tool', 'agent:state', 'agent:created', 'agent:updated', 'job:c
 bus.on('job:done', ({ agent, job }) => {
   send('job:done', { agent, job });
   if (job.status === 'cancelled') return; // the user stopped it: no failure report
-  const reviewReady = job.status === 'review';
-  const ok = job.status === 'done' || reviewReady;
-  const secs = job.startedAt && job.finishedAt ? Math.max(0, Math.round((Date.parse(job.finishedAt) - Date.parse(job.startedAt)) / 1000)) : null;
-  const text = `[CREW REPORT] ${agent.name} ${reviewReady ? 'submitted a report for human review' : ok ? 'finished' : 'failed'} job ${job.id}${secs != null ? ` after ${secs} seconds` : ''}. Task: "${job.task}". ${ok ? 'Result: ' + String(job.result || '').slice(0, 1500) : 'Error: ' + job.error}${reviewReady ? ' This report is not accepted completion. Open Office to inspect and accept or reject it. File checks do not prove correctness.' : ''}`;
-  send('report', { text, agent: agent.name, ok, secs, reviewReady });
+  const report = require('./lib/jobreport').completionReport(agent,job);
+  const {ok,reviewReady}=report;
+  send('report', report);
   if (!win?.isVisible() && Notification.isSupported()) new Notification({ title: `${agent.name} ${reviewReady ? 'has a report to review' : ok ? 'finished a job' : 'hit a problem'}`, body: job.task.slice(0, 100) }).show();
 });
 bus.on('job:storage-error', ({ agent, jobId, error }) => {
@@ -195,7 +193,7 @@ ipcMain.handle('config:save', (_e, patch) => {
   const before = store.get();
   if (patch && patch.homeDir && patch.homeDir !== before.homeDir && (workers.hasPending() || qa.hasPending())) throw new Error('Stop or finish crew/QA jobs before changing the home folder.');
   const cfg = store.set(patch);
-  if (cfg.homeDir !== before.homeDir) { home.root = cfg.homeDir; home.ensure(); home.recoverJobs(); }
+  if (cfg.homeDir !== before.homeDir) { tools.dispose(); home.root = cfg.homeDir; home.ensure(); home.recoverJobs(); }
   applyLoginItem();
   return { ...cfg, voices: VOICES };
 });
@@ -208,7 +206,7 @@ ipcMain.handle('config:commission', (_e, c) => {
   };
   if (!clean.aiName || !clean.userName) throw new Error('A name for the AI and for you are both required');
   const cfg = store.set(clean);
-  home.root = cfg.homeDir; home.ensure(); home.writeCommanderSoul(cfg, true);
+  tools.dispose(); home.root = cfg.homeDir; home.ensure(); home.writeCommanderSoul(cfg, true);
   home.appendMemory(COMMANDER, `Commissioned by ${cfg.userName} (${cfg.userTitle}). I am ${cfg.aiName}.`);
   applyLoginItem();
   return { ...cfg, voices: VOICES };
@@ -286,7 +284,7 @@ ipcMain.handle('shutdown:step', async (e, step) => {
   if (win && e.sender !== win.webContents) return { ok: false, detail: 'not allowed' };
   try {
     if (step === 'crew') { const n = workers.cancelAll(); hermes.stopAll(); return { ok: true, detail: n ? `${n} job${n === 1 ? '' : 's'} stopped` : 'all engines stopped' }; }
-    if (step === 'browser') { const t = orbitBrowser.manager.state().contexts.reduce((n, c) => n + c.tabs.length, 0); orbitBrowser.dispose(); gateway.closeAll().catch(() => {}); return { ok: true, detail: t ? `${t} tab${t === 1 ? '' : 's'} closed` : 'no tabs open' }; }
+    if (step === 'browser') { tools.dispose(); const t = orbitBrowser.manager.state().contexts.reduce((n, c) => n + c.tabs.length, 0); orbitBrowser.dispose(); gateway.closeAll().catch(() => {}); return { ok: true, detail: t ? `${t} tab${t === 1 ? '' : 's'} closed` : 'no tabs open' }; }
     if (step === 'comms') { comms.stop(); return { ok: true, detail: 'closed' }; }
   } catch (err) { return { ok: false, detail: String(err.message || err).slice(0, 80) }; }
   return { ok: false, detail: 'unknown step' };
@@ -353,7 +351,7 @@ app.whenReady().then(async () => {
     }
     if (SHOTS) win.webContents.once('did-finish-load', () => require('./scripts/shots.js')(win, app, { store, home }));
   });
-  app.on('before-quit', () => { quitting = true; qa.cancel(); workers.cancelAll(); hermes.stopAll(); comms.stop(); try { orbitBrowser.dispose(); } catch {} try { gateway.closeAll(); } catch {} try { sysPanel.stop(); } catch {} });
+  app.on('before-quit', () => { quitting = true; tools.dispose(); qa.cancel(); workers.cancelAll(); hermes.stopAll(); comms.stop(); try { orbitBrowser.dispose(); } catch {} try { gateway.closeAll(); } catch {} try { sysPanel.stop(); } catch {} });
   app.on('will-quit', () => globalShortcut.unregisterAll());
   require('./lib/diag').install({ app, getDir: () => path.join(store.get().homeDir, 'logs') });
   app.on('window-all-closed', () => { if (SHOTS) app.quit(); /* otherwise stay alive in the tray */ });
