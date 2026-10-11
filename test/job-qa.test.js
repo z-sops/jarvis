@@ -85,3 +85,25 @@ test('schema v2 requires goal certainty, exact source quotation and every reques
   assert.throws(()=>r.workers.decideReview(r.job.id,'accept'),/QA gate/);assert.equal(r.home.findJob(r.job.id).status,'review');
  }
 });
+
+
+test('explicit broader QA runners validate selection and unavailable tooling records failure',async t=>{const {selectRunner}=require('../lib/job-qa');assert.equal(selectRunner(['a.py'],'pytest'),'pytest');assert.equal(selectRunner(['lib.go','lib_test.go'],'go'),'go');assert.equal(selectRunner(['Cargo.toml'],'cargo'),'cargo');assert.equal(selectRunner(['pom.xml'],'maven'),'maven');for(const [files,runner] of [[['a.js'],'pytest'],[['a.go'],'go'],[['a.py'],'shell'],[['Cargo.toml','other.toml'],'cargo']])assert.throws(()=>selectRunner(files,runner),/matching|mixing/);const r=rig(t);await ready(r);const dir=r.home.findJob(r.job.id).workspaceDir;fs.writeFileSync(path.join(dir,'empty_test.py'),'# no test cases');r.home.updateJob('alex',r.job.id,{verification:review.evidence(r.home,'alex',r.home.findJob(r.job.id))});r.qa.configure(r.job.id,['empty_test.py'],'pytest');const result=await r.qa.runTests(r.job.id);assert.equal(result.qa.test.status,'failed');assert.equal(result.qa.test.source,'orbit_host_pytest');assert.equal(result.qa.test.tests,0);assert.equal(r.qa.hasPending(),false);});
+
+
+test('external runner collectors reject empty, failing, skipped and duplicate simulated tool outcomes',()=>{
+ const reporter=path.resolve(__dirname,'../lib/qa-external-reporter.py');
+ const harness=`import io,json,os,pathlib,runpy,subprocess,sys
+helper,runner,payload=sys.argv[1:];item=json.loads(payload)
+class Child:
+ def __init__(self,args,**kwargs):
+  assert '--offline' in args or '-json' in args
+  if runner=='go': assert kwargs['env']['GOPROXY']=='off' and kwargs['env']['GOTOOLCHAIN']=='local'
+  self.stdout=io.BytesIO(item['output'].encode());self.code=item['code']
+ def wait(self):return self.code
+ def kill(self):self.code=1
+subprocess.Popen=Child
+sys.argv=[helper,runner,'./check_test.go' if runner=='go' else './Cargo.toml']
+runpy.run_path(helper,run_name='__main__')`;
+ const cases=[['go',JSON.stringify({Action:'pass',Package:'fixture',Test:'TestOne'})+'\n',0,true],['go',JSON.stringify({Action:'skip',Package:'fixture',Test:'TestOne'})+'\n',0,false],['go','',0,false],['go',JSON.stringify({Action:'pass',Package:'fixture',Test:'TestOne'})+'\n'+JSON.stringify({Action:'pass',Package:'fixture',Test:'TestOne'})+'\n',0,false],['cargo','test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;\n',0,true],['cargo','test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out;\n',0,false],['cargo','test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;\n',0,false],['cargo','test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;\n',1,false]];
+ for(const [runner,output,code,expected] of cases){const r=require('child_process').spawnSync('python3',['-I','-B','-c',harness,reporter,runner,JSON.stringify({output,code})],{encoding:'utf8'});const report=JSON.parse(r.stdout);assert.equal(report.overall.success,expected,runner);assert.equal(r.status,expected?0:1);}
+});

@@ -87,6 +87,7 @@ const usage = panels.makeUsage({ home });
 const audit = panels.makeAudit({ home, bus });
 gemini.setUsageHook(u => usage.add(u));
 const workers = createWorkers({ askNative: ask, home, getCfg: store.get, gemini, tools, bus, hermes, usage, opencode, runs, getGuidance: () => runtime.guidance, getPlanner: () => runtime.planner, getNativeGateway: agent => runtime.browser?.containedEndpoint(agent) || null });
+runtime.workers=workers;
 const qa = require('./lib/job-qa').createQA({ home, workers, ask, bus });
 workers.qaPending = qa.hasPending;
 Object.assign(runtime, { dispatch: workers.dispatch, cancel: workers.cancel, stateOf: workers.stateOf });
@@ -239,7 +240,7 @@ ipcMain.handle('agents:inspect', (_e, id) => {
   const recentJobs = home.listJobs(agent.id, 20);
   return { agent, activity: workers.activityOf(agent.id) || recentJobs.find(j => j.activity)?.activity || null, folder: home.agentDir(agent.id), soul: rd('brain/soul.md'), skills: home.readSkills(agent.id).map(s => s.name), jobsError: home.recoveryFaults.get(agent.id), jobs: recentJobs.map(j => ({ id: j.id, status: j.status, task: j.task, result: j.result, error: j.error, recoveryNeeded: j.recoveryNeeded, nativeContinuity: j.nativeContinuity, containment: j.containment ? {status:j.containment.status} : null, nativeCheckpoint: j.nativeCheckpoint ? {at:j.nativeCheckpoint.at,engineState:require('./lib/native-engine-state').publicSummary(j.nativeCheckpoint.engineState)} : null, managed: j.managed, guidance: j.guidance, remoteOutcomes: j.remoteOutcomes, expectedOutputs: j.expectedOutputs, verification: j.verification, qa: j.qa, reviewTarget: j.reviewTarget, completionKind: j.completionKind, acceptedAt: j.acceptedAt, dependencies: j.dependencies, workspaceDir: j.workspaceDir, isolation: j.isolation, selectedSkills: (j.selectedSkills || []).map(s => ({ slug: s.slug, selectedBy: s.selectedBy })) })), memory: home.readMemory(agent.id, 600) };
 });
-ipcMain.handle('agents:update', (_e, id, patch) => { try { return { ok: true, agent: home.updateAgent(id, patch || {}) }; } catch (e) { return { ok: false, error: e.message }; } });
+ipcMain.handle('agents:update', (_e, id, patch) => { try { if(patch&&'desiredLifecycle' in patch)throw Error('Use trusted crew lifecycle controls.');return { ok: true, agent: home.updateAgent(id, patch || {}) }; } catch (e) { return { ok: false, error: e.message }; } });
 ipcMain.handle('hermes:check', async (_e, opts) => { try { return { steps: await hermes.check(opts || {}) }; } catch (e) { return { steps: [{ name: 'Check', ok: false, detail: e.message }] }; } });
 ipcMain.handle('opencode:check', async (_e, opts) => { try { return { steps: await opencode.check(opts || {}) }; } catch (e) { return { steps: [{ name: 'Check', ok: false, detail: e.message }] }; } });
 ipcMain.handle('comms:get', () => ({ settings: comms.settings(), status: comms.status() }));

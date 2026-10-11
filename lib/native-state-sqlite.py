@@ -119,6 +119,38 @@ def sanitize(db):
     return {"sessionId": sid, "pendingEffects": pending, "retiredQueueRows": cleared}
 
 
+def portable_todos(db, sid):
+    """Known data-only TODO view, not executable plugin state or cross-engine DB restore."""
+    todos, supported = [], False
+    if engine == 'opencode' and {'session_id', 'content', 'status', 'position'}.issubset(columns(db, 'todo')):
+        supported = True
+        todos = [{'id': str(row[0]), 'content': row[1], 'status': row[2]} for row in db.execute('SELECT position,content,status FROM todo WHERE session_id=? ORDER BY position LIMIT 257', (sid,))]
+    elif engine == 'hermes':
+        calls = set()
+        for role, raw_calls, call_id, content in db.execute('SELECT role,tool_calls,tool_call_id,content FROM messages WHERE session_id=? AND active=1 ORDER BY id', (sid,)):
+            if raw_calls:
+                for call in json.loads(raw_calls):
+                    if call.get('function', {}).get('name') == 'todo_list':
+                        calls.add(call.get('id'))
+            if role == 'tool' and call_id in calls and isinstance(content, str) and len(content) < 512000:
+                item = json.loads(content)
+                if isinstance(item.get('todos'), list):
+                    todos, supported = item['todos'], True
+    if len(todos) > 256:
+        raise ValueError('Portable TODO bound')
+    seen = set()
+    normalized = []
+    for item in todos:
+        if not isinstance(item, dict) or not isinstance(item.get('content'), str) or not item['content'].strip() or len(item['content']) > 4000 or item.get('status') not in ('pending', 'in_progress', 'completed', 'cancelled'):
+            raise ValueError('Unsupported portable TODO item')
+        key = str(item.get('id', ''))
+        if not key or len(key) > 256 or key in seen:
+            raise ValueError('Portable TODO identity')
+        seen.add(key)
+        normalized.append({'id': key, 'content': item['content'], 'status': item['status']})
+    return {'version': 1, 'todos': normalized, 'supported': supported, 'scope': 'data_only_not_permissions_plugins_or_pending_actions'}
+
+
 if mode == "capture":
     files, total = [], 0
     summary = {"sessionId": None, "pendingEffects": 0, "retiredQueueRows": 0}
@@ -134,6 +166,7 @@ if mode == "capture":
                     db = sqlite3.connect(dest)
                     try:
                         summary = sanitize(db)
+                        summary['portable'] = portable_todos(db, summary['sessionId'])
                     finally:
                         db.close()
                 data = dest.read_bytes()

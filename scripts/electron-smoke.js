@@ -42,6 +42,14 @@ async function main() {
       }
     });
     await check('startup recovery persisted without a provider call', async () => { assert.equal(home.findJob(interrupted.id).status, 'interrupted'); });
+    await check('crew health and durable pause/ready use real trusted preload without automatic replay',async()=>{
+      const health=await page.evaluate(()=>bridge.crewHealth.get());assert.equal(health.ok,true);assert.equal(health.job.workers.length,5);
+      await page.locator('nav[aria-label="Screens"]').getByRole('button',{name:'Office',exact:true}).click();await page.evaluate(()=>window.__office.select('bob'));
+      await page.getByRole('button',{name:'Pause worker and cancel queued work',exact:true}).click();await page.getByRole('button',{name:'Make worker ready (no auto-resume)',exact:true}).waitFor();assert.equal(home.getAgent('bob').desiredLifecycle,'paused');
+      assert.equal((await page.evaluate(()=>bridge.jobs.dispatch('bob','Should not start',[]))).ok,false);
+      await page.getByRole('button',{name:'Make worker ready (no auto-resume)',exact:true}).click();await page.getByRole('button',{name:'Pause worker and cancel queued work',exact:true}).waitFor();assert.equal(home.getAgent('bob').desiredLifecycle,'ready');assert.equal(home.listJobs('bob',Infinity).length,0);
+      await page.evaluate(()=>window.__office.select(null));await page.getByRole('button',{name:'Inspect crew health',exact:true}).click();await page.getByLabel('Crew health overview',{exact:true}).getByText(/Bob: desired ready/).waitFor();
+    });
     await check('saved native checkpoint and cleanup state are visible through real Office IPC',async()=>{
       await page.locator('nav[aria-label="Screens"]').getByRole('button',{name:'Office',exact:true}).click();await page.evaluate(()=>window.__office.select('alex'));
       const card=page.locator('[data-job-id="'+interrupted.id+'"]');await card.locator('summary').click();await card.getByText(/Native container: stopped/).waitFor();await card.getByText(/Saved file checkpoint:/).waitFor();await card.getByText(/Protected private engine state: opencode/).waitFor();await page.screenshot({path:path.join(out,'private-state-recovery.png'),fullPage:true});

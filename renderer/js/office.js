@@ -184,8 +184,9 @@
     if (bridge.jobs && j.status === 'review') actions.push(act('Accept result', () => bridge.jobs.review(j.id, 'accept')), act('Reject result', () => bridge.jobs.review(j.id, 'reject')));
     if (bridge.jobs?.configureQA && j.status === 'review' && j.isolation === 'git_worktree') {
       actions.push(act(j.qa?.required ? 'Select QA test files' : 'Enable QA gate', () => {
-        const files = window.prompt('Workspace-relative JavaScript tests or Python unittest files, one per line; do not mix runners. Running them later requires approval and uses your OS permissions.', (j.qa?.tests || []).join('\n'));
-        return files === null ? Promise.resolve({ ok: true }) : bridge.jobs.configureQA(j.id, files.split(/\r?\n/).map(s => s.trim()).filter(Boolean));
+        const runner=window.prompt('QA runner: node, python_unittest, pytest, go, cargo or maven. Tools/dependencies must already be installed; no download is performed.',j.qa?.runner||'node'); if(runner===null)return Promise.resolve({ok:true});
+        const files = window.prompt('Workspace-relative test files, one per line. Go needs selected .go files including a _test.go. Cargo/Maven need one Cargo.toml/pom.xml. Running project code requires approval and uses your OS permissions.', (j.qa?.tests || []).join('\n'));
+        return files === null ? Promise.resolve({ ok: true }) : bridge.jobs.configureQA(j.id, files.split(/\r?\n/).map(s => s.trim()).filter(Boolean),runner.trim());
       }));
       if (j.qa?.tests?.length) {
         actions.push(act('Queue independent review', () => {
@@ -203,9 +204,10 @@
       if (provider === null) return {ok:true};
       const model = window.prompt('Target model ID. Configure matching worker credentials/model before explicit Retry; original budget policy must remain valid.');
       if (model === null) return {ok:true};
-      const preview = await bridge.jobs.previewNativeConversion(j.id,{provider:provider.trim(),model:model.trim()});
+      const includeNativeTodos=window.confirm('Include supported saved native TODO data as untrusted context? This does not recreate native TODOs, import plugins or resume actions. Cancel chooses visible history only.');
+      const preview = await bridge.jobs.previewNativeConversion(j.id,{provider:provider.trim(),model:model.trim(),includeNativeTodos});
       if (!preview.ok) return preview;
-      if (!window.confirm(`Convert ${preview.messages} visible history messages from ${preview.source.provider}/${preview.source.model} to ${preview.target.provider}/${preview.target.model}? Old approvals remain historical; no job starts automatically.`)) { await bridge.jobs.cancelNativeConversion(preview.token); return {ok:true}; }
+      if (!window.confirm(`Convert ${preview.messages} visible history messages from ${preview.source.provider}/${preview.source.model} to ${preview.target.provider}/${preview.target.model}? Native TODO data items: ${preview.portableTodoCount||0}. Old approvals remain historical; no job starts automatically.`)) { await bridge.jobs.cancelNativeConversion(preview.token); return {ok:true}; }
       return bridge.jobs.applyNativeConversion(preview.token);
     }));
     if (bridge.jobs?.inspectNative && ['interrupted','failed','cancelled','rejected'].includes(j.status) && Array.isArray(j.nativeContinuity?.pendingTools) && j.nativeContinuity.pendingTools.length) actions.push(act('Record inspected native outcomes', () => {
@@ -276,6 +278,11 @@
           catch (e) { out.textContent = String((e && e.message) || e); }
         } }, 'Save engine'), out));
     })();
+    let healthRow=null;
+    if(!isC&&bridge.crewHealth){try{
+      const response=await bridge.crewHealth.get(),health=response.job?.workers?.find(w=>w.id===id),msg=h('small',{role:'status'});
+      if(health)healthRow=sec('Worker health',h('p',{},'Desired: '+health.desired+' · Actual: '+health.actual+' · Queued: '+health.queued),h('p',{},health.issues.length?health.issues.join(', '):'No observed lifecycle mismatch. Provider health and result correctness are not established.'),h('button',{class:'mini',type:'button',onclick:async()=>{try{const result=await bridge.crewHealth.setDesired(id,health.desired==='paused'?'ready':'paused');if(!result.ok)throw Error(result.error);await paintSide();}catch(e){msg.textContent=e.message;}}},health.desired==='paused'?'Make worker ready (no auto-resume)':'Pause worker and cancel queued work'),msg);
+    }catch{healthRow=sec('Worker health',h('p',{},'Health records unavailable. Inspect before assigning work.'));}}
     let usageRow = null;
     if (!isC) {
       try {
@@ -299,6 +306,7 @@
       r && r.soul ? sec('Character', h('p', { class: 'of-dim' }, clip(r.soul.replace(/^#.*\n+/, '').split('\n').filter(Boolean).slice(0, 4).join(' '), 260))) : null].filter(Boolean));
     if (!isC) side.appendChild(sec('Observed activity', h('p', { class: 'of-dim of-activity' }, activityText(r?.activity))));
     if (engineRow) side.appendChild(engineRow);
+    if (healthRow) side.appendChild(healthRow);
     if (!isC && bridge.jobs) {
       const task = h('textarea', { class: 'of-job-field', 'aria-label': 'New job task', placeholder: 'Describe the job' });
       const expected = h('textarea', { class: 'of-job-field', 'aria-label': 'Expected output files', placeholder: 'Optional: workspace-relative output files, one per line' });
@@ -339,6 +347,7 @@
       h('button', { class: 'of-row', type: 'button', onclick: () => select(COMMANDER) }, h('div', { class: 'of-avatar sm', style: 'border-color:#FFB23E;color:#FFB23E' }, state.aiName[0].toUpperCase()), h('div', { class: 'of-who' }, h('b', {}, state.aiName), h('span', {}, 'Chief of staff \u00B7 ' + (state.cmd.mode === 'idle' ? 'standing by' : state.cmd.mode)))),
       ...list.map(o => h('button', { class: 'of-row', type: 'button', onclick: () => select(o.id) }, h('div', { class: 'of-avatar sm', style: `border-color:${o.color};color:${o.color}` }, (o.name || '?')[0].toUpperCase()), h('div', { class: 'of-who' }, h('b', {}, o.name), h('span', {}, o.state === 'working' ? clip(o.label || o.task || 'working', 40) : 'resting \u00B7 ' + (o.role || ''))), dot(o.state === 'working' ? 'run' : 'idle'))),
       h('button', { class: 'mini', type: 'button', onclick: () => { window.__ws && __ws.show('bridge'); const b = document.getElementById('add-crew'); if (b) b.click(); } }, 'Add crew'));
+    if(bridge.crewHealth)side.appendChild(h('button',{class:'mini',type:'button',onclick:async()=>{const area=h('section',{class:'of-sec','aria-label':'Crew health overview'});side.appendChild(area);try{const result=await bridge.crewHealth.get();if(!result.ok)throw Error(result.error);area.appendChild(h('h4',{},'Crew health'));for(const w of result.job.workers)area.appendChild(h('p',{},w.name+': desired '+w.desired+', actual '+w.actual+', '+w.queued+' queued. '+(w.issues.length?w.issues.join(', '):'No observed mismatch.')));area.appendChild(h('small',{},result.job.scope));}catch(e){area.textContent=e.message;}}},'Inspect crew health'));
   }
 
   /* ---------- entering and leaving ---------- */
