@@ -10,6 +10,7 @@ function isTitleRequest(body,state){
 function modelReply(body,state){
   if(++state.requests>8)throw Error('Offline fixture model request limit exceeded.');
   if(!Array.isArray(body.messages))throw Error('Unsupported offline model request schema.');
+  (state.modelHistory||=[]).push({request:state.requests,resuming:!!state.resuming,messages:body.messages.length,markerPresent:JSON.stringify(body.messages).includes(state.marker),toolMessages:body.messages.filter(m=>m.role==='tool').length});
   let message,finish;
   if(isTitleRequest(body,state)){
     if((state.titleRequests=(state.titleRequests||0)+1)>2)throw Error('Offline title request limit exceeded.');
@@ -98,7 +99,7 @@ async function check(image,engine,privateContinuity=false){
     runs.end(run);await server.stop();const status=home.findJob(currentJobId)?.containment?.status;
     if(!status||status==='stopped')fs.rmSync(root,{recursive:true,force:true});else report={...report,ok:false,retainedDiagnosticHome:root};
   }
-  return {...report,diagnostics:{runtimePhase:state.phase,mcp:state.mcp,modelRequests:{task:state.taskRequests||0,title:state.titleRequests||0},...(state.runtimeDetails?{runtimeDetails:state.runtimeDetails}:{}),...(state.modelTools?{modelTools:state.modelTools}:{}),...(state.resumedModelHistory?{resumedModelHistory:state.resumedModelHistory}:{})},scope:privateContinuity?'Real contained native CLI and explicit private-session restart with ephemeral fixture encryption/local deterministic model; no physical power-cut, OS-keystore, live provider, billing or arbitrary plugin proof.':'Real contained native CLI, local deterministic model, owning-actor existing MCP and file checkpoint; no live provider, billing or human approval proof.'};
+  return {...report,diagnostics:{runtimePhase:state.phase,mcp:state.mcp,modelRequests:{task:state.taskRequests||0,title:state.titleRequests||0},...(state.runtimeDetails?{runtimeDetails:state.runtimeDetails}:{}),...(state.modelTools?{modelTools:state.modelTools}:{}),...(state.resumedModelHistory?{resumedModelHistory:state.resumedModelHistory}:{}),...(state.modelHistory?{modelHistory:state.modelHistory}:{})},scope:privateContinuity?'Real contained native CLI and explicit private-session restart with ephemeral fixture encryption/local deterministic model; no physical power-cut, OS-keystore, live provider, billing or arbitrary plugin proof.':'Real contained native CLI, local deterministic model, owning-actor existing MCP and file checkpoint; no live provider, billing or human approval proof.'};
 }
 async function main(){
   const image=process.argv[2];if(!/^sha256:[a-f0-9]{64}$/.test(image||''))throw Error('Supply an installed immutable image ID.');
