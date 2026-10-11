@@ -3,6 +3,20 @@
 // No provider network, real credentials, host shell task, or production home.
 const fs=require('fs'),os=require('os'),path=require('path'),crypto=require('crypto');
 const C=require('../lib/native-containment'),{Home}=require('../lib/home'),{createJobRuns}=require('../lib/job-runs');
+const fixtureTask='Use the Orbit read_fixture MCP tool once. Return exactly the marker from that tool. Do not use other tools or modify files.';
+function isHermesTitleRequest(body,state){
+  // Pinned Hermes818c13be agent/title_generator.py: deferred auxiliary JSON title.
+  // Match the bounded diagnostic opener and schema, never arbitrary short requests.
+  const m=body.messages,f=body.response_format,s=f?.json_schema?.schema;
+  return state.engine==='hermes'&&!(body.tools||[]).length&&m.length===2&&
+    m[0].role==='system'&&typeof m[0].content==='string'&&m[0].content.length<4096&&
+    m[0].content.startsWith("You name chat sessions. Given the user's opening message, write a title that lets them find this conversation again in a list.\n\nRules:\n")&&
+    m[0].content.endsWith('Reply with JSON only: {"title": "..."}')&&
+    m[1].role==='user'&&m[1].content===fixtureTask&&
+    f?.type==='json_schema'&&f.json_schema.name==='session_title'&&f.json_schema.strict===true&&
+    s?.type==='object'&&s.additionalProperties===false&&JSON.stringify(s.required)==='["title"]'&&
+    Object.keys(s.properties||{}).length===1&&s.properties.title?.type==='string';
+}
 function isTitleRequest(body,state){
   const text=c=>typeof c==='string'?c:Array.isArray(c)?c.filter(p=>p.type==='text').map(p=>p.text).join(''):'';
   return state.engine==='opencode'&&!(body.tools||[]).length&&body.messages.some(m=>m.role==='system'&&text(m.content).includes('You are a title generator.'))&&body.messages.some(m=>m.role==='user'&&text(m.content).startsWith('Generate a title for this conversation:\n'));
@@ -12,9 +26,10 @@ function modelReply(body,state){
   if(!Array.isArray(body.messages))throw Error('Unsupported offline model request schema.');
   (state.modelHistory||=[]).push({request:state.requests,resuming:!!state.resuming,messages:body.messages.length,markerPresent:JSON.stringify(body.messages).includes(state.marker),toolMessages:body.messages.filter(m=>m.role==='tool').length});
   let message,finish;
-  if(isTitleRequest(body,state)){
+  const hermesTitle=isHermesTitleRequest(body,state);
+  if(hermesTitle||isTitleRequest(body,state)){
     if((state.titleRequests=(state.titleRequests||0)+1)>2)throw Error('Offline title request limit exceeded.');
-    message={role:'assistant',content:'Offline MCP diagnostic'};finish='stop';
+    message={role:'assistant',content:hermesTitle?JSON.stringify({title:'Offline MCP diagnostic'}):'Offline MCP diagnostic'};finish='stop';
   }else if(!state.calls){
     state.taskRequests=(state.taskRequests||0)+1;
     const tools=(body.tools||[]).filter(t=>t.type==='function'&&/read_fixture$/.test(t.function?.name||''));
@@ -76,7 +91,7 @@ async function check(image,engine,privateContinuity=false){
         return modelReply(JSON.parse(options.body),state); // Never fetch an external provider.
       }};
     container=await C.start(launch);
-    const result=await container.execute('Use the Orbit read_fixture MCP tool once. Return exactly the marker from that tool. Do not use other tools or modify files.',{onProgress:p=>{if(p.phase)state.phase=p.phase;for(const key of ['mcpStatus','childExited','exitCode','healthStatus','startup'])if(key in p)(state.runtimeDetails||={})[key]=p[key];}});
+    const result=await container.execute(fixtureTask,{onProgress:p=>{if(p.phase)state.phase=p.phase;for(const key of ['mcpStatus','childExited','exitCode','healthStatus','startup'])if(key in p)(state.runtimeDetails||={})[key]=p[key];}});
     const saved=home.findJob(job.id);
     const checks={nativeResponse:result.trim()===state.marker,owningActorMcp:state.calls===1,modelReceivedToolResult:state.taskRequests>=2,unchangedInput:fs.readFileSync(path.join(workspace,'fixture.txt'),'utf8')===state.marker,checkpointSaved:!!saved.nativeCheckpoint,containerStopped:saved.containment?.status==='stopped'};
     if(privateContinuity){

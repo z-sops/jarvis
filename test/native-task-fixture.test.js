@@ -74,6 +74,14 @@ test('offline native fixture bounds model loops and supports bounded OpenAI SSE'
   const state={marker:'SYNTHETIC_MARKER',requests:0,calls:1};const text=await modelReply({stream:true,messages:[{role:'tool',content:state.marker}]},state).text();assert.match(text,/chat.completion.chunk/);assert.match(text,/SYNTHETIC_MARKER/);assert.ok(text.endsWith('data: [DONE]\n\n'));
   state.requests=8;assert.throws(()=>modelReply({messages:[]},state),/limit exceeded/);
 });
+test('Hermes auxiliary JSON title stays separate from MCP task and resume evidence',async()=>{
+ const title={messages:[{role:'system',content:"You name chat sessions. Given the user's opening message, write a title that lets them find this conversation again in a list.\n\nRules:\nReply with JSON only: {\"title\": \"...\"}"},{role:'user',content:'Use the Orbit read_fixture MCP tool once. Return exactly the marker from that tool. Do not use other tools or modify files.'}],response_format:{type:'json_schema',json_schema:{name:'session_title',strict:true,schema:{type:'object',properties:{title:{type:'string'}},required:['title'],additionalProperties:false}}}};
+ const state={engine:'hermes',requests:0,calls:1,marker:'PRIVATE_TOOL_MARKER'};
+ const response=await modelReply(title,state).json();assert.deepEqual(JSON.parse(response.choices[0].message.content),{title:'Offline MCP diagnostic'});assert.equal(state.titleRequests,1);assert.equal(state.taskRequests,undefined);assert.equal(state.calls,1);assert.ok(!JSON.stringify(response).includes(state.marker));
+ for(const body of [{...title,tools:[{type:'function',function:{name:'tool_call'}}]},{...title,messages:[...title.messages,{role:'user',content:'Other'}]},{...title,messages:[{...title.messages[0],content:'Name any task'},title.messages[1]]},{...title,messages:[title.messages[0],{role:'user',content:'Other task'}]},{...title,response_format:{type:'json_object'}}])assert.throws(()=>modelReply(body,{...state}),/did not return/);
+ state.resuming=true;assert.throws(()=>modelReply({messages:[{role:'user',content:'Resume'}]},state),/did not return/);assert.equal(state.resumedModelHistory.priorMarkerPresent,false);
+ await modelReply(title,state).text();assert.throws(()=>modelReply(title,state),/title request limit/);
+});
 test('Hermes fixture searches native deferred tools and requires actual MCP execution before completing',async()=>{
   const tools=['tool_search','tool_call'].map(name=>({type:'function',function:{name}}));
   const state={engine:'hermes',marker:'REAL_MCP_MARKER',requests:0,calls:0};
