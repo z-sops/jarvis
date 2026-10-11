@@ -113,8 +113,11 @@ if (distMode) {
       // Every shipped first-party file must match the reviewed source, not merely exist.
       let mismatches=0;
       for(const f of files){const name=rel(f);try{
-        const entry=asar.statFile(asarFile,name);
-        const actual=entry.unpacked ? fs.readFileSync(path.join(asarFile+'.unpacked',name)) : asar.extractFile(asarFile,name);
+        // @electron/asar traverses directories with the host path separator.
+        // Keep report/manifest names portable, normalize only reader arguments.
+        const archiveName=path.normalize(name);
+        const entry=asar.statFile(asarFile,archiveName);
+        const actual=entry.unpacked ? fs.readFileSync(path.join(asarFile+'.unpacked',archiveName)) : asar.extractFile(asarFile,archiveName);
         const source=fs.readFileSync(f);
         if(name==='package.json'){
           // Builder strips build/dev scripts and reformats metadata. Runtime fields
@@ -129,7 +132,7 @@ if (distMode) {
       for(const name of ['node_modules/@modelcontextprotocol/sdk/package.json','node_modules/js-yaml/package.json','node_modules/pdfjs-dist/legacy/build/pdf.mjs']){
         if(!list.includes(name))fail(`required runtime dependency absent: ${name}`);
       }
-      try{if(!asar.statFile(asarFile,'lib/native-container-runner.js').unpacked)fail('Docker runtime helper must be unpacked to an actual host file');}
+      try{if(!asar.statFile(asarFile,path.normalize('lib/native-container-runner.js')).unpacked)fail('Docker runtime helper must be unpacked to an actual host file');}
       catch{fail('Docker runtime helper absent from built package');}
     }
   }

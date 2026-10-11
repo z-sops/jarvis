@@ -18,14 +18,16 @@ test('beta manifest keeps app identity, recovery data and explicit no-publish bu
 test('actual ASAR verification requires matching unpacked runtime bytes and runtime dependency entries',async()=>{
   const asar=require('@electron/asar'),cp=require('child_process'),root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-beta-asar-'));
   try{
-    for(const dir of ['scripts','assets','lib','dist/win-unpacked/resources'])fs.mkdirSync(path.join(root,dir),{recursive:true});
+    for(const dir of ['scripts','assets','lib','renderer/js','renderer/fonts','dist/win-unpacked/resources'])fs.mkdirSync(path.join(root,dir),{recursive:true});
     fs.copyFileSync(path.join(__dirname,'../scripts/check-release.js'),path.join(root,'scripts/check-release.js'));
     fs.copyFileSync(path.join(__dirname,'../assets/icon.png'),path.join(root,'assets/icon.png'));
     fs.copyFileSync(path.join(__dirname,'../lib/native-container-runner.js'),path.join(root,'lib/native-container-runner.js'));
     fs.writeFileSync(path.join(root,'main.js'),"require('electron');");
-    fs.writeFileSync(path.join(root,'package.json'),JSON.stringify({build:{files:['main.js','lib/**','assets/**','package.json'],win:{icon:'assets/icon.png'}}}));
+    fs.writeFileSync(path.join(root,'renderer/js/probe.js'),'window.packageProbe=true;');
+    fs.writeFileSync(path.join(root,'renderer/fonts/probe.woff2'),Buffer.from([0,1,2,3,255]));
+    fs.writeFileSync(path.join(root,'package.json'),JSON.stringify({build:{files:['main.js','lib/**','renderer/**','assets/**','package.json'],win:{icon:'assets/icon.png'}}}));
     const stage=path.join(root,'stage');fs.mkdirSync(stage);
-    for(const p of ['main.js','lib','assets','package.json'])fs.cpSync(path.join(root,p),path.join(stage,p),{recursive:true});
+    for(const p of ['main.js','lib','renderer','assets','package.json'])fs.cpSync(path.join(root,p),path.join(stage,p),{recursive:true});
     const metadata=JSON.parse(fs.readFileSync(path.join(stage,'package.json')));delete metadata.build;
     fs.writeFileSync(path.join(stage,'package.json'),JSON.stringify(metadata,null,2));
     const required=['@modelcontextprotocol/sdk/package.json','js-yaml/package.json','pdfjs-dist/legacy/build/pdf.mjs'];
@@ -39,4 +41,17 @@ test('actual ASAR verification requires matching unpacked runtime bytes and runt
     fs.rmSync(path.join(stage,'node_modules/js-yaml'),{recursive:true,force:true});
     await require('node:stream/promises').finished(await asar.createPackageWithOptions(stage,file,{unpack:'**/native-container-runner.js'}));result=run();assert.equal(result.status,1);assert.match(result.stdout,/required runtime dependency absent/);
   }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+test('installed ASAR Windows directory traversal requires normalized nested paths',()=>{
+  const vm=require('vm'),moduleApi=require('module');
+  const filename=require.resolve('@electron/asar/lib/filesystem.js');
+  const localRequire=moduleApi.createRequire(filename),exports={};
+  vm.runInNewContext(fs.readFileSync(filename,'utf8'),{exports,require:n=>n==='path'?path.win32:localRequire(n),process,Buffer});
+  const {Filesystem}=exports;
+  const header=()=>({files:{renderer:{files:{js:{files:{'probe.js':{size:7,offset:'0'}}}}}}});
+  const original=new Filesystem('C:\\fixture');original.setHeader(header(),0);
+  assert.throws(()=>original.getFile('renderer/js/probe.js'),/not found/);
+  const normalized=new Filesystem('C:\\fixture');normalized.setHeader(header(),0);
+  assert.equal(normalized.getFile(path.win32.normalize('renderer/js/probe.js')).size,7);
+  assert.match(fs.readFileSync(path.join(__dirname,'../scripts/check-release.js'),'utf8'),/archiveName=path.normalize\(name\)/);
 });
