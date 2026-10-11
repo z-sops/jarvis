@@ -64,12 +64,13 @@ function modelReply(body,state){
   return new Response([chunk(delta,null),chunk({},finish,usage)].map(x=>'data: '+JSON.stringify(x)+'\n\n').join('')+'data: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}});
 }
 function gatewayForRun(gateway,auth,actor){const token=auth.tokenForActor(actor);if(!token)throw Error('Current diagnostic run has no scoped gateway credential.');return {...gateway,token};}
-async function check(image,engine,privateContinuity=false){
-  const preflight=await C.checkRuntime({nativeContainerImage:image},engine);
+async function check(image,engine,privateContinuity=false,options={}){
+  const actor=options.actor||'fixture-'+engine;if(!/^fixture-[a-z0-9-]{1,30}$/.test(actor))throw Error('Invalid diagnostic actor.');
+  const preflight=options.runtimeVerified===true?{ok:true}:await C.checkRuntime({nativeContainerImage:image},engine);
   if(!preflight.ok)return {engine,ok:false,image,stage:'runtime',error:preflight.error};
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-native-task-')),home=new Home(path.join(root,'home')).ensure();
-  if(privateContinuity){const key=crypto.randomBytes(32);home.secretStorage={available:()=>true,seal(v){const iv=crypto.randomBytes(12),c=crypto.createCipheriv('aes-256-gcm',key,iv),data=Buffer.concat([c.update(JSON.stringify(v)),c.final()]);return {iv:iv.toString('base64'),tag:c.getAuthTag().toString('base64'),data:data.toString('base64')};},open(v){const d=crypto.createDecipheriv('aes-256-gcm',key,Buffer.from(v.iv,'base64'));d.setAuthTag(Buffer.from(v.tag,'base64'));return JSON.parse(Buffer.concat([d.update(Buffer.from(v.data,'base64')),d.final()]));}};}
-  const actor='fixture-'+engine;home.createAgent({name:actor});const agent=home.getAgent(actor),job=home.createJob(actor,'Offline MCP task');
+  const root=options.home?null:fs.mkdtempSync(path.join(os.tmpdir(),'orbit-native-task-')),home=options.home||new Home(path.join(root,'home')).ensure();
+  if(privateContinuity&&!home.secretStorage){const key=crypto.randomBytes(32);home.secretStorage={available:()=>true,seal(v){const iv=crypto.randomBytes(12),c=crypto.createCipheriv('aes-256-gcm',key,iv),data=Buffer.concat([c.update(JSON.stringify(v)),c.final()]);return {iv:iv.toString('base64'),tag:c.getAuthTag().toString('base64'),data:data.toString('base64')};},open(v){const d=crypto.createDecipheriv('aes-256-gcm',key,Buffer.from(v.iv,'base64'));d.setAuthTag(Buffer.from(v.tag,'base64'));return JSON.parse(Buffer.concat([d.update(Buffer.from(v.data,'base64')),d.final()]));}};}
+  if(!home.getAgent(actor))home.createAgent({name:actor});const agent=home.getAgent(actor),job=home.createJob(actor,'Offline MCP task',options.jobOptions||{});
   const workspace=home.p('workspace',actor,'.native',job.id);fs.mkdirSync(workspace,{recursive:true});
   const state={engine,marker:'ORBIT_FIXTURE_'+crypto.randomUUID(),requests:0,calls:0,mcp:[],phase:'initialization'};fs.writeFileSync(path.join(workspace,'fixture.txt'),state.marker);
   const controller=new AbortController(),runs=createJobRuns();let run=runs.begin(actor,job.id,controller.signal);
@@ -90,31 +91,35 @@ async function check(image,engine,privateContinuity=false){
         if(url!=='http://127.0.0.1:1/v1/chat/completions'||options.method!=='POST')throw Error('Offline fixture refused an unexpected endpoint.');
         return modelReply(JSON.parse(options.body),state); // Never fetch an external provider.
       }};
+    await options.onActive?.({home,job:home.findJob(job.id)});
     container=await C.start(launch);
     const result=await container.execute(fixtureTask,{onProgress:p=>{if(p.phase)state.phase=p.phase;for(const key of ['mcpStatus','childExited','exitCode','healthStatus','startup'])if(key in p)(state.runtimeDetails||={})[key]=p[key];}});
     const saved=home.findJob(job.id);
+    await options.afterTask?.({home,job:saved});
     const checks={nativeResponse:result.trim()===state.marker,owningActorMcp:state.calls===1,modelReceivedToolResult:state.taskRequests>=2,unchangedInput:fs.readFileSync(path.join(workspace,'fixture.txt'),'utf8')===state.marker,checkpointSaved:!!saved.nativeCheckpoint,containerStopped:saved.containment?.status==='stopped'};
     if(privateContinuity){
       const context={engine,image,route:broker.identity},first=C.readPrivateState(home,saved,context);checks.privateSessionSaved=!!first?.sessionId;
       await container.close();runs.end(run);home.updateJob(actor,job.id,{status:'interrupted'});
-      const retry=home.createJob(actor,'Explicit offline native history retry'),next=home.updateJob(actor,retry.id,{...require('../lib/job-retry').carry(home.findJob(job.id)),retryOf:job.id});
+      const retry=home.createJob(actor,'Explicit offline native history retry',options.jobOptions||{}),next=home.updateJob(actor,retry.id,{...require('../lib/job-retry').carry(home.findJob(job.id)),retryOf:job.id});
       currentJobId=next.id;
-      const restarted=new Home(home.root).ensure();restarted.secretStorage=home.secretStorage;restarted.recoverJobs();C.restoreCheckpoint(restarted,restarted.findJob(next.id),context);
+      await options.beforeResume?.({home,sourceJob:home.findJob(job.id),job:home.findJob(next.id)});
+      const restarted=new Home(home.root).ensure();restarted.secretStorage=home.secretStorage;restarted.storageCheck=home.storageCheck;restarted.recoverJobs();C.restoreCheckpoint(restarted,restarted.findJob(next.id),context);
       run=runs.begin(actor,next.id,controller.signal);restarted.updateJob(actor,next.id,{status:'running',runId:run.runId});
       state.resuming=true;
       container=await C.start({...launch,home:restarted,job:restarted.findJob(next.id),run,gateway:gatewayForRun(gateway,auth,actor)});
       const resumed=await container.execute('Return the marker from your previous tool result. Do not call any tools or change files.',{onProgress:p=>{if(p.phase)state.phase=p.phase;for(const key of ['mcpStatus','childExited','exitCode','healthStatus','startup'])if(key in p)(state.runtimeDetails||={})[key]=p[key];}});
       const resumedJob=restarted.findJob(next.id),second=C.readPrivateState(restarted,resumedJob,context);
-      checks.privateSessionRestored=second.sessionId===first.sessionId;checks.nativeHistoryReachedModel=resumed.trim()===state.marker&&state.calls===1;checks.retryContainerStopped=resumedJob.containment?.status==='stopped';
+      checks.privateSessionRestored=second.sessionId===first.sessionId;checks.nativeHistoryReachedModel=resumed.trim()===state.marker&&state.calls===1&&state.resumedModelHistory?.priorMarkerPresent===true&&state.resumedModelHistory?.toolMessages>0;checks.retryContainerStopped=resumedJob.containment?.status==='stopped';
     }
     report={engine,ok:Object.values(checks).every(Boolean),image,checks,modelFixtureRequests:state.requests};
   }catch(e){report={engine,ok:false,image,stage:state.resuming?'native_resume':'native_task',error:String(e.message).slice(0,300),modelFixtureRequests:state.requests,mcpCalls:state.calls};}
   finally{
     try{await container?.close();}catch{report={...report,ok:false,error:'Container cleanup is unknown; retain diagnostic home and restore Docker.'};}
     runs.end(run);await server.stop();const status=home.findJob(currentJobId)?.containment?.status;
-    if(!status||status==='stopped')fs.rmSync(root,{recursive:true,force:true});else report={...report,ok:false,retainedDiagnosticHome:root};
+    if(options.home){try{home.updateJob(actor,currentJobId,{status:report?.ok?'review':'failed',result:report?.ok?'Offline native fixture report; not human accepted.':undefined,error:report?.ok?null:'Offline native fixture failed; inspect saved state.'});}catch{report={...report,ok:false,error:'Diagnostic job settlement failed; preserve fixture for inspection.'};}if(status&&status!=='stopped')report={...report,ok:false,retainedDiagnosticHome:home.root};}
+    else if(!status||status==='stopped')fs.rmSync(root,{recursive:true,force:true});else report={...report,ok:false,retainedDiagnosticHome:root};
   }
-  return {...report,diagnostics:{runtimePhase:state.phase,mcp:state.mcp,modelRequests:{task:state.taskRequests||0,title:state.titleRequests||0},...(state.runtimeDetails?{runtimeDetails:state.runtimeDetails}:{}),...(state.modelTools?{modelTools:state.modelTools}:{}),...(state.resumedModelHistory?{resumedModelHistory:state.resumedModelHistory}:{}),...(state.modelHistory?{modelHistory:state.modelHistory}:{})},scope:privateContinuity?'Real contained native CLI and explicit private-session restart with ephemeral fixture encryption/local deterministic model; no physical power-cut, OS-keystore, live provider, billing or arbitrary plugin proof.':'Real contained native CLI, local deterministic model, owning-actor existing MCP and file checkpoint; no live provider, billing or human approval proof.'};
+  return {...report,...(options.home?{fixtureJobs:{source:job.id,current:currentJobId}}:{}),diagnostics:{runtimePhase:state.phase,mcp:state.mcp,modelRequests:{task:state.taskRequests||0,title:state.titleRequests||0},...(state.runtimeDetails?{runtimeDetails:state.runtimeDetails}:{}),...(state.modelTools?{modelTools:state.modelTools}:{}),...(state.resumedModelHistory?{resumedModelHistory:state.resumedModelHistory}:{}),...(state.modelHistory?{modelHistory:state.modelHistory}:{})},scope:privateContinuity?'Real contained native CLI and explicit private-session restart with ephemeral fixture encryption/local deterministic model; no physical power-cut, OS-keystore, live provider, billing or arbitrary plugin proof.':'Real contained native CLI, local deterministic model, owning-actor existing MCP and file checkpoint; no live provider, billing or human approval proof.'};
 }
 async function main(){
   const image=process.argv[2];if(!/^sha256:[a-f0-9]{64}$/.test(image||''))throw Error('Supply an installed immutable image ID.');
