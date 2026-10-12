@@ -368,3 +368,16 @@ Owner's first live response did not meet planning acceptance: generic phases, no
 ### Draft-step revision / plan presentation follow-up
 
 Source gap corrected: clarification can revise actual undispatched steps/assignments/dependencies/output contract, not business text alone; same project ID retained and started/approved scopes refuse. New tool drafts require files/report contract; file plans with no expected output path block. Invalid step-ID feedback actionable, no silent remapping. Explicit typed/voice prompt presentation avoids treating all text turns as spoken summaries. Live worker reasoning, model delivery classification/completeness, actual saved owner card and final website quality remain unverified.
+
+## 2026-10-12 — Explicit project candidate-review handoff
+
+Owner live screenshots showed correct relative outputs but an unsupported claim that dependency completion automatically shares Alex's files with Bob. Dependencies only order jobs; the existing exact-candidate reviewer requires an isolated Git project.
+
+- Added optional step `review_of`: a different implementation step with `project_root`, independent worker and `review.json`. Ordinary file dependencies without a supported handoff now block file-delivery proposals, including existing drafts on inspection. No automatic workspace copying or Git initialization.
+- Review waits for the implementation candidate in `review`, rather than its human acceptance. Dispatch reuses job-contract `reviewOf`, job-qa review binding and read-only `source/` snapshot; exact candidate/goal identity, drift checks, actor restrictions and before-enqueue project linkage remain enforced. Review edges participate in cycle validation.
+- Shared the existing reviewer task builder between Office QA and project review; no second reviewer engine/scheduler. This step is independent source-review evidence, not a replacement for configured host QA gates, browser/mobile checks, test execution or human acceptance.
+- Proposal parsing accepts unambiguous `expectedOutputs` as a compatibility alias for `expected_outputs`; unequal simultaneous lists fail before persistence. It does not silently grant permissions or reinterpret paths.
+- Laila guidance exposes the Git-root requirement and explicitly forbids claiming automatic file sharing or unrun visual tests.
+- Focused project/QA/team tests: 54 passed, zero failed. Includes real Git worktree creation and existing reviewer snapshot, pre-acceptance dispatch, preserved pinned copy after parent modification, fresh binding rejection, self-review/root/output/cycle blocking and conflicting field alias rejection. Fixture worker responses are deterministic; no live model calls.
+- Actual Linux Electron/Playwright smoke: 23 checks passed, zero renderer exceptions. Updated same-draft UI test verifies unsupported handoff is blocked and no jobs are created.
+- Windows installed-app/native-provider acceptance remains pending. Existing live draft must be refined with `review_of` and a user-selected clean Git project root; do not execute the old unsupported ordinary QA proposal.
