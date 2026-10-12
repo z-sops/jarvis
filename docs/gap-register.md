@@ -435,3 +435,8 @@ Final validation: sequential broad regression766total/763pass/0fail/3 existing u
 ### ACP transport adoption — 2026-10-12
 
 Implemented explicit pinned OpenCode ACP lifecycle in the existing contained engine: initialize/new/load/set_model/prompt, streaming text/tool status, cancellation/deadlines, acknowledged private session capture and transport-bound recovery. Original Orbit code; no ZCode file/framework/dependency or second scheduler. Settings run default retained. Additional permission/host service requests fail closed. Protocol/fixture tests and actual Electron Settings verification are separate from real native execution. Remaining: actual Windows offline ACP/private-restart fixture, live project/artifact/reviewer acceptance, richer/warm/other-agent ACP adapters only when needed and security verified. Full source/session/plugin parity not claimed.
+
+
+### Owner native ACP acceptance — 2026-10-12
+
+Windows output on8f97cf5/image018544b25065... verifies contained OpenCode ACP task + scoped MCP + original private-session restart10/10; Hermes regression10/10. This closes the pinned OFFLINE native ACP compatibility/restart gate only. Real provider/gateway authentication, installed-app/Laila project workflow, meaningful reviewer/host/browser QA, physical outages, billing/approval and arbitrary plugins remain open. Timings are one deterministic fixture including restart, not production latency. Full evidence recorded in project-update.md; no source change/test rerun inferred.
