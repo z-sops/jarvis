@@ -172,11 +172,13 @@ ${seen}`;
     }
   } catch (e) { try { bus.emit('tool', { callId: 'dec-err', actor: 'commander', actorName: cfg.aiName, name: 'decision', args: {}, status: 'start' }); bus.emit('tool', { callId: 'dec-err', actor: 'commander', actorName: cfg.aiName, name: 'decision', args: {}, status: 'error', ms: 0, reason: String((e && e.message) || e).slice(0, 160) }); } catch { /* ignore */ } }
   const contents = [...hist, { role: 'user', parts: [{ text: turnText }] }];
-  const { text: reply } = await gemini.runLoop({
+  const projectReceipts=[];
+  const { text: modelReply } = await gemini.runLoop({
     cfg, system: buildCommanderPrompt(cfg, home, { noHistory: true, channel:'text' }), contents,
-    tools: cmdTools, model: cmdModel, exec: (n, a) => tools.exec(n, a, 'commander'), shouldStop: () => chat.stopped()
+    tools: cmdTools, model: cmdModel, exec: async (n,a)=>{const out=await tools.exec(n,a,'commander');if(['plan_project','refine_project_brief','get_project_plan','verify_project_root'].includes(n)&&out?.ok===true&&out.id&&projectReceipts.length<20)projectReceipts.push({name:n,id:out.id});return out;}, shouldStop: () => chat.stopped()
   });
   if (chat.stopped()) return { text: 'Stopped.', cancelled: true };
+  const reply=require('./lib/project-reply').reconcile({reply:modelReply,userText:text,recentText:[...hist].reverse().find(m=>m.role==='model')?.parts?.map(p=>p.text||'').join(' ')||'',receipts:projectReceipts,planner:runtime.planner});
   home.saveConversation([...hist, { role: 'user', parts: [{ text }] }, { role: 'model', parts: [{ text: reply }] }]);
   return { text: reply };
 }

@@ -859,3 +859,6 @@ Typed main commander uses channel:text, detailed requested planning output and c
 
 ### Project review handoff invariant (2026-10-12)
 Dependencies never share candidate files. Explicit `review_of` project steps reuse existing revision-bound `reviewOf` jobs and require a clean implementation `project_root`, separate reviewer and `review.json`. They wait for review-ready Git candidates before human acceptance. Do not invent automatic ordinary-QA workspace access, weaken snapshot/identity/drift controls, or claim source review proves browser/mobile tests. Proposal output aliases are accepted only if unambiguous; conflicting simultaneous lists must be rejected without changing the card.
+
+### Git observation and typed project-state invariant (2026-10-12)
+A model-provided path is not clean Git evidence. Use fresh human-approved verify_project_root; host observations expire and execution rechecks. Never initialize shared Orbit storage or imply verification grants execution approval. Existing prepareHandoffs copies only accepted hash-checked artifacts into .handoffs/; do not replace it or claim dependencies never transfer files. Exact-candidate source review is separate. Typed project state uses durable-card reconciliation and real tool receipts; voice/free-form claims are not universally verified by this bounded guard.
