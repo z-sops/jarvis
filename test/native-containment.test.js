@@ -144,3 +144,13 @@ test('native storage refusal retains the last published checkpoint and removes o
 test('mounted standalone runner writes runtime files without unavailable host modules',t=>{
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-runtime-standalone-'));t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));const original=path.join(__dirname,'../lib/native-container-runner.js'),copy=path.join(temp,'orbit-runtime.js');fs.copyFileSync(original,copy);const script="const r=require(process.argv[1]);r.writeRuntimeFile(process.argv[2],'runtime fixture');console.log(JSON.stringify(r.opencodeMediationPolicy()));";const out=require('child_process').spawnSync(process.execPath,['-e',script,copy,path.join(temp,'config.json')],{encoding:'utf8',timeout:10000});assert.equal(out.status,0,out.stderr);assert.equal(fs.readFileSync(path.join(temp,'config.json'),'utf8'),'runtime fixture');assert.equal(JSON.parse(out.stdout).agent.title.disable,true);assert.deepEqual(JSON.parse(out.stdout).compaction,{auto:false,prune:false});assert.doesNotMatch(fs.readFileSync(copy,'utf8'),/require\(['"]\.\//); // No dependency can hide a real filesystem denial during isolation probes.
 });
+
+test('ACP transport is passed to contained helper and checkpoint transport cannot switch on retry',async t=>{
+ const r=rig(t),d=fakeDocker();let init;
+ const c=await start(t,r,d,(m,emit)=>{if(m.type==='init'){init=m;snapshot(emit,'ACP candidate','final');}},{cfg:{nativeContainerImage:image,opencodeTransport:'acp'}});
+ await c.execute('Goal');assert.equal(init.config.opencodeTransport,'acp');assert.ok(init.config.acpTimeoutMs>0);
+ const j=r.home.findJob(r.job.id),meta=JSON.parse(fs.readFileSync(r.home.p(...j.nativeCheckpoint.dir.split('/'),'.orbit-checkpoint.json')));assert.equal(meta.transport,'acp');
+ fs.unlinkSync(path.join(r.ws,'proof.txt'));
+ assert.throws(()=>C.restoreCheckpoint(r.home,j,{transport:'run'}),/transport changed/);assert.equal(fs.existsSync(path.join(r.ws,'proof.txt')),false);
+ const d2=fakeDocker();await assert.rejects(start(t,{...r,job:j},d2,()=>{},{cfg:{nativeContainerImage:image,opencodeTransport:'run'}}),/transport changed/);assert.equal(d2.calls.length,0);
+});

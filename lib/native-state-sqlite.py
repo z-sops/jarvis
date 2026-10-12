@@ -81,7 +81,9 @@ def sanitize(db):
             if "promoted_seq" not in columns(db, "session_input"):
                 raise ValueError("Unsupported native queue schema")
             cleared += db.execute("DELETE FROM session_input WHERE promoted_seq IS NULL").rowcount
-        row = db.execute("SELECT id FROM session WHERE parent_id IS NULL AND directory='/workspace' ORDER BY time_created DESC LIMIT 1").fetchone()
+        row = db.execute("SELECT id FROM session WHERE parent_id IS NULL AND directory='/workspace' AND id=?", (selected_session,)).fetchone() if selected_session else db.execute("SELECT id FROM session WHERE parent_id IS NULL AND directory='/workspace' ORDER BY time_created DESC LIMIT 1").fetchone()
+        if selected_session and not row:
+            raise ValueError("Original OpenCode session not found")
         sid = row[0] if row else None
         for row in db.execute("SELECT data FROM part"):
             item = json.loads(row[0])

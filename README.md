@@ -330,3 +330,5 @@ OpenCode hosted gateway execution now has an explicit request-limited option for
 It preserves contained execution and tool approvals but cannot guarantee exact
 token/USD limits or free pricing. Active job/team token/USD budgets still refuse
 this mode. See [policy and ZCode pattern mapping](docs/zcode-patterns.md).
+
+OpenCode now has an explicit **ACP sessions (preview)** transport under Crew Settings. It reuses the existing Docker/model broker/NeuralOps/job/review boundaries and preserves acknowledged native session IDs. Existing JSON run remains the default; transport changes cannot silently resume old checkpoints. Actual Docker/OpenCode ACP acceptance remains pending. See [ACP transport](docs/acp-transport.md).

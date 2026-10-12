@@ -211,7 +211,28 @@ async function main() {
       assert.equal(saved.workerGatewayMode,'requests');
       assert.equal(saved.workerTokenBudget,before.workerTokenBudget); assert.equal(saved.workerCostBudgetUsd,before.workerCostBudgetUsd);
       assert.equal(JSON.parse(fs.readFileSync(path.join(temp,'settings.json'),'utf8')).workerGatewayMode,'requests');
-      await page.evaluate(() => bridge.config.save({workerGatewayMode:'exact'}));
+      await page.evaluate(()=>window.__ui.openSettings());
+      await page.getByRole('combobox',{name:'OpenCode gateway execution'}).selectOption('exact');
+      await page.getByRole('button',{name:'Save',exact:true}).click();
+      await page.waitForFunction(()=>!document.querySelector('.settings'));
+    });
+    await check('ACP transport requires explicit Settings selection and preserves other policy', async () => {
+      const before=await page.evaluate(()=>bridge.config.get());
+      assert.equal(before.opencodeTransport,'run');
+      await assert.rejects(page.evaluate(()=>bridge.config.save({opencodeTransport:'auto'})),/ACP/);
+      await page.evaluate(()=>window.__ui.openSettings());
+      const mode=page.getByRole('combobox',{name:'OpenCode transport'});
+      await mode.selectOption('acp');await mode.scrollIntoViewIfNeeded();
+      await page.screenshot({path:path.join(out,'acp-transport-settings.png')});
+      await page.getByRole('button',{name:'Save',exact:true}).click();
+      await page.waitForFunction(()=>!document.querySelector('.settings'));
+      const after=await page.evaluate(()=>bridge.config.get());assert.equal(after.opencodeTransport,'acp');
+      assert.equal(after.workerGatewayMode,before.workerGatewayMode);assert.equal(after.workerTokenBudget,before.workerTokenBudget);
+      assert.equal(JSON.parse(fs.readFileSync(path.join(temp,'settings.json'),'utf8')).opencodeTransport,'acp');
+      await page.evaluate(()=>window.__ui.openSettings());
+      await page.getByRole('combobox',{name:'OpenCode transport'}).selectOption('run');
+      await page.getByRole('button',{name:'Save',exact:true}).click();
+      await page.waitForFunction(()=>!document.querySelector('.settings'));
     });
     await check('YAML configuration previews and applies through real Settings, preload and durable Home state', async () => {
       await page.evaluate(() => window.__ui.openSettings());

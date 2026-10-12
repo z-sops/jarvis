@@ -45,3 +45,9 @@ call=json.dumps([{'id':'todo-owned','function':{'name':'todo_list'}}])
 result=json.dumps({'todos':[{'id':'1','content':'Inspect','status':'pending'}]})
 d.execute('INSERT INTO messages VALUES(1,?,?,?,?,?,?,?)',('native-session','user',call,None,1,None,'untrusted caller'))
 d.execute('INSERT INTO messages VALUES(2,?,?,?,?,?,?,?)',('native-session','tool',None,'todo-owned',1,None,result))`);assert.equal(capture('hermes',root).portable.supported,false);edit("d.execute(\"UPDATE messages SET role='assistant' WHERE id=1\")");assert.equal(capture('hermes',root).portable.todos.length,1);edit("d.execute('INSERT INTO messages SELECT 3,session_id,role,tool_calls,tool_call_id,active,display_metadata,content FROM messages WHERE id=2')");assert.throws(()=>capture('hermes',root));});
+
+test('OpenCode snapshot follows acknowledged ACP ID instead of newer unrelated session',t=>{
+ const root=fixture(t,'opencode');cp.execFileSync('python',['-c',"import sqlite3,sys,pathlib;d=sqlite3.connect(pathlib.Path(sys.argv[1])/'data/opencode/opencode.db');d.execute(\"INSERT INTO session VALUES('unrelated-newer',NULL,'/workspace',2,NULL)\");d.commit()",root]);
+ const owned=JSON.parse(cp.execFileSync('python',[helper,'opencode','capture',root,'native-session']));assert.equal(owned.sessionId,'native-session');
+ assert.throws(()=>cp.execFileSync('python',[helper,'opencode','capture',root,'missing-original'],{stdio:'pipe'}));
+});
