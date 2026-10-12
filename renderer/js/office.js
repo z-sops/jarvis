@@ -260,7 +260,7 @@
     // Per-worker engine/model override (blank fields inherit the crew default from Settings).
     const engineRow = isC ? null : (() => {
       const eng = h('select', {}, [['', 'Crew default'], ['builtin', 'Built-in'], ['hermes', 'Hermes Agent'], ['opencode', 'OpenCode']].map(([v, t]) => h('option', { value: v, selected: v === ((r && r.agent && r.agent.engine) || '') }, t)));
-      const prov = h('input', { value: (r && r.agent && r.agent.workerProvider) || '', placeholder: 'gemini / openrouter / anthropic / openai / custom' });
+      const prov = h('input', { value: (r && r.agent && r.agent.workerProvider) || '', placeholder: 'gemini / opencode / anthropic / openai / custom' });
       const model = h('input', { value: (r && r.agent && r.agent.workerModel) || '', placeholder: 'blank = crew model' });
       const key = h('input', { type: 'password', autocomplete: 'off', value: (r && r.agent && r.agent.workerApiKey) || '', placeholder: 'blank = crew key' });
       const base = h('input', { value: (r && r.agent && r.agent.workerBaseUrl) || '', placeholder: 'https://.../v1 (custom only)' });

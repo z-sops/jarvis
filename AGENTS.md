@@ -866,3 +866,7 @@ A model-provided path is not clean Git evidence. Use fresh human-approved verify
 
 ### OpenCode gateway boundary (2026-10-12)
 Do not confuse OpenCode engine support with OpenCode hosted gateway support. Registry/catalog-only and space-bunny-free protocol fixtures are partial support. The gateway has no verified exact pre-submission counter and strict native execution must refuse even when configured token/USD budgets are zero. Never infer a price/count from a free model suffix or bypass this gate using custom URLs. Existing Gemini/OpenAI/Anthropic upstreams remain supported by the contained OpenCode engine. No live gateway acceptance was performed.
+
+
+### Explicit gateway execution supersedes universal exact-counter refusal (2026-10-12)
+Owner authorizes ZCode-inspired request-limited execution. workerGatewayMode defaults exact; explicit requests applies only to opencode/space-bunny-free. Never disable a job/team token/USD budget, infer free price/zero tokens, introduce alternate routes or give native processes real upstream credentials. Durable request intent/count before submission, actual usage afterward with unknown cost, preserved uncertain outcomes/no replay, policy-bound continuation and existing Guardian/Docker/reviewer/QA remain mandatory. Old statement that ALL gateway executions always require exact counts is superseded only for this explicit unbudgeted mode. No imported ZCode source/framework/second scheduler. Read docs/zcode-patterns.md.

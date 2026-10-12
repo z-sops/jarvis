@@ -140,7 +140,7 @@
     const st = agentsList.find(a => a.id === id) || {};
     const engineRow = id === 'jarvis' ? null : (() => {
       const eng = h('select', {}, [['', 'Crew default'], ['builtin', 'Built-in'], ['hermes', 'Hermes Agent'], ['opencode', 'OpenCode']].map(([v, t]) => h('option', { value: v, selected: v === (r.agent.engine || '') }, t)));
-      const prov = h('input', { value: r.agent.workerProvider || '', placeholder: 'gemini / openrouter / anthropic / openai / custom' });
+      const prov = h('input', { value: r.agent.workerProvider || '', placeholder: 'gemini / opencode / anthropic / openai / custom' });
       const model = h('input', { value: r.agent.workerModel || '', placeholder: 'blank = crew model' });
       const key = h('input', { type: 'password', autocomplete: 'off', value: r.agent.workerApiKey || '', placeholder: 'blank = crew key' });
       const base = h('input', { value: r.agent.workerBaseUrl || '', placeholder: 'https://.../v1 (custom only)' });
@@ -327,14 +327,15 @@
       f('Engine', sel('engine', [['builtin', 'Built-in (light, Gemini only)'], ['hermes', 'Hermes Agent (real coding tools)'], ['opencode', 'OpenCode (open-source coding agent)']]), 'Native crew jobs require the approved Docker Linux image below. Direct internet, host folders and unrestricted integrations are blocked.'),
       f('Hermes command', inp('hermesPath', { placeholder: 'hermes' }), 'Host command for Hermes communication services. Native crew jobs use Hermes installed inside the approved image.'),
       f('OpenCode command', inp('opencodePath', { placeholder: 'opencode' }), 'Legacy host command. Native crew jobs use OpenCode installed inside the approved image.'),
-      f('Crew provider', sel('workerProvider', [['gemini', 'Google Gemini'], ['openrouter', 'OpenRouter'], ['anthropic', 'Anthropic'], ['openai', 'OpenAI'], ['custom', 'Custom endpoint']])),
+      f('Crew provider', sel('workerProvider', [['gemini', 'Google Gemini'], ['opencode', 'OpenCode gateway'], ['openrouter', 'OpenRouter'], ['anthropic', 'Anthropic'], ['openai', 'OpenAI'], ['custom', 'Custom endpoint']])),
       f('Crew model', inp('workerModel', { placeholder: 'blank = the Gemini thinking model' }), 'Use a strong tool-calling model for coding.'),
       f('Native runtime image ID', inp('nativeContainerImage', { placeholder: 'sha256: followed by the installed image ID' }), 'Hermes/OpenCode jobs run inside this approved Linux image. It must include Node 20+ and the selected CLI. Orbit never downloads it automatically.'),
       f('Worker model requests per job', inp('workerMaxRequests', { type: 'number', min: 1, max: 500, step: 1 }), 'Counts built-in and broker-mediated native submissions. Legacy native routes, commander chat and voice are outside this limit.'),
+      f('OpenCode gateway execution', sel('workerGatewayMode', [['exact', 'Strict: exact token count required'], ['requests', 'Request-limited: reported usage afterward']]), 'Explicit opt-in for opencode / space-bunny-free only. Request-limited mode caps submissions and requested output, but cannot guarantee a token or USD ceiling or free pricing. Job/team token or USD budgets still block this mode. Other providers retain exact accounting; no paid/model fallback.'),
       f('Worker deadline (seconds)', inp('workerTimeoutSeconds', { type: 'number', min: 1, max: 86400, step: 1 }), 'Stops Orbit waiting after this execution limit. Inspect prior effects before retrying; external process termination depends on the engine.'),
       f('Worker token budget per job', inp('workerTokenBudget', { type: 'number', min: 0, max: 100000000, step: 1 }), '0 disables. Reserves input plus maximum output before built-in or supported native generation; unsupported native providers are refused.'),
       f('Worker token cost budget (USD)', inp('workerCostBudgetUsd', { type: 'number', min: 0, max: 10000, step: 0.01 }), '0 disables. Requires explicit model prices below; this covers mediated token charges, not all provider fees or OS-level bypasses.'),
-      f('Reserved output tokens per request', inp('workerMaxOutputTokens', { type: 'number', min: 1, max: 65536, step: 1 }), 'Maximum generated output/thinking tokens for a budgeted request.'),
+      f('Reserved output tokens per request', inp('workerMaxOutputTokens', { type: 'number', min: 1, max: 65536, step: 1 }), 'Requested maximum output/thinking tokens. Gateway overrun stops further work and retains actual usage; this is not an OS-enforced generation limit.'),
       f('Native model routes (JSON)', routes, 'Optional explicit Gemini/OpenAI/Anthropic candidates: provider, model, contextTokens, capabilities [text, tools]. Catalog availability and entered prices rank routes. Saves authorize history transfer to these providers; unknown generation failures never automatically replay.'),
       ...['gemini','openai','anthropic'].map(p => f('Router ' + p + ' key', routeKey(p), 'Optional protected routing credential; blank can reuse the current provider key.')),
       f('Worker model allowlist', models, 'Comma-separated model IDs. Enforced for built-in and supported native broker requests. Unsupported native providers are refused when configured.'),

@@ -195,6 +195,24 @@ async function main() {
       assert.equal(saved.nativeContainerImage, 'sha256:' + 'a'.repeat(64));
       assert.equal(saved.workerTimeoutSeconds, 30); assert.equal(saved.workerTokenBudget, 12000); assert.equal(saved.workerCostBudgetUsd, 1); assert.equal(saved.workerMaxOutputTokens, 512); assert.deepEqual(saved.workerModelRates, {fixture:{input:1,output:2}});
     });
+    await check('gateway execution mode is explicit in Settings and never disables existing budgets', async () => {
+      const before = await page.evaluate(() => bridge.config.get());
+      assert.equal(before.workerGatewayMode, 'exact');
+      await assert.rejects(page.evaluate(() => bridge.config.save({workerGatewayMode:'auto'})), /request-limited/);
+      await page.evaluate(() => window.__ui.openSettings());
+      const mode = page.getByRole('combobox', {name:'OpenCode gateway execution'});
+      await mode.selectOption('requests'); await mode.scrollIntoViewIfNeeded();
+      assert.match(await page.locator('.settings').innerText(), /cannot guarantee a token or USD ceiling/);
+      await page.screenshot({path:path.join(out,'gateway-mode-settings.png')});
+      await page.getByRole('button', {name:'Save',exact:true}).click();
+      await page.waitForFunction(() => !document.querySelector('.settings') || !!document.querySelector('.settings .ob-err')?.textContent);
+      if(await page.locator('.settings').count()) throw Error('Settings did not save request mode');
+      const saved = await page.evaluate(() => bridge.config.get());
+      assert.equal(saved.workerGatewayMode,'requests');
+      assert.equal(saved.workerTokenBudget,before.workerTokenBudget); assert.equal(saved.workerCostBudgetUsd,before.workerCostBudgetUsd);
+      assert.equal(JSON.parse(fs.readFileSync(path.join(temp,'settings.json'),'utf8')).workerGatewayMode,'requests');
+      await page.evaluate(() => bridge.config.save({workerGatewayMode:'exact'}));
+    });
     await check('YAML configuration previews and applies through real Settings, preload and durable Home state', async () => {
       await page.evaluate(() => window.__ui.openSettings());
       await page.getByRole('button', { name: 'Crew configuration (YAML)', exact: true }).click();

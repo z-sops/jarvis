@@ -230,3 +230,5 @@ test('abrupt rollback process exit leaves linked durable intents and current-sta
   assert.equal(ex.unresolved.length,2); assert.equal(ex.unresolved[1].status,'prepared'); assert.equal(ex.unresolved[1].reconciliation.workers[0].status,'matches_requested');
   assert.deepEqual(fs.readFileSync(file),before); assert.throws(()=>require('../lib/crew-config').assertReady(r.home));
 });
+
+test('OpenCode provider configuration round-trips without changing strict gateway policy or worker credentials',t=>{const r=rig(t);r.home.updateAgent('alex',{engine:'opencode',workerProvider:'opencode',workerModel:'space-bunny-free',workerApiKey:'HIDDEN_GATEWAY_FIXTURE'});const original=r.service.export(),d=yaml.load(original.text);assert.equal(d.workers[0].config.workerProvider,'opencode');assert.doesNotMatch(original.text,/HIDDEN_GATEWAY_FIXTURE|workerGatewayMode/);const preview=r.service.preview(original.text);r.service.apply(preview.token);assert.equal(r.home.getAgent('alex').workerApiKey,'HIDDEN_GATEWAY_FIXTURE');assert.equal(r.service.export().text,original.text);assert.equal(r.cfg.workerGatewayMode,undefined);});

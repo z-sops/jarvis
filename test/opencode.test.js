@@ -138,3 +138,7 @@ test('abort settles even if the killed child never closes and never emits Finish
   await new Promise(resolve=>setImmediate(resolve));ctl.abort(Error('User stop'));
   await assert.rejects(promise,/User stop/);assert.equal(r.killed(),1);assert.equal(events.at(-1).status,'cancelled');
 });
+
+test('mediated OpenCode config disables unrelated title requests and preserves complete protected history',t=>{
+ const r=engineFor();t.after(()=>fs.rmSync(path.dirname(r.home.root),{recursive:true,force:true}));const agent=r.home.createAgent({name:'Policy fixture'});const prepared=r.engine.writeProjectConfig(agent,{nativeBroker:true});const cfg=JSON.parse(fs.readFileSync(path.join(prepared.ws,'opencode.json'),'utf8'));assert.deepEqual(cfg.agent,{title:{disable:true}});assert.deepEqual(cfg.compaction,{auto:false,prune:false});assert.deepEqual(cfg.enabled_providers,['custom']);assert.equal(cfg.small_model,cfg.model);assert.equal(cfg.permission.bash,'deny');const policy=require('../lib/native-container-runner').opencodeMediationPolicy();policy.agent.title.disable=false;assert.equal(require('../lib/native-container-runner').opencodeMediationPolicy().agent.title.disable,true);assert.ok(fs.readFileSync(path.join(__dirname,'../lib/native-container-runner.js'),'utf8').includes('...opencodeMediationPolicy()'));
+});

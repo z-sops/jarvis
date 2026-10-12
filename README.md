@@ -323,3 +323,10 @@ Laila can preview and ask approval for bounded API discussion turns using existi
 Version `0.1.0-beta.1` is a testing candidate. See [beta-release.md](docs/beta-release.md) and `scripts/beta-build.ps1` for existing-dependency Windows x64 packaging, exact package verification, checksum and known limitations. No installer/signature/Windows upgrade or complete-project acceptance is claimed by source tests. Existing app identity is retained; use a disposable test account/profile and back up existing Home.
 
 Recent real-issue fixes strengthen project brief readiness, completion evidence, cancellation/retry, browser startup and static workspace preview. New Laila project drafts block execution until measurable criteria and recorded unknowns are addressed. Accepted steps remain distinct from verified project-wide outcomes. See [the behavior and validation boundaries](docs/real-issue-fixes.md); Windows/live complete-project acceptance remains pending.
+
+
+OpenCode hosted gateway execution now has an explicit request-limited option for
+`opencode / space-bunny-free`, alongside the default strict exact-count policy.
+It preserves contained execution and tool approvals but cannot guarantee exact
+token/USD limits or free pricing. Active job/team token/USD budgets still refuse
+this mode. See [policy and ZCode pattern mapping](docs/zcode-patterns.md).
