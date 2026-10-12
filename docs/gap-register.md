@@ -360,3 +360,7 @@ Implemented: new Laila proposal readiness blocks absent success criteria and rec
 Implemented: static immutable loopback preview, existing localhost approval, module MIME types and disposal; browser session user-agent eliminates an extra pre-approval native window. Legacy OpenCode total/idle/cancellation distinctions; verified original retry goal; control-task refusal; report risk tail and truthful partial usage UI.
 
 Acceptance retained: Windows owner reproduction and rebuilt installer, live Laila requirement/staffing/recovery judgment, full dynamic website QA, complete usage/billing, native live/security/power-loss and final project E2E. A static loaded page and human-accepted report steps do not close those gaps. Exact offline/actual Linux UI counts are recorded in project-update.md.
+
+### Live planning behavior follow-up
+
+Owner's first live response did not meet planning acceptance: generic phases, no concrete requirement questions and unsupported staffing suggestions. Shared voice/text prompt now prioritizes requirement gathering/structured drafts over casual brevity and direct single-worker delegation. Existing list_agents/staffingEvidence include bounded real skills/readiness/sampled job observations; nextPlanningAction surfaces unknowns. Offline/Electron controls are tested; actual model judgment and the installed Windows revision remain live-test acceptance. No title rename, new scheduler or implied expertise.

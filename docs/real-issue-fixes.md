@@ -33,3 +33,15 @@ Static preview is not a framework dev server or proof that a website's backend, 
 The UI says Recorded usage and displays unavailable token cost when no usage was recorded. It does not infer free execution from zero. Native job budgets and other telemetry do not become complete aggregate billing evidence through this label change.
 
 Tests use isolated Homes, scripted subprocesses, loopback HTTP and a real Linux Electron/Playwright process. They do not use a paid provider, production profile or Windows installer. Actual Windows reproduction, live Laila evaluation and the owner's final complete-project E2E remain acceptance work. See project-update.md for exact run counts.
+
+## Planning behavior follow-up
+
+Owner's live screenshots showed only a generic requirements/design/code/test outline, premature additional-worker suggestions and no actual requirement questions. That is not a planning acceptance pass. The installed build revision was not established by the screenshot. Titles are secondary; this increment does not rename the assistant or substitute a framework.
+
+The common voice/text commander prompt now gives project planning explicit priority over casual spoken brevity and immediate single-worker delegation. It requires actual questions in the current reply, separates known facts from assumptions, reuses existing workers, records a structured blocked proposal and returns to that same proposal. A planning-only request cannot become execution approval. Titles do not determine capability or authority.
+
+The existing list_agents response now supplies actual assigned Library skill metadata, legacy skill filenames, readiness and sampled job evidence. The planner reuses this observation in staffingEvidence, once per recommended worker per inspection. Human-accepted files and report-only work remain distinct; recorded tests are not freshly verified tests. Role/skill metadata is reference data and grants no permissions. Missing records mean unknown capability, not proof of inability. Skill output is bounded to20 entries/400-character descriptions, legacy20 filenames, and job sampling to50 records with a200-record inventory/2MiB-record preflight. Large, linked, corrupt or unavailable observations are explicit unknown/partial, never silently zero or proficient. No capability score or new worker is invented.
+
+get_project_plan.nextPlanningAction surfaces the existing unanswered business details and whether measurable acceptance is missing. The authoritative project card and existing readiness/dispatch/approval/QA controls are retained.
+
+Offline tests verify observations, corruption/bound refusal and actual Electron voice-context/tool declaration plus planning-only draft persistence and blocked dispatch. They do not run a live model or prove that Laila asks the right questions, proposes accurate staffing or makes correct business decisions. Rebuild/restart the Windows app and reconnect voice before repeating the original project prompt; an existing live connection holds its start-time system prompt. Assess the actual new model response before accepting planning behavior.

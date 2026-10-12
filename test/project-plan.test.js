@@ -80,3 +80,25 @@ test('accepted report-only steps do not establish project success criteria and f
  r.home.updateJob('alex',first.job.id,{status:'done',acceptedBy:null,result:'Everything completed!'});assert.equal(r.planner.inspect(p.id).steps[0].status,'unaccepted_completion_claim');assert.equal(r.planner.inspect(p.id).steps[0].accepted,false);
  r.home.updateJob('alex',first.job.id,{status:'review'});r.workers.decideReview(first.job.id,'accept');const view=r.planner.inspect(p.id);assert.equal(view.status,'human_accepted');assert.equal(view.deliveryAssessment.criteriaVerified,false);assert.equal(view.deliveryAssessment.status,'steps_human_accepted_project_criteria_unverified');
 });
+
+test('team inspection exposes actual skills/readiness and separates accepted files from reports and unverified claims',async t=>{
+ const r=rig(t),lib=new(require('../lib/library').Library)(r.home);r.home.updateAgent('alex',{role:'Full Stack Python Developer',allowCode:false,desiredLifecycle:'paused'});
+ lib.saveSkill({name:'Frontend',description:'Responsive HTML and CSS',body:'Inspect supplied requirements before implementation.'});lib.setAssignment('alex',{skills:['frontend'],packs:[]});r.home.addSkill('alex','Web design','Reference only; this is not permission.');
+ for(const patch of [{status:'done',acceptedBy:'human',completionKind:'human_accepted_files',qa:{test:{status:'passed'}}},{status:'done',acceptedBy:'human',completionKind:'human_accepted_report'},{status:'done',acceptedBy:null,completionKind:'human_accepted_files',qa:{test:{status:'passed'}}},{status:'failed'},{status:'interrupted'}]){const j=r.home.createJob('alex','Fixture record');r.home.updateJob('alex',j.id,patch);}
+ const tools=require('../lib/tools').createTools({home:r.home,getCfg:()=>({}),runtime:r.runtime,bus:r.bus});t.after(()=>tools.dispose());const before=r.home.listJobs('alex',Infinity),out=await tools.exec('list_agents',{},'commander');assert.equal(out.ok,true);
+ const e=out.agents.find(a=>a.id==='alex').planningEvidence;assert.equal(e.assignedLibrarySkills[0].slug,'frontend');assert.ok(e.legacySkillFiles.includes('web-design.md'));assert.equal(e.readiness.desiredLifecycle,'paused');assert.equal(e.readiness.codeAccess,'disabled');assert.equal(e.expertiseVerified,false);
+ assert.equal(e.recentJobs.humanAcceptedFiles,1);assert.equal(e.recentJobs.humanAcceptedReports,1);assert.equal(e.recentJobs.recordedPassingTests,1);assert.equal(e.recentJobs.failed,1);assert.equal(e.recentJobs.interrupted,1);assert.match(e.recentJobs.scope,/not_fresh/);assert.deepEqual(r.home.listJobs('alex',Infinity),before);assert.equal(r.home.listAgents().length,2);
+});
+test('faulted capability evidence stays unknown instead of reporting no skills or proven inability',t=>{
+ const r=rig(t),{workerPlanningEvidence}=require('../lib/project-plan');const dir=r.home.p('agents','alex','jobs'),bad=path.join(dir,'job-'+require('crypto').randomUUID()+'.json');fs.writeFileSync(bad,'broken');
+ const evidence=workerPlanningEvidence(r.home,r.home.getAgent('alex'));assert.equal(evidence.coverage.jobs,'unknown');assert.equal(evidence.recentJobs.observed,null);assert.equal(evidence.expertiseVerified,false);assert.equal(fs.readFileSync(bad,'utf8'),'broken');
+});
+test('planning evidence refuses large history scanning and oversized skills without editing records',t=>{
+ const r=rig(t),{workerPlanningEvidence}=require('../lib/project-plan'),lib=new(require('../lib/library').Library)(r.home);lib.saveSkill({name:'Frontend',body:'Reference'});lib.setAssignment('alex',{skills:['frontend'],packs:[]});fs.writeFileSync(lib.p('skills','frontend','SKILL.md'),'x'.repeat(65537));
+ for(let i=0;i<201;i++)fs.writeFileSync(r.home.p('agents','alex','jobs','fixture-'+i+'.json'),'{}');
+ const out=workerPlanningEvidence(r.home,r.home.getAgent('alex'),lib);assert.equal(out.coverage.skills,'unknown_or_partial');assert.equal(out.coverage.jobs,'unknown');assert.equal(out.recentJobs.observed,null);
+});
+test('blocked project inspection surfaces actual unanswered details and reuses worker capability evidence',t=>{
+ const r=rig(t),unknowns=['Which company name and services should appear?','Should the contact form actually send messages?'];const p=r.planner.create({...input(),business:{successCriteria:['Mobile-readable four-page site'],unknowns}});
+ assert.equal(p.nextPlanningAction.kind,'clarify_requirements');assert.deepEqual(p.nextPlanningAction.unresolvedDetails,unknowns);assert.equal(p.staffingEvidence[0].observedCapability.declaredRole,'Backend developer');assert.equal(p.staffingEvidence[0].expertiseVerified,false);assert.equal(r.home.listJobs('alex',Infinity).length,0);
+});

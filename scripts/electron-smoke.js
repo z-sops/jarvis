@@ -55,6 +55,15 @@ async function main() {
       await page.evaluate(()=>bridge.stop.all());await assert.rejects(fetch(loaded.url));
       await page.locator('nav[aria-label="Screens"]').getByRole('button',{name:'Orbit',exact:true}).click();
     });
+    await check('voice and text share project-planning context; a planning-only draft asks details and cannot dispatch',async()=>{
+      const context=await page.evaluate(async()=>{const c=await bridge.live.context();return{planning:c.systemPrompt.includes('Project planning behavior (applies to voice and text)'),names:c.tools.map(t=>t.name)};});assert.equal(context.planning,true);assert.ok(context.names.includes('plan_project'));assert.ok(context.names.includes('list_agents'));
+      const team=await page.evaluate(()=>bridge.live.tool('list_agents',{}));assert.equal(team.ok,true);assert.equal(team.agents.length,5);assert.equal(team.agents[0].planningEvidence.expertiseVerified,false);
+      const jobsBefore=home.listAgents().map(a=>[a.id,home.listJobs(a.id,Infinity).length]);
+      const draft=await page.evaluate(()=>bridge.live.tool('plan_project',{goal:'Four-page mobile-friendly software-company website',business:{successCriteria:['Home, Services, About and Contact readable on mobile'],unknowns:['What company name and branding should be used?','Should Contact actually send a message?']},steps:[{id:'site',agent:'bob',role:'General assistant',task:'Build only after requirements are confirmed',expected_outputs:['index.html']}]}));assert.equal(draft.ok,true);assert.equal(draft.nextPlanningAction.kind,'clarify_requirements');assert.equal(draft.executionReadiness.status,'blocked');
+      const denied=await page.evaluate(id=>bridge.live.tool('dispatch_project_step',{project_id:id,step_id:'site'}),draft.id);assert.equal(denied.ok,false);assert.match(denied.error,/blocked/);
+      assert.deepEqual(home.listAgents().map(a=>[a.id,home.listJobs(a.id,Infinity).length]),jobsBefore);assert.equal(fs.existsSync(home.p('workspace','bob','index.html')),false);
+      const saved=await page.evaluate(id=>bridge.live.tool('get_project_plan',{project_id:id}),draft.id);assert.equal(saved.ok,true);assert.equal(saved.business.unknowns.length,2);assert.equal(saved.steps[0].jobId,undefined);
+    });
     await check('latency IPC observes offline reply and validates renderer metrics without provider calls',async()=>{
       const r=await page.evaluate(()=>bridge.chat.send('/laila Offline fixture'));assert.ok(r.latencyTraceId);
       assert.equal(await page.evaluate(id=>bridge.latency.rendered(id,{feedbackMs:1,replyDomMs:2}),r.latencyTraceId),true);
