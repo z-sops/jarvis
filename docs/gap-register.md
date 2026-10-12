@@ -364,3 +364,7 @@ Acceptance retained: Windows owner reproduction and rebuilt installer, live Lail
 ### Live planning behavior follow-up
 
 Owner's first live response did not meet planning acceptance: generic phases, no concrete requirement questions and unsupported staffing suggestions. Shared voice/text prompt now prioritizes requirement gathering/structured drafts over casual brevity and direct single-worker delegation. Existing list_agents/staffingEvidence include bounded real skills/readiness/sampled job observations; nextPlanningAction surfaces unknowns. Offline/Electron controls are tested; actual model judgment and the installed Windows revision remain live-test acceptance. No title rename, new scheduler or implied expertise.
+
+### Draft-step revision / plan presentation follow-up
+
+Source gap corrected: clarification can revise actual undispatched steps/assignments/dependencies/output contract, not business text alone; same project ID retained and started/approved scopes refuse. New tool drafts require files/report contract; file plans with no expected output path block. Invalid step-ID feedback actionable, no silent remapping. Explicit typed/voice prompt presentation avoids treating all text turns as spoken summaries. Live worker reasoning, model delivery classification/completeness, actual saved owner card and final website quality remain unverified.

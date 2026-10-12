@@ -173,7 +173,7 @@ ${seen}`;
   } catch (e) { try { bus.emit('tool', { callId: 'dec-err', actor: 'commander', actorName: cfg.aiName, name: 'decision', args: {}, status: 'start' }); bus.emit('tool', { callId: 'dec-err', actor: 'commander', actorName: cfg.aiName, name: 'decision', args: {}, status: 'error', ms: 0, reason: String((e && e.message) || e).slice(0, 160) }); } catch { /* ignore */ } }
   const contents = [...hist, { role: 'user', parts: [{ text: turnText }] }];
   const { text: reply } = await gemini.runLoop({
-    cfg, system: buildCommanderPrompt(cfg, home, { noHistory: true }), contents,
+    cfg, system: buildCommanderPrompt(cfg, home, { noHistory: true, channel:'text' }), contents,
     tools: cmdTools, model: cmdModel, exec: (n, a) => tools.exec(n, a, 'commander'), shouldStop: () => chat.stopped()
   });
   if (chat.stopped()) return { text: 'Stopped.', cancelled: true };
@@ -226,7 +226,7 @@ ipcMain.handle('chat:reset', () => { home.saveConversation([]); return true; });
 ipcMain.handle('chat:pickFile', async () => { const r = await dialog.showOpenDialog(win, { properties: ['openFile'], title: 'Attach a file for Laila' }); return r.canceled ? null : r.filePaths[0]; });
 ipcMain.handle('live:context', () => {
   const cfg = store.get();
-  return { systemPrompt: buildCommanderPrompt(cfg, home), tools: tools.declarationsFor('commander'), voice: cfg.voice, model: cfg.liveModel, apiKey: cfg.apiKey, aiName: cfg.aiName, idleMinutes: cfg.idleMinutes };
+  return { systemPrompt: buildCommanderPrompt(cfg, home, {channel:'voice'}), tools: tools.declarationsFor('commander'), voice: cfg.voice, model: cfg.liveModel, apiKey: cfg.apiKey, aiName: cfg.aiName, idleMinutes: cfg.idleMinutes };
 });
 ipcMain.handle('tool:exec', (_e, name, args) => tools.exec(String(name), args || {}, 'commander'));
 ipcMain.handle('agents:list', () => home.listAgents().map(a => ({ ...a, ...workers.stateOf(a.id) })));
