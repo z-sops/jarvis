@@ -862,3 +862,7 @@ Dependencies never share candidate files. Explicit `review_of` project steps reu
 
 ### Git observation and typed project-state invariant (2026-10-12)
 A model-provided path is not clean Git evidence. Use fresh human-approved verify_project_root; host observations expire and execution rechecks. Never initialize shared Orbit storage or imply verification grants execution approval. Existing prepareHandoffs copies only accepted hash-checked artifacts into .handoffs/; do not replace it or claim dependencies never transfer files. Exact-candidate source review is separate. Typed project state uses durable-card reconciliation and real tool receipts; voice/free-form claims are not universally verified by this bounded guard.
+
+
+### OpenCode gateway boundary (2026-10-12)
+Do not confuse OpenCode engine support with OpenCode hosted gateway support. Registry/catalog-only and space-bunny-free protocol fixtures are partial support. The gateway has no verified exact pre-submission counter and strict native execution must refuse even when configured token/USD budgets are zero. Never infer a price/count from a free model suffix or bypass this gate using custom URLs. Existing Gemini/OpenAI/Anthropic upstreams remain supported by the contained OpenCode engine. No live gateway acceptance was performed.
