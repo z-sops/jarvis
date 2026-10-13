@@ -183,6 +183,13 @@ async function main() {
       await d.getByRole('textbox').press('Escape');
       await d.waitFor({state:'hidden'});assert.equal(JSON.stringify(home.findJob(interrupted.id)),before);
     });
+    await check('unknown provider request recovery is visible and protected storage refusal does not change the job',async()=>{
+      home.updateJob('alex',interrupted.id,{nativeContinuity:{provider:'opencode',model:'space-bunny-free',requests:1,requestOutcome:'unknown'}});
+      await page.evaluate(()=>window.__office.select('alex'));const card=page.locator('[data-job-id=\"'+interrupted.id+'\"]');await card.locator('summary').click();
+      const before=JSON.stringify(home.findJob(interrupted.id));await card.getByText(/Provider request outcome: unknown/).waitFor();await card.getByRole('button',{name:'Review unknown provider request',exact:true}).click();
+      await card.getByText('Choose a stopped native job with accessible protected history.',{exact:true}).waitFor();assert.equal(JSON.stringify(home.findJob(interrupted.id)),before);
+      assert.equal((await page.evaluate(()=>bridge.jobs.applyNativeRequest('foreign-token'))).ok,false);await page.screenshot({path:path.join(out,'unknown-request-recovery.png')});
+    });
     await check('file acceptance and report-only acceptance retain distinct evidence', async () => {
       for (const j of [accepted, report]) assert.equal((await page.evaluate(id => bridge.jobs.review(id, 'accept'), j.id)).ok, true);
       assert.equal(home.findJob(accepted.id).completionKind, 'human_accepted_files'); assert.equal(home.findJob(report.id).verification.status, 'unverified');

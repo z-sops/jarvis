@@ -1277,3 +1277,18 @@ Regression: focused Office/native continuity/broker59/59; touched JS syntax and 
 Final regression:797total/794pass/0fail/3existing Hermes runtime skips,78.29s; actual Linux Electron28/28,zero renderer errors. Conversion screenshot initially captured fade-in mid-animation; driver waits for final opacity before visual review. No live provider outcome or owner Windows dialog acceptance inferred.
 
 Visual QA caught inherited white input/low contrast in the new form; added scoped job-input dark background/text/caret/focus styles and actual computed-color assertion. Final UI rerun follows; no security or recovery policy change.
+
+
+## Unknown gateway request recovery — 2026-10-13
+
+Owner Windows screenshot confirms the themed Job input dialog opens. The original website job remains failed: an upstream model submission was recorded before its complete response could be durably decoded/saved. Pending tool outcomes zero does not settle that provider request. Conversion is not a workaround.
+
+Added trusted-window Review unknown provider request preview/apply/cancel using existing encrypted job history and atomic job replacement. Applies only to unbudgeted request-limited OpenCode space-bunny-free history. Exact-budget reservations, unresolved broker/private tool effects, foreign ownership, unknown cleanup and inconsistent request accounting refuse. Preview expires in five minutes, is one-use and binds the entire durable job revision/content. Cancel, expiry, changed state and persistence failure preserve the original intent. No new job or network/model request is started by review.
+
+The request is moved to a retained encrypted abandonedRequests inventory with human-main-window provenance; its outcome remains unknown_until_durable_response, its count is never refunded, and reported usage is explicitly incomplete. Counters require measured responses plus reviewed unknown requests to equal submissions. Explicit Retry alone can create continuation work; it uses saved visible history/workspace with a fresh native private session. The protected original checkpoint remains; engine/image/provider/transport mismatch gates and Guardian/new approvals remain. This review is permission to continue despite uncertainty, NOT evidence of provider failure, success, no billing or no external effect. Old provider response/tool batch is not reconstructed or replayed.
+
+Retry now detects unreviewed unknown request history before creating another doomed child job. Provider conversion still refuses retained unknown request history; no cross-provider conversion claim. Existing original project/retry lineage and ownership are unchanged.
+
+Validation: first focused run caught an edit accidentally inserted into dispatch (old undefined); corrected before publication. Broker48/48, containment38/38 and affected native/recovery121/121 passed. Actual Linux Electron/Playwright29/29, zero renderer errors; screenshot reviewed. UI check verifies control visibility and real protected-storage refusal without mutation; successful encrypted review/reopen/continuation is an offline AES fixture, not Windows key-store/native CLI/live gateway acceptance. Full final suite result is appended below. No dependency install, real provider call, production profile edit, main merge or publication.
+
+Final validation: npm804 total /801pass /0fail /3 existing unavailable-real-Hermes skips,70.80s. Nine changed production/UI JavaScript syntax checks PASS. Source release check PASS with existing optional release-denylist warning. Actual Linux Electron29/29, errors[]. Windows owner screenshot verified themed conversion dialog rendering before this increment; new unknown-request review/continuation requires owner acceptance after rebuild.

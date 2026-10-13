@@ -233,6 +233,11 @@
       if (!window.confirm('Retry this job? Inspect existing files first. An earlier external action may already have happened.')) return Promise.resolve({ ok: true });
       return bridge.jobs.retry(j.id);
     }));
+    if (bridge.jobs?.previewNativeRequest && j.nativeContinuity?.requestOutcome==='unknown' && ['interrupted','failed','cancelled','rejected'].includes(j.status)) actions.push(act('Review unknown provider request',async()=>{
+      const preview=await bridge.jobs.previewNativeRequest(j.id);if(!preview.ok)return preview;
+      if(!window.confirm(preview.unknownRequests+' unknown request(s), '+preview.requestsUsed+'/'+preview.requestLimit+' requests already charged.\n\n'+preview.scope+'\n\nAllow a separately initiated continuation with this uncertainty?')){await bridge.jobs.cancelNativeRequest(preview.token);return {ok:true};}
+      return bridge.jobs.applyNativeRequest(preview.token);
+    }));
     if (bridge.jobs?.previewNativeConversion && j.nativeContinuity && ['interrupted','failed','cancelled','rejected'].includes(j.status)) actions.push(act('Review provider/model conversion', async () => {
       const provider = await jobInput('Target provider: gemini, openai or anthropic. Visible broker history only; private CLI state is not restored.');
       if (provider === null) return {ok:true};
@@ -261,7 +266,7 @@
     return h('details', { class: 'of-job', 'data-job-id': j.id },
       h('summary', {}, dot(jobTone(j.status)), h('span', {}, clip(String(j.task || ''), 70))),
       h('p', { class: 'of-job-state' }, jobLabel(j)),
-      j.nativeContinuity ? h('p', {}, 'Native model history: ' + j.nativeContinuity.requests + ' requests; ' + (j.nativeContinuity.restored ? 'restored' : 'saved') + '. Pending tool outcomes: ' + (j.nativeContinuity.pendingTools?.length || 0) + '.') : null,
+      j.nativeContinuity ? h('p', {}, 'Native model history: ' + j.nativeContinuity.requests + ' requests; ' + (j.nativeContinuity.restored ? 'restored' : 'saved') + '. Provider request outcome: '+(j.nativeContinuity.requestOutcome||'not recorded')+'. Retained unknown requests: '+(j.nativeContinuity.unknownRequestCount||0)+'. Pending tool outcomes: ' + (j.nativeContinuity.pendingTools?.length || 0) + '.') : null,
       j.containment ? h('p', {}, 'Native container: '+j.containment.status+'. '+(j.containment.status==='cleanup_unknown'?'Restore Docker and restart Orbit before retrying.':'Direct network and host writes are blocked.')) : null,
       j.nativeCheckpoint ? h('p', {}, 'Saved file checkpoint: '+j.nativeCheckpoint.at+'. Explicit retry restores this snapshot after cleanup; inspect uncertain actions first.') : null,
       j.nativeCheckpoint?.engineState ? h('p', {}, 'Protected private engine state: '+j.nativeCheckpoint.engineState.engine+'. Session: '+(j.nativeCheckpoint.engineState.sessionPresent?'saved':'not yet created')+'. Unresolved native effects: '+j.nativeCheckpoint.engineState.pendingEffects+'. Retired queue/routing records: '+j.nativeCheckpoint.engineState.retiredQueueRows+'. Credentials and grants are regenerated.') : null,

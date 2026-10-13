@@ -334,3 +334,5 @@ this mode. See [policy and ZCode pattern mapping](docs/zcode-patterns.md).
 OpenCode now has an explicit **ACP sessions (preview)** transport under Crew Settings. It reuses the existing Docker/model broker/NeuralOps/job/review boundaries and preserves acknowledged native session IDs. Existing JSON run remains the default; transport changes cannot silently resume old checkpoints. Actual Docker/OpenCode ACP acceptance remains pending. See [ACP transport](docs/acp-transport.md).
 
 Office job inputs use an Electron-compatible dialog for provider/model conversion, QA setup and inspected native outcomes. Cancel preserves the job; entering values does not approve execution or clear uncertain provider requests.
+
+Unknown request recovery: Office exposes **Review unknown provider request** for stopped request-limited OpenCode jobs. Explicit review retains the unknown request and its count, then permits a separately initiated Retry with fresh private state. It neither settles provider usage nor starts work. Token/USD-budgeted histories remain outside this recovery option.

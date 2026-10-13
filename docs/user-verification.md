@@ -311,3 +311,9 @@ The paired NeuralOps draft fixes /mcp forwarding of X-Agent-Id into the existing
 
 ## Office conversion input (2026-10-13)
 An older installed build can show prompt() is not supported on Review provider/model conversion and other job input actions. Updated builds use a Job input dialog with Continue, Cancel and Escape; QA test files support multiple lines. Input collection is separate from preview approval. Unknown gateway submission outcomes still block replay/conversion as required by their existing safety checks. Do not treat this UI correction as a recovered provider outcome or successful website build.
+
+
+## Unknown OpenCode gateway request — owner Windows acceptance pending
+After rebuilding and byte-verifying the installer, keep NeuralOps running. In Alex's original failed job choose **Review unknown provider request**. Inspect the exact unknown count, used/maximum request count and fresh-private-session warning. Cancel must leave history unchanged. Accepting review must leave the job stopped and show reviewed_unknown with retained unknown requests. Only then explicitly Retry once; existing cap, cleanup, checkpoint/route/transport and approvals must remain valid. Capture the full job result/error; do not infer website completion from successful review. No Gemini key/model change or provider conversion is needed for this same-provider recovery.
+
+The control preserves encrypted unknown submission records and incomplete usage; it cannot determine whether the remote provider processed/billed the lost response. Review is explicit permission for future continuation, not outcome verification. No live Windows gateway continuation has yet been demonstrated for this change.

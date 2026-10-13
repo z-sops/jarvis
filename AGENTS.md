@@ -882,3 +882,7 @@ Owner confirmed typed NeuralOps identity text was invisible because inherited li
 
 ### Electron job input dialogs — 2026-10-13
 window.prompt is unsupported in Electron. Office conversion, QA runner/files/reviewer and native outcome/evidence collection must use the existing themed accessible Promise dialog, with Cancel/Escape/Office leave cleanup and focus return. Input is never approval; preserve separate preview/apply confirmation and unknown provider-request refusal. Do not clear pending broker submission merely because pending tools are zero. Owner verified broker/Laila/Alex/Bob at14:04:26; subsequent controlled retry refused unknown original gateway outcome. No website success inferred.
+
+
+### Human-reviewed unknown provider continuation — 2026-10-13
+Preserve unknown provider request charges and encrypted original intents. Trusted-window review is scoped to unbudgeted request-limited OpenCode gateway jobs; never settle/refund unknown usage, reset caps, disable budgets or automatically start/replay. One-use revision-bound preview, stopped ownership, healthy cleanup and no pending tool/private effects are required. Review permits only separately initiated continuation with fresh private state and preserved workspace/broker history. Original private archive stays protected; image/engine/provider/transport checks still apply. Retained unknown request history blocks provider conversion. Retry refuses before child creation until review. Linux fixture/UI evidence is not live gateway or Windows native recovery acceptance.

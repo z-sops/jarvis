@@ -440,3 +440,6 @@ Implemented explicit pinned OpenCode ACP lifecycle in the existing contained eng
 ### Owner native ACP acceptance — 2026-10-12
 
 Windows output on8f97cf5/image018544b25065... verifies contained OpenCode ACP task + scoped MCP + original private-session restart10/10; Hermes regression10/10. This closes the pinned OFFLINE native ACP compatibility/restart gate only. Real provider/gateway authentication, installed-app/Laila project workflow, meaningful reviewer/host/browser QA, physical outages, billing/approval and arbitrary plugins remain open. Timings are one deterministic fixture including restart, not production latency. Full evidence recorded in project-update.md; no source change/test rerun inferred.
+
+
+2026-10-13: unknown request-only gateway outcome now has explicit human preview/apply recovery instead of a retry/conversion dead end. Unknown charges/intents remain retained; fresh private state only, no automatic replay, original checkpoint preserved. Offline encrypted broker recovery and Linux trusted UI/refusal verified. Original Windows website/native gateway continuation and meaningful QA remain pending. Exact-budget unknown reservations and conversion of unknown histories remain intentionally blocked.
