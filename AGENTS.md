@@ -886,3 +886,7 @@ window.prompt is unsupported in Electron. Office conversion, QA runner/files/rev
 
 ### Human-reviewed unknown provider continuation — 2026-10-13
 Preserve unknown provider request charges and encrypted original intents. Trusted-window review is scoped to unbudgeted request-limited OpenCode gateway jobs; never settle/refund unknown usage, reset caps, disable budgets or automatically start/replay. One-use revision-bound preview, stopped ownership, healthy cleanup and no pending tool/private effects are required. Review permits only separately initiated continuation with fresh private state and preserved workspace/broker history. Original private archive stays protected; image/engine/provider/transport checks still apply. Retained unknown request history blocks provider conversion. Retry refuses before child creation until review. Linux fixture/UI evidence is not live gateway or Windows native recovery acceptance.
+
+
+### Native checkpoint worktree selection — 2026-10-13
+A broker refusal can precede workspace preparation. Never assume the immediate retry child owns the checkpoint root. Existing prepareWorkspace must follow bounded reciprocal verified retry lineage to the checkpoint-owning actor/project worktree before creating or selecting a root. Preserve all worktree ownership/revision/link and protected checkpoint checks; refuse orphaned lineage rather than weaken binding. Wrong-root child worktrees are retained, not automatically deleted. Owner review_unknown is observed; subsequent native checkpoint binding failure is not task success.
