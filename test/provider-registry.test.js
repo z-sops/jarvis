@@ -19,11 +19,15 @@ test('OpenCode gateway adapter preserves bounded tool calls and actual usage, wi
  const body={messages:[{role:'user',content:'Read fixture'}],tools:[{type:'function',function:{name:'read_file',parameters:{type:'object'}}}]};
  const r=adapter.prepare('opencode','space-bunny-free',body,20);
  assert.equal(r.countUrl,null);assert.equal(r.countQuality,'unavailable');assert.equal(r.body.stream,false);assert.equal(r.body.max_tokens,20);assert.deepEqual(r.body.tools,body.tools);
- assert.throws(()=>adapter.prepare('opencode','gpt-fixture',body,20),/protocols are unverified/);
+ assert.equal(adapter.prepare('opencode','gpt-fixture',body,20).body.model,'gpt-fixture');
  const data={choices:[{finish_reason:'tool_calls',message:{role:'assistant',content:null,tool_calls:[{id:'read-1',type:'function',function:{name:'read_file',arguments:'{"path":"fixture.txt"}'}}]}}],usage:{prompt_tokens:10,completion_tokens:3}};
  const d=adapter.decode('opencode',data);assert.equal(d.message.tool_calls[0].id,'read-1');assert.equal(d.usage.promptTokenCount,10);assert.equal(d.usage.candidatesTokenCount,3);
  for(const patch of [{choices:[{...data.choices[0],finish_reason:'length'}]},{usage:{}},{choices:[{...data.choices[0],finish_reason:'stop'}]}])assert.throws(()=>adapter.decode('opencode',{...data,...patch}));
  const duplicate=structuredClone(data);duplicate.choices[0].message.tool_calls.push(duplicate.choices[0].message.tool_calls[0]);assert.throws(()=>adapter.decode('opencode',duplicate),/function call/);
  const bad=structuredClone(data);bad.choices[0].message.tool_calls[0].function.arguments='null';assert.throws(()=>adapter.decode('opencode',bad),/arguments/);
  const text=adapter.decode('opencode',{choices:[{finish_reason:'stop',message:{role:'assistant',content:'Reply'}}],usage:{prompt_tokens:2,completion_tokens:1}});assert.equal(text.message.content,'Reply');
+});
+test('worker model catalogue is read-only, bounded, credential-private and refuses stale settings',async()=>{
+ const list=require('../lib/opencode-models').list;let key='PRIVATE_CATALOG_KEY',calls=0;const cfg={workerProvider:'opencode',workerApiKey:key},home={getAgent:()=>({id:'alex'})},getCfg=()=>({...cfg,workerApiKey:key});const r=await list({home,getCfg,actor:'alex',fetchImpl:async(url,o)=>{calls++;assert.equal(url,registry.get('opencode').catalog);assert.equal(o.method,'GET');assert.equal(o.redirect,'error');return new Response(JSON.stringify({data:[{id:'mimo-v2.5-free',secret:'PRIVATE'},{id:'nemotron-3-ultra-free'},{id:'space-bunny-free'},{id:'custom-user-model'},{id:'bad\nmodel'},{id:'space-bunny-free'}]}));}});assert.equal(calls,1);assert.deepEqual(r.models,['custom-user-model','mimo-v2.5-free','nemotron-3-ultra-free','space-bunny-free']);assert.doesNotMatch(JSON.stringify(r),/PRIVATE/);
+ await assert.rejects(list({home,getCfg,actor:'alex',fetchImpl:async()=>{key='CHANGED';return new Response('{"data":[{"id":"fixture"}]}');}}),/changed/);await assert.rejects(list({home,getCfg,actor:'alex',fetchImpl:async()=>new Response('PRIVATE',{status:403})}),/HTTP 403/);await assert.rejects(list({home:{getAgent:()=>null},getCfg,actor:'missing',fetchImpl:async()=>{throw Error('must not fetch');}}),/unavailable/);
 });

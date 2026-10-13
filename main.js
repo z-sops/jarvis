@@ -253,6 +253,7 @@ ipcMain.handle('agents:inspect', (_e, id) => {
 });
 ipcMain.handle('agents:update', (_e, id, patch) => { try { if(patch&&'desiredLifecycle' in patch)throw Error('Use trusted crew lifecycle controls.');return { ok: true, agent: home.updateAgent(id, patch || {}) }; } catch (e) { return { ok: false, error: e.message }; } });
 ipcMain.handle('hermes:check', async (_e, opts) => { try { return { steps: await hermes.check(opts || {}) }; } catch (e) { return { steps: [{ name: 'Check', ok: false, detail: e.message }] }; } });
+ipcMain.handle('opencode:models',async(_e,id)=>{try{return {ok:true,...await require('./lib/opencode-models').list({home,getCfg:store.get,actor:String(id)})};}catch{return {ok:false,error:'OpenCode model catalogue could not be loaded. Check saved provider/key and network; no model request was submitted.'};}});
 ipcMain.handle('opencode:check', async (_e, opts) => { try { return { steps: await opencode.check(opts || {}) }; } catch (e) { return { steps: [{ name: 'Check', ok: false, detail: e.message }] }; } });
 ipcMain.handle('comms:get', () => ({ settings: comms.settings(), status: comms.status() }));
 ipcMain.handle('comms:save', async (_e, c) => { try { return await comms.save(c); } catch (e) { return { ok: false, errors: [e.message] }; } });

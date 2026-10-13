@@ -898,3 +898,7 @@ A failed broker/workspace preflight may leave the protected journal owned by an 
 
 ### Native diagnostic failure precedence — 2026-10-13
 Capture safe typed provider/host broker failure before it becomes generic CLI unknown. Persist same actor/job/run nativeFailure; last20 category/status events only, no URLs/headers/body/prompt/tool args/raw exception/stderr. Container classifies bounded chunks and sends only allowlisted codes/exit status; host filters again. Preserve existing dependency/MCP priority, unknown usage/counts, cancellation/deadline, cleanup and no-replay controls. Diagnostics are not successful recovery or billing proof. No external runtime link/dependency or copied source files.
+
+
+### OpenCode model choice supersedes Space Bunny-only policy — 2026-10-13
+Owner explicitly removes hard-coded Space Bunny execution/recovery restrictions. User can choose any bounded OpenCode model ID through saved-worker catalogue or manual input. Existing request/output limits, run-pinned selection, job/team budget protection, trusted stopped-history review and no automatic alternate routes remain; these are not model-name restrictions. Read-only catalogue does not prove free price or inference access. Same-provider reviewed switch preserves original-model unknown records/counts/archive, current pending effects still refuse. Chat Completions transport remains; other protocols may fail visibly and universal live compatibility is unverified. No external reference runtime/import/dependency link.
