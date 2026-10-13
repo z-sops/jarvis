@@ -320,3 +320,6 @@ The control preserves encrypted unknown submission records and incomplete usage;
 
 
 2026-10-13 follow-up: owner request review succeeded, then Retry failed Native checkpoint binding changed with a new child worktree. Rebuild with the worktree-lineage correction. Use the latest failed linked website job's Retry once; do not create another project or edit/delete checkpoints. Existing reciprocal lineage selects the checkpoint owner's original worktree and validates its contents. If lineage/root/hash or private engine/image/provider binding is invalid, refusal is expected and needs inspection. Gateway/native website completion remains pending.
+
+
+Native history follow-up: rebuild the stable-owner correction before retrying the latest failed linked website job once. History can legitimately remain owned by an ancestor when intervening jobs failed before any durable model response. Orbit verifies the complete deeper retry lineage; broken links still refuse. No token/provider change, new project or history deletion is needed. Capture actual result; offline tests do not establish live gateway/native website success.

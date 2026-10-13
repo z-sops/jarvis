@@ -890,3 +890,7 @@ Preserve unknown provider request charges and encrypted original intents. Truste
 
 ### Native checkpoint worktree selection — 2026-10-13
 A broker refusal can precede workspace preparation. Never assume the immediate retry child owns the checkpoint root. Existing prepareWorkspace must follow bounded reciprocal verified retry lineage to the checkpoint-owning actor/project worktree before creating or selecting a root. Preserve all worktree ownership/revision/link and protected checkpoint checks; refuse orphaned lineage rather than weaken binding. Wrong-root child worktrees are retained, not automatically deleted. Owner review_unknown is observed; subsequent native checkpoint binding failure is not task success.
+
+
+### Stable native journal owner across multiple retries — 2026-10-13
+A failed broker/workspace preflight may leave the protected journal owned by an earlier ancestor. Reuse job-retry.historyOwner across broker and trusted inspection/conversion/recovery; deeper ancestry requires bounded same-actor reciprocal links, retried parent and retryLinkReady child. Existing direct-parent compatibility remains. Never accept history by actor alone or rewrite its owner to bypass checks. Preserve unknown charges, archive, checkpoint and permission gates. ZCode stable session/task/replay-gate concepts were inspected, no source transplant needed. Tests must include unknown review followed by multiple pre-submission failures, not just one retry.
