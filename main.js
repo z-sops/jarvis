@@ -221,7 +221,7 @@ ipcMain.handle('dialog:pickDir', async () => {
 ipcMain.handle('key:test', (_e, k) => gemini.testKey(String(k || '')));
 ipcMain.handle('shell:openExternal', (_e, u) => { if (/^https:\/\//.test(u)) shell.openExternal(u); });
 ipcMain.handle('shell:showInFolder', (_e, p) => { if (isInside(home.root, p)) shell.showItemInFolder(p); });
-ipcMain.handle('chat:send', async (_e, text) => { try { return await commanderTurn(String(text)); } catch (e) { return { text: `Something went wrong on my side: ${e.message}`, error: true }; } });
+ipcMain.handle('chat:send', async (_e, text) => { try { return await commanderTurn(String(text)); } catch (e) { return { text: `Something went wrong on my side: ${gemini.describeFailure(e)}`, error: true }; } });
 ipcMain.handle('latency:rendered',(e,id,metrics)=>{if(!win||win.isDestroyed()||e.sender!==win.webContents||e.senderFrame!==win.webContents.mainFrame)throw Error('Use the trusted main window.');return require('./lib/latency').rendered(id,metrics);});
 ipcMain.handle('latency:get', e => { if(!win||win.isDestroyed()||e.sender!==win.webContents||e.senderFrame!==win.webContents.mainFrame)throw Error('Use the trusted main window.');return require('./lib/latency').summarize(); });
 ipcMain.handle('chat:reset', () => { home.saveConversation([]); return true; });

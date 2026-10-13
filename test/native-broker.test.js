@@ -180,3 +180,8 @@ test('Pinned ignores cheaper alternatives and Auto never switches after generati
  const r=rig(t),x=await start(t,r,cfg,async(url,o)=>o.method!=='POST'?response({models:routes.map(r=>({name:'models/'+r.model,supportedGenerationMethods:['generateContent']}))}):response(url.endsWith('countTokens')?{totalTokens:5}:reply()));assert.equal(x.b.identity.model,'fixture');assert.equal((await x.call(undefined,{model:x.b.override.workerModel})).status,200);
  const q=rig(t);let generations=0;const y=await start(t,q,{...cfg,workerModelSelection:'auto'},async(url,o)=>{if(o.method!=='POST')return response({models:routes.map(r=>({name:'models/'+r.model,supportedGenerationMethods:['generateContent']}))});if(url.endsWith('countTokens'))return response({totalTokens:5});generations++;throw Error('lost after submission');});assert.equal((await y.call(undefined,{model:y.b.override.workerModel})).status,400);assert.equal(generations,1);const j=q.storage.open(q.home.findJob(y.job.id).nativeBridge);assert.ok(j.pending);assert.equal(j.requests,1);assert.equal(q.home.findJob(y.job.id).tokenBudget.reservedTokens,15);
 });
+
+
+test('structured auth refusal retains only a fixed reason without response body or token',async t=>{
+ const r=rig(t),x=await start(t,r,gatewayConfig(),async()=>new Response(JSON.stringify({error:{type:'AuthError',message:'Invalid API key. SECRET_RESPONSE_CANARY'}}),{status:403}));assert.equal((await gatewayCall(x)).status,400);const d=x.b.failureDiagnostic();assert.equal(d.reason,'invalid_or_inactive_api_key');assert.doesNotMatch(JSON.stringify(d),/SECRET_RESPONSE_CANARY|AuthError|PRIVATE_GATEWAY/);assert.ok(r.storage.open(r.home.findJob(x.job.id).nativeBridge).pending);
+});

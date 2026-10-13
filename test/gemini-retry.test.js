@@ -105,3 +105,8 @@ test('Stop: a request in flight and a retry wait both end at once, and the loop 
     assert.ok(Date.now() - t0 < 1500, 'the wait was cut short: ' + (Date.now() - t0) + ' ms'); assert.equal(calls.length, 1);
   });
 });
+
+
+test('exhausted Gemini fallback records actual attempts and produces safe high-demand guidance',async()=>{
+ await withFetch(()=>fail(503,'PRIVATE_RESPONSE_TEXT'),async()=>{let error;try{await gemini.generate(cfg({textFallbackModel:'backup-fixture'}),{contents:[]});}catch(e){error=e;}assert.ok(error);assert.deepEqual(error.modelAttempts,[{model:'gemini-a-flash',status:503,attempts:4},{model:'backup-fixture',status:503,attempts:2}]);const text=gemini.describeFailure(error);assert.match(text,/daily quota/);assert.match(text,/backup-fixture/);assert.doesNotMatch(text,/PRIVATE_RESPONSE_TEXT|\{"error"/);});
+});

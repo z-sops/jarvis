@@ -1357,3 +1357,15 @@ Auto can select another eligible route on an exact-count endpoint HTTP 401/403/4
 Limits: generation HTTP refusals, transport uncertainty after submission, completed native/private state, unresolved tools and existing history do NOT automatically switch/replay. Request-limited OpenCode/OpenRouter supports initial catalogue selection only; it still cannot guarantee token/USD budgets. This increment is not seamless mid-task failover or a no-interruption guarantee. Existing reviewed conversion/recovery remains necessary there. Communication/desired-state foundations are reused, no second scheduler introduced.
 
 Validation: 62/62 focused native-broker/router tests; final full suite 816 total, 813 pass, zero fail, three existing unavailable-Hermes skips (78.98s). Real Linux Electron/Playwright 30/30, zero errors; Auto/Pinned selector and invalid selection IPC verified. Initial test fixtures shared a cached catalogue key and used the wrong native model alias, corrected; an exact accessible-name UI selector was corrected to include its description. No live model, HiClaw runtime or Windows installer run.
+
+
+### Live-owner provider failures: honest retry evidence and bounded auth reasons — 2026-10-13
+Owner fresh text-only Space Bunny job job-23ef5fcf-cf23-4760-bf26-b0decda63128 failed at model_request HTTP403 after one retained unknown request. Separate commander screenshots show Gemini HTTP503 high demand; 19/500 displayed requests is not daily-exhaustion evidence. No website or fresh model success claimed.
+
+Audit found commander Gemini retry plus alternate Flash fallback already existed. Exhausting the backup previously threw only the original provider error, hiding which models/attempts failed. Added actual bounded model/attempt/status trail and clear high-demand guidance for commander chat, excluding raw response content. Retry/fallback policy, tool permissions and accounting were not changed.
+
+Native broker now reads at most8KiB of structured HTTP failure response solely to classify allowlisted reason codes (invalid_or_inactive_api_key, insufficient_credit, model_access_refused); no raw body/header/key/prompt persisted or displayed. Native worker error displays the fixed reason when established by provider message; absent/unknown reason remains generic. Pending unknown submission and reservations remain protected; no automatic retry or credential mutation.
+
+This improves diagnosis, not provider availability. Current owner key/access remains unverified; correct endpoint/catalogue does not prove inference authorization.
+
+Validation:68/68 focused Gemini retry/native broker tests; full suite818 total,815 pass,zero fail,three existing unavailable-Hermes skips (80.07s). Real Linux Electron/Playwright30/30,zero errors. Deterministic fixture confirms primary4/backup2 exhausted attempts and safe text; structured403 fixture confirms fixed invalid-key reason and retained pending request. No live provider credential tested or changed; Windows rebuild required.

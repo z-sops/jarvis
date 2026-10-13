@@ -337,3 +337,7 @@ Keep engine **OpenCode**. In the worker’s own engine settings, set provider `o
 
 ### Auto/Pinned selection acceptance
 Settings → Native worker model selection: Pinned keeps your selected provider/model; Auto uses only your configured routes and credentials. Save explicit route capabilities/context and prices before a budgeted job. Test catalogue unavailability and first token-count refusal separately from generation failure. A lost generation response must remain unknown with no automatic alternate call. Current OpenCode request-limited mode only has catalogue-based initial selection; changing an existing job still requires explicit reviewed conversion. Do not claim seamless automatic continuation from these tests.
+
+
+### Gemini busy versus OpenCode access refusal
+New commander HTTP503 errors summarize primary/backup attempts instead of exposing raw JSON. Existing saved chat messages remain unchanged. Native HTTP refusals may include a fixed provider-derived reason; unknown payloads do not invent a reason. Do not retry old unknown jobs merely because no tools ran. Verify the provider key/access independently and use a fresh minimal job for explicit acceptance. Live provider recovery remains pending.

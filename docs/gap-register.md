@@ -459,3 +459,13 @@ Adopted gateway routing/configuration patterns as original Orbit code, without i
 Auto can select another eligible route on an exact-count endpoint HTTP 401/403/429/500/502/503/504 refusal BEFORE the first generation. Bounded route exclusion prevents cycles; preserved prompt/system and immutable native loopback model alias allow the existing CLI to receive the successful response. Actual upstream identity and count-refusal switch receipts are persisted; exact token/cost reservations use the selected route. Selection-mode drift blocks continuation.
 
 Limits: generation HTTP refusals, transport uncertainty after submission, completed native/private state, unresolved tools and existing history do NOT automatically switch/replay. Request-limited OpenCode/OpenRouter supports initial catalogue selection only; it still cannot guarantee token/USD budgets. This increment is not seamless mid-task failover or a no-interruption guarantee. Existing reviewed conversion/recovery remains necessary there. Communication/desired-state foundations are reused, no second scheduler introduced.
+
+
+### Live-owner provider failures: honest retry evidence and bounded auth reasons — 2026-10-13
+Owner fresh text-only Space Bunny job job-23ef5fcf-cf23-4760-bf26-b0decda63128 failed at model_request HTTP403 after one retained unknown request. Separate commander screenshots show Gemini HTTP503 high demand; 19/500 displayed requests is not daily-exhaustion evidence. No website or fresh model success claimed.
+
+Audit found commander Gemini retry plus alternate Flash fallback already existed. Exhausting the backup previously threw only the original provider error, hiding which models/attempts failed. Added actual bounded model/attempt/status trail and clear high-demand guidance for commander chat, excluding raw response content. Retry/fallback policy, tool permissions and accounting were not changed.
+
+Native broker now reads at most8KiB of structured HTTP failure response solely to classify allowlisted reason codes (invalid_or_inactive_api_key, insufficient_credit, model_access_refused); no raw body/header/key/prompt persisted or displayed. Native worker error displays the fixed reason when established by provider message; absent/unknown reason remains generic. Pending unknown submission and reservations remain protected; no automatic retry or credential mutation.
+
+This improves diagnosis, not provider availability. Current owner key/access remains unverified; correct endpoint/catalogue does not prove inference authorization.
