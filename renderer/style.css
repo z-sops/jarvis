@@ -205,3 +205,6 @@ textarea { resize: vertical; }
 .team-workspace textarea { min-height:90px; resize:vertical; }
 .team-workspace textarea[aria-label="Scoped discussion draft"] { min-height:180px; font-family:monospace; font-size:13px; }
 .team-workspace button { margin:4px 4px 4px 0; }
+.modal.job-input .f { display: grid; gap: 10px; }
+.modal.job-input input, .modal.job-input textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; background: var(--void); color: var(--ceramic); caret-color: var(--ceramic); border: 1px solid var(--line-2); font: 13px var(--m); }
+.modal.job-input input:focus, .modal.job-input textarea:focus { outline: 2px solid var(--amber); outline-offset: 2px; }

@@ -307,3 +307,7 @@ Orbit accepts NeuralOps MCP's direct agent/via result, as well as an explicit su
 
 The paired NeuralOps draft fixes /mcp forwarding of X-Agent-Id into the existing authenticated identity resolver. Updating Orbit alone may verify the broker but refuse workers if the server still drops their headers. Update/restart the companion service with the same external data directory, then use the existing saved token and Verify worker identities. Do not rotate/re-register merely because the old verifier refused its response. If verification fails, report the fixed reason/status without sharing a token or raw identity payload. Keep native task retry and project acceptance separate.
 
+
+
+## Office conversion input (2026-10-13)
+An older installed build can show prompt() is not supported on Review provider/model conversion and other job input actions. Updated builds use a Job input dialog with Continue, Cancel and Escape; QA test files support multiple lines. Input collection is separate from preview approval. Unknown gateway submission outcomes still block replay/conversion as required by their existing safety checks. Do not treat this UI correction as a recovered provider outcome or successful website build.

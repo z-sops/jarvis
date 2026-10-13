@@ -33,7 +33,7 @@ async function main() {
   const make = (task, status, expectedOutputs = []) => { const j = home.createJob('alex', task, { expectedOutputs }); return home.updateJob('alex', j.id, { status, runId: 'fixture-prior-run', result: 'Fixture report for review' }); };
   const interrupted = make('Previously running job', 'running'), accepted = make('Review a real file', 'review', ['proof.txt']);
   const missing = make('Missing artifact', 'review', ['missing.txt']), report = make('Report only', 'review'), rejected = make('Reject this report', 'review');
-  home.updateJob('alex',interrupted.id,{containment:{status:'stopped'},nativeCheckpoint:{at:'2026-10-10T00:00:00.000Z',engineState:{engine:'opencode',sessionPresent:true,pendingEffects:0,retiredQueueRows:1}}});
+  home.updateJob('alex',interrupted.id,{containment:{status:'stopped'},nativeContinuity:{provider:'openai',model:'fixture',requests:0},nativeCheckpoint:{at:'2026-10-10T00:00:00.000Z',engineState:{engine:'opencode',sessionPresent:true,pendingEffects:0,retiredQueueRows:1}}});
   fs.writeFileSync(home.p('workspace', 'alex', 'proof.txt'), 'Fixture artifact');
   for (const j of [accepted, missing, report, rejected]) home.updateJob('alex', j.id, { verification: review.evidence(home, 'alex', j) });
   const projectRoot = path.join(temp, 'project'); fs.mkdirSync(projectRoot);
@@ -163,6 +163,25 @@ async function main() {
     });
     await check('missing output cannot be accepted through real IPC', async () => {
       const result = await page.evaluate(id => bridge.jobs.review(id, 'accept'), missing.id); assert.equal(result.ok, false); assert.match(result.error, /missing/); assert.equal(home.findJob(missing.id).status, 'review');
+    });
+    await check('native conversion input uses an Electron dialog and cancel/Escape preserve the job',async()=>{
+      const before=JSON.stringify(home.findJob(interrupted.id));
+      const card=page.locator('[data-job-id="'+interrupted.id+'"]');
+      await card.getByRole('button',{name:'Review provider/model conversion',exact:true}).click();
+      const d=page.getByRole('dialog',{name:'Job input',exact:true});
+      await d.getByRole('textbox').fill('openai');
+      await d.getByRole('button',{name:'Continue',exact:true}).click();
+      await d.getByRole('textbox').fill('fixture');
+      const inputColors=await d.getByRole('textbox').evaluate(e=>({fg:getComputedStyle(e).color,bg:getComputedStyle(e).backgroundColor}));
+      assert.notEqual(inputColors.fg,inputColors.bg);assert.notEqual(inputColors.bg,'rgb(255, 255, 255)');
+      await page.waitForFunction(()=>[...document.querySelectorAll('.modal-back')].every(e=>Number(getComputedStyle(e).opacity)===1));
+      await page.screenshot({path:path.join(out,'native-conversion-input.png')});
+      await d.getByRole('button',{name:'Cancel',exact:true}).click();
+      await d.waitFor({state:'hidden'});assert.equal(JSON.stringify(home.findJob(interrupted.id)),before);
+      if(!await card.getByRole('button',{name:'Review provider/model conversion',exact:true}).isVisible())await card.locator('summary').click();
+      await card.getByRole('button',{name:'Review provider/model conversion',exact:true}).click();
+      await d.getByRole('textbox').press('Escape');
+      await d.waitFor({state:'hidden'});assert.equal(JSON.stringify(home.findJob(interrupted.id)),before);
     });
     await check('file acceptance and report-only acceptance retain distinct evidence', async () => {
       for (const j of [accepted, report]) assert.equal((await page.evaluate(id => bridge.jobs.review(id, 'accept'), j.id)).ok, true);

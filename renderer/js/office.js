@@ -6,6 +6,40 @@
   if (!window.bridge || !window.OfficeCore) return;
   const O = window.OfficeCore, COMMANDER = 'jarvis';
   const h = (tag, attrs = {}, ...kids) => { const el = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') el.className = v; else if (k.startsWith('on')) el.addEventListener(k.slice(2), v); else if (v != null && v !== false) el.setAttribute(k, v === true ? '' : v); } for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(kid)); return el; };
+  let cancelInput = null;
+  // Electron does not support window.prompt. Input alone never grants approval.
+  function jobInput(question, value = '', multiline = false) {
+    if (cancelInput) cancelInput();
+    return new Promise(resolve => {
+      const previous = document.activeElement;
+      const field = h(multiline ? 'textarea' : 'input', { 'aria-label': question, maxlength: multiline ? 16000 : 1000, ...(multiline ? { rows: 6 } : { type: 'text' }), autocomplete: 'off', spellcheck: 'false' });
+      field.value = value;
+      const cancel = h('button', { type: 'button', class: 'btn' }, 'Cancel');
+      const next = h('button', { type: 'submit', class: 'btn primary' }, 'Continue');
+      const form = h('form', { class: 'modal job-input', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Job input' },
+        h('h2', {}, 'Job input'), h('label', { class: 'f' }, question, field),
+        h('div', { class: 'modal-actions' }, cancel, next));
+      const backdrop = h('div', { class: 'modal-back' }, form);
+      let settled = false;
+      const finish = result => {
+        if (settled) return; settled = true;
+        document.removeEventListener('keydown', keys, true); backdrop.remove();
+        if (cancelInput === abort) cancelInput = null;
+        if (previous?.isConnected) previous.focus();
+        resolve(result);
+      };
+      const abort = () => finish(null);
+      const keys = e => {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); abort(); }
+        else if (e.key === 'Tab') {
+          const controls = [field, cancel, next], i = controls.indexOf(document.activeElement);
+          e.preventDefault(); controls[(i + (e.shiftKey ? 2 : 1)) % 3].focus();
+        }
+      };
+      cancel.onclick = abort; form.onsubmit = e => { e.preventDefault(); finish(field.value); };
+      cancelInput = abort; document.body.append(backdrop); document.addEventListener('keydown', keys, true); field.focus();
+    });
+  }
   const NICE = { run_shell: 'Running a command', write_file: 'Writing a file', read_file: 'Reading a file', list_dir: 'Looking in a folder', web_search: 'Searching the web', browser_open: 'Opening a web page', browser_read: 'Reading a web page', browser_click: 'Clicking on a web page', browser_type: 'Typing on a web page', browser_select: 'Using a web page', browser_press: 'Using a web page', browser_scroll: 'Scrolling a web page', browser_nav: 'Using a web page', browser_tabs: 'Using browser tabs', browser_wait: 'Waiting for a web page', open_url: 'Opening a page', look_at_screen: 'Looking at the screen', assign_task: 'Giving out a job', cancel_job: 'Stopping a job', create_agent: 'Adding crew', get_system_info: 'Checking the system', remember: 'Making a note', list_jobs: 'Checking jobs', get_job: 'Reading a report' };
   const clip = (s, n) => (s.length > n ? s.slice(0, n - 1) + '\u2026' : s);
   const activityText = a => {
@@ -183,14 +217,14 @@
     const actions = [];
     if (bridge.jobs && j.status === 'review') actions.push(act('Accept result', () => bridge.jobs.review(j.id, 'accept')), act('Reject result', () => bridge.jobs.review(j.id, 'reject')));
     if (bridge.jobs?.configureQA && j.status === 'review' && j.isolation === 'git_worktree') {
-      actions.push(act(j.qa?.required ? 'Select QA test files' : 'Enable QA gate', () => {
-        const runner=window.prompt('QA runner: node, python_unittest, pytest, go, cargo or maven. Tools/dependencies must already be installed; no download is performed.',j.qa?.runner||'node'); if(runner===null)return Promise.resolve({ok:true});
-        const files = window.prompt('Workspace-relative test files, one per line. Go needs selected .go files including a _test.go. Cargo/Maven need one Cargo.toml/pom.xml. Running project code requires approval and uses your OS permissions.', (j.qa?.tests || []).join('\n'));
+      actions.push(act(j.qa?.required ? 'Select QA test files' : 'Enable QA gate', async () => {
+        const runner=await jobInput('QA runner: node, python_unittest, pytest, go, cargo or maven. Tools/dependencies must already be installed; no download is performed.',j.qa?.runner||'node'); if(runner===null)return Promise.resolve({ok:true});
+        const files = await jobInput('Workspace-relative test files, one per line. Go needs selected .go files including a _test.go. Cargo/Maven need one Cargo.toml/pom.xml. Running project code requires approval and uses your OS permissions.', (j.qa?.tests || []).join('\n'), true);
         return files === null ? Promise.resolve({ ok: true }) : bridge.jobs.configureQA(j.id, files.split(/\r?\n/).map(s => s.trim()).filter(Boolean),runner.trim());
       }));
       if (j.qa?.tests?.length) {
-        actions.push(act('Queue independent review', () => {
-          const actor = window.prompt('Choose another existing worker by name or ID. The reviewer receives a separate source snapshot.');
+        actions.push(act('Queue independent review', async () => {
+          const actor = await jobInput('Choose another existing worker by name or ID. The reviewer receives a separate source snapshot.');
           return actor === null ? Promise.resolve({ ok: true }) : bridge.jobs.queueQAReview(j.id, actor.trim());
         }), act('Run QA tests (ask first)', () => bridge.jobs.runQATests(j.id)), act('Stop QA tests', async () => { await bridge.stop.agent(j.agent); return { ok: true }; }));
       }
@@ -200,9 +234,9 @@
       return bridge.jobs.retry(j.id);
     }));
     if (bridge.jobs?.previewNativeConversion && j.nativeContinuity && ['interrupted','failed','cancelled','rejected'].includes(j.status)) actions.push(act('Review provider/model conversion', async () => {
-      const provider = window.prompt('Target provider: gemini, openai or anthropic. Visible broker history only; private CLI state is not restored.');
+      const provider = await jobInput('Target provider: gemini, openai or anthropic. Visible broker history only; private CLI state is not restored.');
       if (provider === null) return {ok:true};
-      const model = window.prompt('Target model ID. Configure matching worker credentials/model before explicit Retry; original budget policy must remain valid.');
+      const model = await jobInput('Target model ID. Configure matching worker credentials/model before explicit Retry; original budget policy must remain valid.');
       if (model === null) return {ok:true};
       const includeNativeTodos=window.confirm('Include supported saved native TODO data as untrusted context? This does not recreate native TODOs, import plugins or resume actions. Cancel chooses visible history only.');
       const preview = await bridge.jobs.previewNativeConversion(j.id,{provider:provider.trim(),model:model.trim(),includeNativeTodos});
@@ -210,12 +244,12 @@
       if (!window.confirm(`Convert ${preview.messages} visible history messages from ${preview.source.provider}/${preview.source.model} to ${preview.target.provider}/${preview.target.model}? Native TODO data items: ${preview.portableTodoCount||0}. Old approvals remain historical; no job starts automatically.`)) { await bridge.jobs.cancelNativeConversion(preview.token); return {ok:true}; }
       return bridge.jobs.applyNativeConversion(preview.token);
     }));
-    if (bridge.jobs?.inspectNative && ['interrupted','failed','cancelled','rejected'].includes(j.status) && Array.isArray(j.nativeContinuity?.pendingTools) && j.nativeContinuity.pendingTools.length) actions.push(act('Record inspected native outcomes', () => {
+    if (bridge.jobs?.inspectNative && ['interrupted','failed','cancelled','rejected'].includes(j.status) && Array.isArray(j.nativeContinuity?.pendingTools) && j.nativeContinuity.pendingTools.length) actions.push(act('Record inspected native outcomes', async () => {
       const outcomes=[];
       for (const c of j.nativeContinuity.pendingTools) {
-        const outcome=window.prompt('Inspect the effects of '+c.tool+' ('+c.id+'). Outcome: completed, failed, or not_executed. This does not grant permission to repeat it.');
+        const outcome=await jobInput('Inspect the effects of '+c.tool+' ('+c.id+'). Outcome: completed, failed, or not_executed. This does not grant permission to repeat it.');
         if(outcome===null)return Promise.resolve({ok:true});
-        const evidence=window.prompt('Describe the evidence you inspected for '+c.tool+'.');
+        const evidence=await jobInput('Describe the evidence you inspected for '+c.tool+'.');
         if(evidence===null)return Promise.resolve({ok:true});outcomes.push({id:c.id,outcome,evidence});
       }
       return bridge.jobs.inspectNative(j.id,outcomes);
@@ -367,7 +401,7 @@
     root.style.setProperty('--ox', ox + 'px'); root.style.setProperty('--oy', oy + 'px'); root.classList.add('pre'); state.visible = true; state.snap = true; state.last = 0; resize(); loadAgents(); loadFiles(); paintSide();
     requestAnimationFrame(() => requestAnimationFrame(() => { root.classList.remove('pre'); resize(); })); requestAnimationFrame(loop);
   }
-  function leave() { state.visible = false; }
+  function leave() { if (cancelInput) cancelInput(); state.visible = false; }
   // the way in from the Orbit: a button and a double click on the crew deck
   const deckHead = document.querySelector('.panel.crew .ph'), deck = document.getElementById('town');
   if (deckHead) { const b = h('button', { class: 'mini', type: 'button', title: 'Walk into the office (Alt+2)', onclick: () => window.__ws && __ws.show('office', { from: deckHead.closest('.panel').getBoundingClientRect() }) }, 'Enter office'); deckHead.insertBefore(b, deckHead.querySelector('#add-crew')); }
