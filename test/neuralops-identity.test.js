@@ -251,7 +251,7 @@ test('trusted verification IPC uses host worker inventory and rejects foreign wi
   } finally { await r.gw.closeAll(); }
 });
 
-test('verification uses real MCP HTTP SDK with separate broker and worker headers', async () => {
+test('verification uses real MCP HTTP SDK direct-result envelope with separate broker and worker headers', async () => {
   const http = require('node:http'), requests = [];
   const token = 'nops_only_disposable_http_fixture';
   const server = http.createServer((req, res) => {
@@ -265,7 +265,7 @@ test('verification uses real MCP HTTP SDK with separate broker and worker header
       else if (m.method === 'tools/call' && m.params.name === 'neuralops_whoami') {
         requests.push(actor);
         const agent = { id: actor || 'agent.orbit', workspaceId: 'ws', revokedAt: null, ...(actor ? { delegate: 'agent.orbit' } : { access: 'broker' }) };
-        result = { content: [{ type: 'text', text: JSON.stringify({ ok: true, result: { agent } }) }] };
+        result = { content: [{ type: 'text', text: JSON.stringify({ agent, via: actor ? 'delegated' : 'token' }) }] };
       } else { res.writeHead(400); return res.end(); }
       res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ jsonrpc: '2.0', id: m.id, result }));
     });
@@ -276,4 +276,17 @@ test('verification uses real MCP HTTP SDK with separate broker and worker header
     const out = await require('../lib/neuralops-identity').verifyIdentities({ get: () => c, token: () => token, visibleTo: () => true }, 'neuralops', ['alex', 'bob']);
     assert.equal(out.allPassed, true); assert.deepEqual(requests, [null, 'agent.laila', 'agent.alex', 'agent.bob']); assert.ok(!JSON.stringify(out).includes(token));
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+});
+
+test('direct MCP result and REST wrapper are supported but explicit error envelopes never pass', async () => {
+  for (const shape of [a => ({ agent: a, via: 'token' }), a => ({ ok: true, result: { agent: a } }), a => ({ ok: false, agent: a }), a => ({ agent: a, error: 'denied' }), a => ({ agent: a, errorCode: 'forbidden' }), a => ({ agent: [a] })]) {
+    const r = verificationRig((a, id) => ({ content: [{ type: 'text', text: JSON.stringify(shape(a)) }] }));
+    const out = await verify(r); const sample = shape({});
+    assert.equal(out.allPassed, sample.ok === true || (sample.ok === undefined && !sample.error && !sample.errorCode && !Array.isArray(sample.agent)));
+  }
+});
+
+test('MCP endpoint ignoring worker header cannot pass as a shared broker identity', async () => {
+  const r = verificationRig((a, id) => { if (id) { a.id = 'agent.orbit'; a.access = 'broker'; delete a.delegate; } return { content: [{ type: 'text', text: JSON.stringify({ agent: a, via: 'token' }) }] }; });
+  const out = await verify(r); assert.equal(out.broker.passed, true); assert.equal(out.allPassed, false); assert.ok(out.workers.every(x => x.reason === 'unexpected_identity'));
 });
