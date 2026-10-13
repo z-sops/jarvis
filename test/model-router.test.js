@@ -9,7 +9,7 @@ test('router uses authenticated catalogs, configured capabilities/prices and fal
 });
 test('router refuses missing capability, allowlist, unsupported count providers and missing prices',async()=>{
  for(const patch of [{workerAllowedModels:['other']},{workerCostBudgetUsd:1},{workerRoutes:[{...route('gemini','fixture'),capabilities:['text']}]}])await assert.rejects(router.select({workerProvider:'gemini',apiKey:'KEY',workerRoutes:[route('gemini','fixture')],...patch},{fetchImpl:()=>{throw Error('must not be called');}}),/No configured/);
- assert.throws(()=>router.validate({workerRoutes:[route('openrouter','fixture')]}),/supported count/);assert.throws(()=>router.validate({workerRoutes:[route('gemini','same'),route('openai','same')]}),/unique model/);
+ assert.equal(router.validate({workerRoutes:[route('openrouter','nvidia/fixture:free')]}).length,1);await assert.rejects(router.select({workerProvider:'openrouter',workerApiKey:'KEY',workerRoutes:[route('openrouter','nvidia/fixture:free')]},{fetchImpl:()=>{throw Error('exact counter unavailable; no request allowed');}}),/No configured/);assert.throws(()=>router.validate({workerRoutes:[route('unknown','fixture')]}),/supported count/);assert.throws(()=>router.validate({workerRoutes:[route('gemini','same'),route('openai','same')]}),/unique model/);
 });
 test('route pinning and credential-isolated cache prevent silently switching an existing transcript',async()=>{
  const cfg={workerProvider:'openai',workerApiKey:'ROUTER_KEY_C',workerRoutes:[route('openai','a'),route('openai','b')],workerModelRates:{a:{input:1,output:1},b:{input:2,output:2}}};

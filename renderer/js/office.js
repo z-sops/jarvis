@@ -239,7 +239,7 @@
       return bridge.jobs.applyNativeRequest(preview.token);
     }));
     if (bridge.jobs?.previewNativeConversion && j.nativeContinuity && ['interrupted','failed','cancelled','rejected'].includes(j.status)) actions.push(act('Review provider/model conversion', async () => {
-      const provider = await jobInput('Target provider: opencode, gemini, openai or anthropic. Visible broker history only; private CLI state is not restored.');
+      const provider = await jobInput('Target provider: opencode, openrouter, gemini, openai or anthropic. Visible broker history only; private CLI state is not restored.');
       if (provider === null) return {ok:true};
       const model = await jobInput('Target model ID. Configure matching worker credentials/model before explicit Retry; original budget policy must remain valid.');
       if (model === null) return {ok:true};
@@ -299,11 +299,13 @@
     // Per-worker engine/model override (blank fields inherit the crew default from Settings).
     const engineRow = isC ? null : (() => {
       const eng = h('select', {}, [['', 'Crew default'], ['builtin', 'Built-in'], ['hermes', 'Hermes Agent'], ['opencode', 'OpenCode']].map(([v, t]) => h('option', { value: v, selected: v === ((r && r.agent && r.agent.engine) || '') }, t)));
-      const prov = h('input', { value: (r && r.agent && r.agent.workerProvider) || '', placeholder: 'gemini / opencode / anthropic / openai / custom' });
+      const prov = h('input', { value: (r && r.agent && r.agent.workerProvider) || '', placeholder: 'gemini / opencode / openrouter / anthropic / openai / custom' });
       const model = h('input', { value: (r && r.agent && r.agent.workerModel) || '', placeholder: 'blank = crew model' });
       const picker=h('select',{'aria-label':'Available OpenCode models'},h('option',{value:''},'Choose a model'));picker.onchange=()=>{if(picker.value)model.value=picker.value;};
-      const loadModels=h('button',{class:'mini',type:'button',onclick:async()=>{out.textContent='Loading model catalogue…';try{const result=await bridge.opencode.models(id);if(!result.ok)throw Error(result.error);picker.replaceChildren(h('option',{value:''},'Choose a model'),...result.models.map(v=>h('option',{value:v},v)));out.textContent='Choose a model, then Save engine. Catalogue does not prove access or free pricing. Existing stopped jobs need reviewed model conversion.';}catch(e){out.textContent=e.message;}}},'Load OpenCode models');
-      const key = h('input', { type: 'password', autocomplete: 'off', value: (r && r.agent && r.agent.workerApiKey) || '', placeholder: 'blank = crew key' });
+      const loadModels=h('button',{class:'mini',type:'button',onclick:async()=>{out.textContent='Loading model catalogue…';try{const current=await bridge.agents.inspect(id);if((current?.agent?.workerProvider||'')!==prov.value.trim())throw Error('Save the provider and its API key before loading models.');const result=await bridge.opencode.models(id);if(!result.ok)throw Error(result.error);picker.replaceChildren(h('option',{value:''},'Choose a model'),...result.models.map(v=>h('option',{value:v},v+(result.prices?.find(p=>p.id===v)?.freeTextPricing?' — Free text pricing':''))));out.textContent='Choose a model, then Save engine. Catalogue does not prove access or free pricing. Existing stopped jobs need reviewed model conversion.';}catch(e){out.textContent=e.message;}}},'Load OpenCode / OpenRouter models');
+      let savedProvider=(r&&r.agent&&r.agent.workerProvider)||'';
+      const key = h('input', { type: 'password', autocomplete: 'off', value: (r && r.agent && r.agent.workerApiKey) || '', placeholder: 'blank = matching provider crew key' });
+      prov.addEventListener('change',()=>{if(prov.value.trim()!==savedProvider){key.value='';out.textContent='Provider changed. Enter that provider’s API key before Save engine.';}});
       const base = h('input', { value: (r && r.agent && r.agent.workerBaseUrl) || '', placeholder: 'https://.../v1 (custom only)' });
       const out = h('small', {});
       return sec(`${name}'s own engine (blank = crew default)`,
@@ -315,7 +317,7 @@
           h('label', { class: 'field' }, h('span', {}, 'Base URL'), base)),
         h('div', {}, loadModels,picker,h('button', { class: 'mini', type: 'button', onclick: async () => {
           out.textContent = 'Saving…';
-          try { const saved=await bridge.agents.update(id, { engine: eng.value, workerProvider: prov.value.trim(), workerModel: model.value.trim(), workerApiKey: key.value.trim(), workerBaseUrl: base.value.trim() });if(!saved?.ok)throw Error(saved?.error||'Worker settings were not saved.'); out.textContent = 'Saved.'; }
+          try { const saved=await bridge.agents.update(id, { engine: eng.value, workerProvider: prov.value.trim(), workerModel: model.value.trim(), workerApiKey: key.value.trim(), workerBaseUrl: base.value.trim() });if(!saved?.ok)throw Error(saved?.error||'Worker settings were not saved.'); savedProvider=prov.value.trim(); out.textContent = 'Saved.'; }
           catch (e) { out.textContent = String((e && e.message) || e); }
         } }, 'Save engine'), out));
     })();

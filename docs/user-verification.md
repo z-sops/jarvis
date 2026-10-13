@@ -329,3 +329,7 @@ Provider diagnostics acceptance: owner live second submission failed opencode_ta
 
 
 OpenCode picker acceptance: after rebuild, select Alex → saved provider opencode → Load OpenCode models. Confirm model IDs populate or a clear catalogue refusal appears. Choose your model and Save engine; no job should start. For an existing failed job first review any unknown request, then Review provider/model conversion with provider opencode and the chosen model ID. Inspect/confirm preview, then explicitly Retry once. Counters/source archive/workspace stay preserved; native private session is fresh. Models can still be refused by provider or require a different API protocol. Current owner HTTP403 is not proven fixed by selecting a model. No keys/screenshots of key values required.
+
+
+### OpenRouter worker model selection
+Keep engine **OpenCode**. In the worker’s own engine settings, set provider `openrouter`, enter that provider’s API key, then **Save engine**. Select **Load OpenCode / OpenRouter models**, choose a model and **Save engine** again. Manual namespaced IDs remain supported. Free text pricing labels reflect explicit catalogue metadata only, not a guarantee of quota or access. Existing stopped jobs require reviewed history conversion to the selected provider/model before a separate explicit retry; do not blindly replay unknown requests. Keep request/output limits; token/USD budgets still require exact accounting support.

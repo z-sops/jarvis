@@ -443,3 +443,11 @@ Windows output on8f97cf5/image018544b25065... verifies contained OpenCode ACP ta
 
 
 2026-10-13: unknown request-only gateway outcome now has explicit human preview/apply recovery instead of a retry/conversion dead end. Unknown charges/intents remain retained; fresh private state only, no automatic replay, original checkpoint preserved. Offline encrypted broker recovery and Linux trusted UI/refusal verified. Original Windows website/native gateway continuation and meaningful QA remain pending. Exact-budget unknown reservations and conversion of unknown histories remain intentionally blocked.
+
+
+### OpenRouter inside the existing OpenCode worker flow — 2026-10-13
+- Added OpenRouter fixed catalogue and Chat Completions adapter to the existing native broker; no separate worker engine, external reference dependency or automatic fallback. Namespaced model IDs and explicit `:free` variants are selectable.
+- Worker catalogue uses saved provider credentials, bounded responses and stale-provider rejection. Only explicit zero prompt/completion metadata receives the Free text pricing label; catalogue listing is not live access or permanent free availability.
+- Provider changes do not inherit another provider’s crew API key. Reviewed stopped OpenCode/OpenRouter history conversion preserves original unknown requests, request accounting and protected archives. Pending effects still block continuation.
+- Request-limited mode remains explicit and OpenCode-engine scoped. Token/USD/team budgets are not weakened: without a verified exact counter budgeted execution refuses. Current-run model/provider are pinned.
+- Regression validation pending final results below; initial obsolete unsupported-OpenRouter assertions failed and were corrected to unsupported-provider/exact-counter checks. No live provider generation or Windows installer execution performed.
