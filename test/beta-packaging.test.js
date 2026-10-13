@@ -55,3 +55,8 @@ test('installed ASAR Windows directory traversal requires normalized nested path
   assert.equal(normalized.getFile(path.win32.normalize('renderer/js/probe.js')).size,7);
   assert.match(fs.readFileSync(path.join(__dirname,'../scripts/check-release.js'),'utf8'),/archiveName=path.normalize\(name\)/);
 });
+
+
+test('installed electron-builder accepts the prebuilt Windows ICO directly without conversion output',async()=>{
+ const root=path.join(__dirname,'..'),p=require('../package.json');assert.equal(p.build.win.icon,'assets/icon.ico');const file=path.join(root,p.build.win.icon),b=fs.readFileSync(file),count=b.readUInt16LE(4);assert.equal(b.readUInt16LE(0),0);assert.equal(b.readUInt16LE(2),1);assert.ok(count>0&&count<=32);let has256=false;for(let i=0;i<count;i++){const at=6+16*i;assert.ok(at+16<=b.length);const size=b.readUInt32LE(at+8),offset=b.readUInt32LE(at+12);assert.ok(size>0&&offset>=6+16*count&&offset+size<=b.length);has256 ||= (b[at]||256)===256&&(b[at+1]||256)===256;}assert.ok(has256);const temp=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-direct-ico-'));try{const out=path.join(temp,'must-not-be-created'),result=await require('app-builder-lib/out/util/iconConverter').convertIcon({sources:[file],fallbackSources:[],roots:[root],format:'ico',outDir:out});assert.deepEqual(result.icons,[{file,size:256}]);assert.equal(fs.existsSync(out),false);}finally{fs.rmSync(temp,{recursive:true,force:true});}
+});

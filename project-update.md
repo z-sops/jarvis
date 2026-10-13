@@ -1379,3 +1379,8 @@ Official upstream issue anomalyco/opencode#52907 includes HTTP403 FreeTierError:
 Acceptance gap: prove the owner's exact error envelope and supported native-client compatibility under existing broker/containment. Do not claim changing endpoint/key or upgrading CLI fixes it without evidence. Native1.18.35 versus current provider behavior remains a version-sensitive dependency.
 
 Validation:58/58 native broker tests; full suite819 total,816 pass,zero fail,three existing unavailable-Hermes skips (112.02s). UI unchanged; prior30/30 Electron evidence applies only to unchanged UI, not a new live-provider acceptance. No key accessed, live inference called, endpoint changed, native identity spoofed or security relaxed. Owner Windows exact refusal reason remains pending.
+
+
+### Windows icon-conversion memory failure — 2026-10-14
+Owner build failed in electron-builder icons-bundle PNG→ICO WebAssembly.Memory allocation, before installer completion. Generated assets/icon.ico from the existing256px PNG with7 sizes16–256px and selected it for Windows only. Existing PNG remains for Electron/macOS/Linux. Installed electron-builder26.15.3 directly returns an existing valid256px ICO, bypassing icon-tool conversion and its WASM allocation.
+Validation: actual installed converter accepts the ICO without creating conversion output; all5 packaging tests pass; source release check passes with existing optional denylist warning. No dependency updates or memory/pagefile changes; Windows rebuild and installer acceptance remain owner-side. Failed build must not launch an older leftover installer.
