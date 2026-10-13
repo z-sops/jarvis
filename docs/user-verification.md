@@ -333,3 +333,7 @@ OpenCode picker acceptance: after rebuild, select Alex → saved provider openco
 
 ### OpenRouter worker model selection
 Keep engine **OpenCode**. In the worker’s own engine settings, set provider `openrouter`, enter that provider’s API key, then **Save engine**. Select **Load OpenCode / OpenRouter models**, choose a model and **Save engine** again. Manual namespaced IDs remain supported. Free text pricing labels reflect explicit catalogue metadata only, not a guarantee of quota or access. Existing stopped jobs require reviewed history conversion to the selected provider/model before a separate explicit retry; do not blindly replay unknown requests. Keep request/output limits; token/USD budgets still require exact accounting support.
+
+
+### Auto/Pinned selection acceptance
+Settings → Native worker model selection: Pinned keeps your selected provider/model; Auto uses only your configured routes and credentials. Save explicit route capabilities/context and prices before a budgeted job. Test catalogue unavailability and first token-count refusal separately from generation failure. A lost generation response must remain unknown with no automatic alternate call. Current OpenCode request-limited mode only has catalogue-based initial selection; changing an existing job still requires explicit reviewed conversion. Do not claim seamless automatic continuation from these tests.

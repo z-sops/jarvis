@@ -245,6 +245,7 @@ async function main() {
       assert.equal((await page.evaluate(() => bridge.jobs.dispatch('alex', 'Unsafe', ['../outside']))).ok, false); assert.equal(home.listJobs('alex', 99).length, count);
     });
     await check('request, model and token budget settings save through real UI and reject invalid IPC input', async () => {
+      await assert.rejects(page.evaluate(() => bridge.config.save({ workerModelSelection: 'invalid' })), /Auto or Pinned/);
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerMaxRequests: 0 })), /integer/);
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerTimeoutSeconds: 0 })), /integer/);
       await assert.rejects(page.evaluate(() => bridge.config.save({ nativeContainerImage: 'latest' })), /immutable/);
@@ -252,6 +253,7 @@ async function main() {
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerModelRates: { fixture: { input: -1, output: 1 } } })), /price|rate/i);
       await assert.rejects(page.evaluate(() => bridge.config.save({ workerRoutes: [{provider:'unsupported',model:'fixture',contextTokens:1024,capabilities:['text','tools']}] })), /supported count adapters/);
       await page.evaluate(() => window.__ui.openSettings());
+      const selection=page.getByRole('combobox',{name:/^Native worker model selection/});await selection.selectOption('auto');assert.equal(await selection.inputValue(),'auto');await selection.selectOption('pinned');
       const continuity = page.getByRole('checkbox', { name: /Preserve protected native history/ });
       await continuity.check();
       await page.getByRole('textbox', { name: 'Native runtime image ID' }).fill('sha256:' + 'a'.repeat(64));

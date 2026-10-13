@@ -451,3 +451,11 @@ Windows output on8f97cf5/image018544b25065... verifies contained OpenCode ACP ta
 - Provider changes do not inherit another provider’s crew API key. Reviewed stopped OpenCode/OpenRouter history conversion preserves original unknown requests, request accounting and protected archives. Pending effects still block continuation.
 - Request-limited mode remains explicit and OpenCode-engine scoped. Token/USD/team budgets are not weakened: without a verified exact counter budgeted execution refuses. Current-run model/provider are pinned.
 - Regression validation pending final results below; initial obsolete unsupported-OpenRouter assertions failed and were corrected to unsupported-provider/exact-counter checks. No live provider generation or Windows installer execution performed.
+
+
+### Explicit Auto/Pinned native routing — 2026-10-13
+Adopted gateway routing/configuration patterns as original Orbit code, without importing HiClaw/ZCode runtime files. Existing native broker remains the authority. Settings now offer Pinned (default) and explicit Auto. Auto requires configured bounded routes, provider-specific credentials, capabilities/context and existing budget policy. Pinned selects the configured worker provider/model even when another route is cheaper.
+
+Auto can select another eligible route on an exact-count endpoint HTTP 401/403/429/500/502/503/504 refusal BEFORE the first generation. Bounded route exclusion prevents cycles; preserved prompt/system and immutable native loopback model alias allow the existing CLI to receive the successful response. Actual upstream identity and count-refusal switch receipts are persisted; exact token/cost reservations use the selected route. Selection-mode drift blocks continuation.
+
+Limits: generation HTTP refusals, transport uncertainty after submission, completed native/private state, unresolved tools and existing history do NOT automatically switch/replay. Request-limited OpenCode/OpenRouter supports initial catalogue selection only; it still cannot guarantee token/USD budgets. This increment is not seamless mid-task failover or a no-interruption guarantee. Existing reviewed conversion/recovery remains necessary there. Communication/desired-state foundations are reused, no second scheduler introduced.
