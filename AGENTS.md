@@ -894,3 +894,7 @@ A broker refusal can precede workspace preparation. Never assume the immediate r
 
 ### Stable native journal owner across multiple retries — 2026-10-13
 A failed broker/workspace preflight may leave the protected journal owned by an earlier ancestor. Reuse job-retry.historyOwner across broker and trusted inspection/conversion/recovery; deeper ancestry requires bounded same-actor reciprocal links, retried parent and retryLinkReady child. Existing direct-parent compatibility remains. Never accept history by actor alone or rewrite its owner to bypass checks. Preserve unknown charges, archive, checkpoint and permission gates. ZCode stable session/task/replay-gate concepts were inspected, no source transplant needed. Tests must include unknown review followed by multiple pre-submission failures, not just one retry.
+
+
+### Native diagnostic failure precedence — 2026-10-13
+Capture safe typed provider/host broker failure before it becomes generic CLI unknown. Persist same actor/job/run nativeFailure; last20 category/status events only, no URLs/headers/body/prompt/tool args/raw exception/stderr. Container classifies bounded chunks and sends only allowlisted codes/exit status; host filters again. Preserve existing dependency/MCP priority, unknown usage/counts, cancellation/deadline, cleanup and no-replay controls. Diagnostics are not successful recovery or billing proof. No external runtime link/dependency or copied source files.

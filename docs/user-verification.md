@@ -323,3 +323,6 @@ The control preserves encrypted unknown submission records and incomplete usage;
 
 
 Native history follow-up: rebuild the stable-owner correction before retrying the latest failed linked website job once. History can legitimately remain owned by an ancestor when intervening jobs failed before any durable model response. Orbit verifies the complete deeper retry lineage; broken links still refuse. No token/provider change, new project or history deletion is needed. Capture actual result; offline tests do not establish live gateway/native website success.
+
+
+Provider diagnostics acceptance: owner live second submission failed opencode_task/unknown after valid workspace/history restoration. Rebuild diagnostic increment before another attempt. The current pending request must still be explicitly reviewed; review is not settlement or permission to silently replay. A controlled explicit Retry should expose safe broker cause (for example HTTP401 authentication or HTTP429 rate limit) if broker evidence exists. Exact cause of prior attempts cannot be retroactively reconstructed from screenshots. No key/token/log-body dump required. Container failures retain known stage/code/exit metadata; unclassified failures remain unknown. Stop repeated attempts if the new failure is still uncertain.

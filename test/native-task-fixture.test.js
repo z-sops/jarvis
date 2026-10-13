@@ -110,3 +110,6 @@ test('resumed fixture reports history health without exposing transcript or mark
 test('private Hermes fresh session adopts authenticated response identity; restore must acknowledge exact saved ID',()=>{
  const {hermesSessionIdentity}=require('../lib/native-container-runner');assert.equal(hermesSessionIdentity(null,'api-native-123'),'api-native-123');assert.equal(hermesSessionIdentity('api-native-123','api-native-123'),'api-native-123');for(const got of [null,'../secret','api-other'])assert.throws(()=>hermesSessionIdentity('api-native-123',got),/acknowledged/);
 });
+test('native provider diagnostic categories are bounded and preserve existing dependency priority',()=>{
+ assert.equal(classifyRuntimeIssue('401 Unauthorized api_key=PRIVATE'),'provider_authentication');assert.equal(classifyRuntimeIssue('429 rate limit PRIVATE'),'provider_rate_limit');assert.equal(classifyRuntimeIssue('ECONNRESET PRIVATE'),'provider_network');assert.equal(classifyRuntimeIssue('ModuleNotFoundError: request fetch failed'),'missing_dependency');assert.equal(classifyRuntimeIssue('x'.repeat(16384)+' 401 Unauthorized'),'unknown');
+});
