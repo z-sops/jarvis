@@ -185,3 +185,8 @@ test('Pinned ignores cheaper alternatives and Auto never switches after generati
 test('structured auth refusal retains only a fixed reason without response body or token',async t=>{
  const r=rig(t),x=await start(t,r,gatewayConfig(),async()=>new Response(JSON.stringify({error:{type:'AuthError',message:'Invalid API key. SECRET_RESPONSE_CANARY'}}),{status:403}));assert.equal((await gatewayCall(x)).status,400);const d=x.b.failureDiagnostic();assert.equal(d.reason,'invalid_or_inactive_api_key');assert.doesNotMatch(JSON.stringify(d),/SECRET_RESPONSE_CANARY|AuthError|PRIVATE_GATEWAY/);assert.ok(r.storage.open(r.home.findJob(x.job.id).nativeBridge).pending);
 });
+
+
+test('free-tier native-client policy refusal is distinguished from an invalid key and never bypassed',async t=>{
+ const r=rig(t),x=await start(t,r,gatewayConfig(),async()=>new Response(JSON.stringify({error:{type:'FreeTierError',message:"Error from provider: OpenCode's free tier can only be used from within OpenCode PRIVATE_BODY"}}),{status:403}));assert.equal((await gatewayCall(x)).status,400);assert.equal(x.b.failureDiagnostic().reason,'free_tier_native_client_required');assert.doesNotMatch(JSON.stringify(x.b.failureDiagnostic()),/PRIVATE_BODY/);const j=r.storage.open(r.home.findJob(x.job.id).nativeBridge);assert.equal(j.requests,1);assert.ok(j.pending);
+});

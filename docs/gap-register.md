@@ -469,3 +469,11 @@ Audit found commander Gemini retry plus alternate Flash fallback already existed
 Native broker now reads at most8KiB of structured HTTP failure response solely to classify allowlisted reason codes (invalid_or_inactive_api_key, insufficient_credit, model_access_refused); no raw body/header/key/prompt persisted or displayed. Native worker error displays the fixed reason when established by provider message; absent/unknown reason remains generic. Pending unknown submission and reservations remain protected; no automatic retry or credential mutation.
 
 This improves diagnosis, not provider availability. Current owner key/access remains unverified; correct endpoint/catalogue does not prove inference authorization.
+
+
+### ZCode successful Space Bunny comparison — 2026-10-14 Karachi
+Owner screenshot image(20261013-193050).png shows Space Bunny Free and TEST_OK responses (14s/4s) in ZCode. It does not establish that the same credential is saved in Orbit. ZCode delegates to the real OpenCode provider/auth/session; Orbit contained OpenCode uses a custom loopback broker and host sends upstream inference. This execution-path difference is established by source.
+
+Official upstream issue anomalyco/opencode#52907 includes HTTP403 FreeTierError: native-client-only free tier, with reports involving OpenCode1.18.34 and permission/tool configuration. This is a plausible explanation, NOT the owner's proven root cause. Added fixed free_tier_native_client_required reason extraction; preserve pending unknown state, no automatic replay, spoofed client headers, tool-policy relaxation or silent paid fallback. Existing 403 classification without this reason cannot establish invalid key.
+
+Acceptance gap: prove the owner's exact error envelope and supported native-client compatibility under existing broker/containment. Do not claim changing endpoint/key or upgrading CLI fixes it without evidence. Native1.18.35 versus current provider behavior remains a version-sensitive dependency.

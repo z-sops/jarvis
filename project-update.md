@@ -1369,3 +1369,13 @@ Native broker now reads at most8KiB of structured HTTP failure response solely t
 This improves diagnosis, not provider availability. Current owner key/access remains unverified; correct endpoint/catalogue does not prove inference authorization.
 
 Validation:68/68 focused Gemini retry/native broker tests; full suite818 total,815 pass,zero fail,three existing unavailable-Hermes skips (80.07s). Real Linux Electron/Playwright30/30,zero errors. Deterministic fixture confirms primary4/backup2 exhausted attempts and safe text; structured403 fixture confirms fixed invalid-key reason and retained pending request. No live provider credential tested or changed; Windows rebuild required.
+
+
+### ZCode successful Space Bunny comparison — 2026-10-14 Karachi
+Owner screenshot image(20261013-193050).png shows Space Bunny Free and TEST_OK responses (14s/4s) in ZCode. It does not establish that the same credential is saved in Orbit. ZCode delegates to the real OpenCode provider/auth/session; Orbit contained OpenCode uses a custom loopback broker and host sends upstream inference. This execution-path difference is established by source.
+
+Official upstream issue anomalyco/opencode#52907 includes HTTP403 FreeTierError: native-client-only free tier, with reports involving OpenCode1.18.34 and permission/tool configuration. This is a plausible explanation, NOT the owner's proven root cause. Added fixed free_tier_native_client_required reason extraction; preserve pending unknown state, no automatic replay, spoofed client headers, tool-policy relaxation or silent paid fallback. Existing 403 classification without this reason cannot establish invalid key.
+
+Acceptance gap: prove the owner's exact error envelope and supported native-client compatibility under existing broker/containment. Do not claim changing endpoint/key or upgrading CLI fixes it without evidence. Native1.18.35 versus current provider behavior remains a version-sensitive dependency.
+
+Validation:58/58 native broker tests; full suite819 total,816 pass,zero fail,three existing unavailable-Hermes skips (112.02s). UI unchanged; prior30/30 Electron evidence applies only to unchanged UI, not a new live-provider acceptance. No key accessed, live inference called, endpoint changed, native identity spoofed or security relaxed. Owner Windows exact refusal reason remains pending.
