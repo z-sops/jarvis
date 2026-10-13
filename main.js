@@ -262,7 +262,7 @@ ipcMain.handle('comms:pair', () => comms.pairWhatsApp());
 require('./lib/screen').register({ ipcMain, store, gemini, bus, send });
 require('./lib/panels').register({ ipcMain, shell, home, bus, send, workers, usage, audit, chat, getCfg: store.get });
 require('./lib/browser-panel').register({ ipcMain, browser: orbitBrowser, store, hermes, win: () => win });
-require('./lib/connectors-panel').register({ ipcMain, connectors: connectorsStore, gateway, store, bus, send, win: () => win, fsOpts, pickFolder: async () => { const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'], title: 'Choose a folder the crew may use' }); return r.canceled ? '' : r.filePaths[0]; } });
+require('./lib/connectors-panel').register({ ipcMain, connectors: connectorsStore, gateway, store, bus, send, win: () => win, workerIds: () => home.listAgents().map(a => a.id), fsOpts, pickFolder: async () => { const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'], title: 'Choose a folder the crew may use' }); return r.canceled ? '' : r.filePaths[0]; } });
 require('./lib/memory-panel').register({ ipcMain, home, store, bus, shell, win: () => win });
 require('./lib/topics-panel').register({ ipcMain, home, win: () => win });
 require('./lib/quota-panel').register({ ipcMain, home, usage, store, send, win: () => win });

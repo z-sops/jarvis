@@ -8,6 +8,10 @@ async function main() {
   const root = path.resolve(__dirname, '..'), temp = fs.mkdtempSync(path.join(os.tmpdir(), 'orbit-electron-smoke-'));
   const out = path.resolve(process.env.ORBIT_ELECTRON_RESULTS || path.join(root, 'test-results', 'electron')); fs.mkdirSync(out, { recursive: true });
   const home = new Home(path.join(temp, 'home')).ensure(); for (const name of ['Alex', 'Bob', 'Charlie', 'Dave', 'Eve']) home.createAgent({ name });
+  // Synthetic connector with no secret: exercise identity UI and real trusted IPC,
+  // including refusal. This cannot imply live NeuralOps registration acceptance.
+  fs.mkdirSync(home.p('connectors'), { recursive: true });
+  fs.writeFileSync(home.p('connectors', 'connectors.json'), JSON.stringify({ servers: [{ id: 'neuralops', catalogId: 'neuralops', name: 'NeuralOps', url: 'http://127.0.0.1:3031/mcp', enabled: true, agents: 'all', mode: 'read-only', tools: ['neuralops_whoami'], levels: { neuralops_whoami: 'free' }, neuralopsIdentities: {} }] }));
   const make = (task, status, expectedOutputs = []) => { const j = home.createJob('alex', task, { expectedOutputs }); return home.updateJob('alex', j.id, { status, runId: 'fixture-prior-run', result: 'Fixture report for review' }); };
   const interrupted = make('Previously running job', 'running'), accepted = make('Review a real file', 'review', ['proof.txt']);
   const missing = make('Missing artifact', 'review', ['missing.txt']), report = make('Report only', 'review'), rejected = make('Reject this report', 'review');
@@ -85,6 +89,24 @@ async function main() {
       for (const [label, id] of [['Office', 'office'], ['Workspace', 'workspace'], ['Browser', 'browser'], ['Connectors', 'connectors'], ['Memory', 'memory'], ['Library', 'library'], ['Orbit', 'bridge']]) {
         await page.locator('nav[aria-label="Screens"]').getByRole('button', { name: label, exact: true }).click(); await page.waitForFunction(id => document.body.dataset.view === id, id);
       }
+    });
+    await check('NeuralOps identity inputs are visible and save before trusted read-only verification', async () => {
+      await page.locator('nav[aria-label="Screens"]').getByRole('button', { name: 'Connectors', exact: true }).click();
+      const card = page.locator('.cn-card').filter({ has: page.locator('input[aria-label="NeuralOps identity for Alex"]') });
+      await card.getByRole('button', { name: 'Who can use it', exact: true }).click();
+      const input = page.getByRole('textbox', { name: 'NeuralOps identity for Alex', exact: true });
+      await input.click(); await input.pressSequentially('agent.alex'); assert.equal(await input.inputValue(), 'agent.alex');
+      const colors = await input.evaluate(e => ({ fg: getComputedStyle(e).color, bg: getComputedStyle(e).backgroundColor }));
+      assert.notEqual(colors.fg, colors.bg); assert.notEqual(colors.bg, 'rgb(255, 255, 255)');
+      await card.getByRole('button', { name: 'Verify worker identities', exact: true }).click();
+      await card.getByRole('status').filter({ hasText: 'Unsaved names are not checked' }).waitFor();
+      await card.getByRole('button', { name: 'Save worker identities', exact: true }).click();
+      await card.getByRole('status').filter({ hasText: 'Mappings saved' }).waitFor();
+      assert.equal((await page.evaluate(() => bridge.connectors.list())).connectors.find(c => c.id === 'neuralops').neuralopsIdentities.alex, 'agent.alex');
+      await card.getByRole('button', { name: 'Verify worker identities', exact: true }).click();
+      await card.getByRole('status').filter({ hasText: 'token refused or expired' }).waitFor();
+      await page.screenshot({ path: path.join(out, 'neuralops-identity-verification.png') });
+      await page.locator('nav[aria-label="Screens"]').getByRole('button', { name: 'Orbit', exact: true }).click();
     });
     await check('startup recovery persisted without a provider call', async () => { assert.equal(home.findJob(interrupted.id).status, 'interrupted'); });
     await check('crew health and durable pause/ready use real trusted preload without automatic replay',async()=>{

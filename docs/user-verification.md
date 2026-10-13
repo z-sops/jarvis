@@ -290,3 +290,10 @@ Final latency validation: npm660 total /657pass /0fail /3 unavailable-real-Herme
 ### ACP preview acceptance
 
 The latest draft offers Settings → OpenCode transport → ACP sessions (preview). First run the existing disposable offline checker with `--private-continuity --acp`, using the installed image ID from docs/acp-transport.md. OpenCode report must explicitly say `opencodeTransport: "acp"` and pass actual MCP/checkpoint/original-native-history checks; Hermes is unchanged. No paid provider/network call. Existing JSON-run private checkpoints cannot silently switch to ACP; use new reviewed work for the trial. Do not replace prior passing run-mode evidence with an ACP claim until the actual output passes.
+
+
+## Saved-token NeuralOps identity verification — 2026-10-13
+
+After rebuilding/installing this increment, open Connectors > NeuralOps > Who can use it. Enter the distinct identities actually registered in the running NeuralOps workspace and Save worker identities. The dark identity fields must show entered text and a visible keyboard focus outline. Press Verify worker identities: it checks the saved broker token and each current worker's registered identity, non-revoked status, exact delegate and shared workspace with read-only whoami calls. No secret export/prompt, registration, token rotation, authority grant or job retry occurs. Unsaved edits refuse verification. Missing/refused/wrong/stale evidence must not show PASS. Re-open the panel to recheck; results are temporary observations, not persistent authorization.
+
+Actual owner running service registration is still unverified. Earlier Connected42-tools screenshot proved discovery only; Alex's missing mapping and opencode_task/unknown failure were distinct observations, not a proven causal diagnosis. Do not retry unknown effects automatically or claim this button fixes the native task failure.
