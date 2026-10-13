@@ -8,10 +8,28 @@ async function main() {
   const root = path.resolve(__dirname, '..'), temp = fs.mkdtempSync(path.join(os.tmpdir(), 'orbit-electron-smoke-'));
   const out = path.resolve(process.env.ORBIT_ELECTRON_RESULTS || path.join(root, 'test-results', 'electron')); fs.mkdirSync(out, { recursive: true });
   const home = new Home(path.join(temp, 'home')).ensure(); for (const name of ['Alex', 'Bob', 'Charlie', 'Dave', 'Eve']) home.createAgent({ name });
+  const fixtureToken = 'nops_disposable_electron_broker', fixtureCalls = [];
+  const fixtureServer = require('node:http').createServer((req,res)=>{
+    if(req.method!=='POST'){res.writeHead(405);return res.end();}
+    if(req.headers.authorization!=='Bearer '+fixtureToken){res.writeHead(401);return res.end();}
+    let raw='';req.on('data',x=>raw+=x);req.on('end',()=>{
+      const m=JSON.parse(raw);if(m.method==='notifications/initialized'){res.writeHead(202);return res.end();}
+      let result;
+      if(m.method==='initialize')result={protocolVersion:m.params.protocolVersion,capabilities:{tools:{}},serverInfo:{name:'disposable-fixture',version:'1'}};
+      else if(m.method==='tools/list')result={tools:[{name:'neuralops_whoami',inputSchema:{type:'object'}}]};
+      else if(m.method==='tools/call'){
+        const actor=req.headers['x-agent-id']||null;fixtureCalls.push(actor);
+        const agent={id:actor||'agent.orbit-broker',workspaceId:'fixture',revokedAt:null,...(actor?{delegate:'agent.orbit-broker'}:{access:'broker'})};
+        result={content:[{type:'text',text:JSON.stringify({agent})}]};
+      }else{res.writeHead(400);return res.end();}
+      res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({jsonrpc:'2.0',id:m.id,result}));
+    });
+  });
+  await new Promise(r=>fixtureServer.listen(0,'127.0.0.1',r));
   // Synthetic connector with no secret: exercise identity UI and real trusted IPC,
   // including refusal. This cannot imply live NeuralOps registration acceptance.
   fs.mkdirSync(home.p('connectors'), { recursive: true });
-  fs.writeFileSync(home.p('connectors', 'connectors.json'), JSON.stringify({ servers: [{ id: 'neuralops', catalogId: 'neuralops', name: 'NeuralOps', url: 'http://127.0.0.1:3031/mcp', enabled: true, agents: 'all', mode: 'read-only', tools: ['neuralops_whoami'], levels: { neuralops_whoami: 'free' }, neuralopsIdentities: {} }] }));
+  fs.writeFileSync(home.p('connectors', 'connectors.json'), JSON.stringify({ servers: [{ id: 'neuralops', catalogId: 'neuralops', name: 'NeuralOps', url: 'http://127.0.0.1:'+fixtureServer.address().port+'/mcp', enabled: true, agents: 'all', mode: 'read-only', tools: ['neuralops_whoami'], levels: { neuralops_whoami: 'free' }, neuralopsIdentities: {} }] }));
   const make = (task, status, expectedOutputs = []) => { const j = home.createJob('alex', task, { expectedOutputs }); return home.updateJob('alex', j.id, { status, runId: 'fixture-prior-run', result: 'Fixture report for review' }); };
   const interrupted = make('Previously running job', 'running'), accepted = make('Review a real file', 'review', ['proof.txt']);
   const missing = make('Missing artifact', 'review', ['missing.txt']), report = make('Report only', 'review'), rejected = make('Reject this report', 'review');
@@ -106,6 +124,18 @@ async function main() {
       await card.getByRole('button', { name: 'Verify worker identities', exact: true }).click();
       await card.getByRole('status').filter({ hasText: 'token refused or expired' }).waitFor();
       await page.screenshot({ path: path.join(out, 'neuralops-identity-verification.png') });
+      await card.getByRole('button',{name:'Change token',exact:true}).click();
+      await page.locator('.cn-form input[type="password"]').fill(fixtureToken);
+      await page.getByRole('button',{name:'Save and test',exact:true}).click();
+      // This Linux harness has no secure OS key store. Exercise actual refusal,
+      // never replace safeStorage with a plaintext/insecure success fallback.
+      await page.locator('.cn-form').getByText(/Protected credential storage is unavailable or locked/).waitFor();
+      assert.equal(await page.locator('.cn-form input[type="password"]').inputValue(),'');
+      assert.equal((await page.evaluate(()=>bridge.connectors.list())).connectors.find(c=>c.id==='neuralops').hasToken,false);
+      assert.deepEqual(fixtureCalls,[]);
+      assert.ok(!await page.locator('body').innerText().then(t=>t.includes(fixtureToken)));
+      await page.screenshot({path:path.join(out,'neuralops-token-save-refusal.png')});
+      await page.locator('.cn-form').getByRole('button',{name:'Cancel',exact:true}).click();
       await page.locator('nav[aria-label="Screens"]').getByRole('button', { name: 'Orbit', exact: true }).click();
     });
     await check('startup recovery persisted without a provider call', async () => { assert.equal(home.findJob(interrupted.id).status, 'interrupted'); });
@@ -355,6 +385,6 @@ async function main() {
     });
     fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ status: 'passed', checks, electron: require('electron/package.json').version, errors, coverage: 'Real Linux Electron main/window/preload/IPC and SDK startup; developer screenshot driver disabled; no engines/live providers/Windows test.' }, null, 2));
   } catch (e) { fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ status: 'failed', checks, errors, error: e.message }, null, 2)); throw e; }
-  finally { if (app) await app.close(); fs.rmSync(temp, { recursive: true, force: true }); }
+  finally { if (app) await app.close(); fixtureServer.closeAllConnections();await new Promise(r=>fixtureServer.close(r)); fs.rmSync(temp, { recursive: true, force: true }); }
 }
 main().catch(e => { console.error(e.stack || e.message); process.exitCode = 1; });
