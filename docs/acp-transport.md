@@ -90,3 +90,9 @@ Native failure records add `rejectCode`, bounded `rejectDetail`, `validationPhas
 Submission phases come from broker control flow, not the activity meter. `before_submission` precedes generation reservation; `submission_reserved` includes a failed persistence attempt; `submitted_outcome_unknown` starts before upstream generation fetch; `response_received` means a successful upstream HTTP response was obtained, not that parsing/accounting/tools succeeded. Token-count requests stay before generation submission. Old diagnostics have no retroactive phase. Nothing here authorizes replay or clears prior uncertainty.
 
 The Office error text exposes the rejection code and phase. Windows fresh native-provider acceptance remains pending: after rebuilding, run one fresh text-only job and inspect only fixed diagnostic fields. The implementation is a diagnosis aid, not a confirmed repair of the owner's payload mismatch hypothesis.
+
+
+### Request-field diagnostic round 2
+`unsupported_request_field` now names only a fixed set of standard candidate parameter names (store, reasoning_effort, prompt_cache_key, safety_identifier, service_tier, stop, seed, frequency_penalty, presence_penalty, logit_bias, logprobs, top_logprobs, response_format, modalities, audio, prediction, web_search_options, verbosity, top_k, thinking, reasoning). This vocabulary does not authorize any of those parameters. Every other name remains unknown_field.
+
+The first rejected field additionally records valueType (type only), unknownCount (capped at20) and nameHash (12 lowercase hex characters from SHA-256 of the name). No values or arbitrary names are persisted. The hash is a diagnostic matching aid, not encryption or a secrecy guarantee for guessable names. The existing allowlist, HTTP400 message, budgets, approvals and submission phases are unchanged.

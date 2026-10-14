@@ -195,7 +195,7 @@ test('broker records fixed pre-submission rejection and never persists arbitrary
  const r=rig(t);let upstream=0;const x=await start(t,r,config(),async()=>{upstream++;return response({});});
  const res=await x.call([{role:'user',content:'SENTINEL_PRIVATE_PROMPT'}],{SENTINEL_PRIVATE_FIELD:'SENTINEL_PRIVATE_TOKEN'});
  assert.equal(res.status,400);assert.equal(upstream,0);
- const d=x.b.failureDiagnostic();assert.equal(d.rejectCode,'unsupported_request_field');assert.equal(d.submissionPhase,'before_submission');assert.equal(d.validationPhase,'request_validate');assert.deepEqual(d.rejectDetail,{field:'unknown_field'});
+ const d=x.b.failureDiagnostic();assert.equal(d.rejectCode,'unsupported_request_field');assert.equal(d.submissionPhase,'before_submission');assert.equal(d.validationPhase,'request_validate');assert.equal(d.rejectDetail.field,'unknown_field');assert.equal(d.rejectDetail.valueType,'string');assert.equal(d.rejectDetail.unknownCount,1);assert.equal(d.rejectDetail.nameHash,crypto.createHash('sha256').update('SENTINEL_PRIVATE_FIELD').digest('hex').slice(0,12));
  const stored=JSON.stringify(r.home.findJob(x.job.id));assert.doesNotMatch(stored,/SENTINEL_PRIVATE/);assert.equal(r.home.findJob(x.job.id).nativeBridge,undefined);
 });
 test('native validator diagnoses unsupported shapes with the same refusal text and bounded safe details',()=>{
@@ -225,3 +225,11 @@ test('reservation-save failure remains reserved and transport/decode failures pr
  }
 });
 test('later faulted requests cannot overwrite the original diagnostic rejection',async t=>{const r=rig(t),x=await start(t,r);await x.call([{role:'user',content:[]}]);const first=x.b.failureDiagnostic();await x.call();assert.deepEqual(x.b.failureDiagnostic(),first);});
+test('known rejected parameters report only fixed names, type, capped count and first name hash',()=>{
+ for(const name of ['store','reasoning_effort','prompt_cache_key','safety_identifier','service_tier','stop','seed','frequency_penalty','presence_penalty','logit_bias','logprobs','top_logprobs','response_format','modalities','audio','prediction','web_search_options','verbosity','top_k','thinking','reasoning']){
+  assert.throws(()=>adapter.validate({messages:[{role:'user',content:'PRIVATE_PROMPT'}],[name]:'PRIVATE_VALUE',PRIVATE_NAME:42}),e=>{assert.equal(e.rejectCode,'unsupported_request_field');assert.equal(e.rejectDetail.field,name);assert.equal(e.rejectDetail.valueType,'string');assert.equal(e.rejectDetail.unknownCount,2);assert.equal(e.rejectDetail.nameHash,crypto.createHash('sha256').update(name).digest('hex').slice(0,12));assert.doesNotMatch(JSON.stringify(e.rejectDetail),/PRIVATE/);return true;});
+ }
+ for(const [v,type]of [[null,'null'],[[],'array'],[{},'object'],[1,'number'],[true,'boolean']])assert.throws(()=>adapter.validate({messages:[{role:'user',content:'g'}],PRIVATE_NAME:v}),e=>e.rejectDetail.valueType===type);
+ const extras=Object.fromEntries(Array.from({length:25},(_,i)=>['PRIVATE_'+i,'PRIVATE_VALUE']));assert.throws(()=>adapter.validate({messages:[{role:'user',content:'g'}],...extras}),e=>e.rejectDetail.unknownCount===20);
+ const {Reject}=require('../lib/native-rejection');assert.deepEqual(new Reject('unsupported_request_field','fixed',{nameHash:'PRIVATE',valueType:'PRIVATE',unknownCount:21}).rejectDetail,{});
+});
