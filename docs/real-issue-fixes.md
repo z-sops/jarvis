@@ -1,0 +1,120 @@
+# Real issue fixes and project decision gates
+
+This increment strengthens existing workers, project cards, browser permissions and review evidence. It introduces no alternate scheduler or copied external framework.
+
+## Planning and completion
+
+New `plan_project` tool proposals require measurable `business.successCriteria` before project execution or staffing. Recorded `business.unknowns` block direct dispatch, finite coordinator approval and staffing. `get_project_plan.executionReadiness` explains the blockers. Missing details should be clarified with the user; a model must not fabricate requirements just to clear the gate.
+
+`refine_project_brief` updates only an undispatched draft with an exact `briefRevision`. It validates the same bounded business fields, refuses a changed revision, and cannot change an already dispatched/approved coordinator scope or incomplete staffing. Refinement is a model proposal, never user permission. Existing coordinator approval, roles, Library skills, Guardian and job review remain authoritative. Dispatch rechecks the entire persisted proposal before linking a job.
+
+Legacy project cards without the new `requireBrief` marker retain their original draft semantics; they are explicitly not proof of requirements completeness. Any recorded unknowns still block execution. Direct planner callers that explicitly supply a business brief opt into the same completeness gate. Ad hoc worker tasks remain distinct from managed project plans.
+
+A job claiming `done` without human acceptance is `unaccepted_completion_claim`; stale accepted artifact evidence is separate. `deliveryAssessment` reports accepted steps separately from project-wide success criteria, which remain unverified. Passing these gates does not prove Laila's judgment, business feasibility, staffing accuracy or production website quality.
+
+Completion notifications preserve the report beginning and ending, retain risks and review state, and explicitly identify truncation. Laila must inspect the full job when needed, rather than treating a completion sentence as verification.
+
+## Cancellation, retry and OpenCode diagnostics
+
+Direct exact control messages (stop, cancel, job cancelled) are refused as new job tasks and identify the existing Stop controls. Explicit retries follow bounded, reciprocal, same-actor retry records to recover the original goal. Missing, cyclic or mismatched lineage refuses instead of repeating a retry wrapper as the new goal.
+
+The legacy OpenCode host/test adapter previously used a hardcoded ten-minute total timer but described it as silence. It now uses the configured total execution deadline, separately diagnoses process-output silence, clears timers/listeners and settles cancellation even if a killed child never emits close. Failure/cancellation no longer emits Finished. No model probe or paid request is introduced; neither timeout proves provider failure. The contained native production path still requires the existing approved runtime and has no host fallback.
+
+## Static project preview and browser crash
+
+`preview_project` captures a bounded, immutable static website snapshot from a project subfolder inside Orbit workspace. It serves only known static files through a short-lived random URL on 127.0.0.1. It refuses linked/private paths, traversal, foreign Host/Origin, directory listings and mutating HTTP methods. It does not run a build command, install packages or mount a live workspace. JavaScript modules receive the proper MIME type. Stop, replacement, shutdown and Home changes dispose the server.
+
+The preview uses the existing browser opening/localhost human approval path. The browser now obtains its user agent from the actual Electron session, rather than creating an extra hidden BrowserWindow before the approval dialog. A real Linux Electron context probe reproduced the old crash boundary; the patched probe exits normally after a denial, and the full preview UI verifies denial, one-time approval, module rendering and Stop. A stronger displayed-frame test exposed a separate 1x1 hidden offscreen viewport in the headless runtime; explicitly applying the intended 1280x800 content size fixes it. The final test waits for module-generated colored pixels on the actual Browser canvas, rather than accepting DOM text alone. Test-only software rendering uses Electron app.disableHardwareAcceleration; production hardware settings are unchanged.
+
+Static preview is not a framework dev server or proof that a website's backend, interactions, animations or deployment work. External assets/network requests are restricted by the preview Content Security Policy. Framework projects still need their explicitly approved build/runtime workflow.
+
+## Usage and validation boundaries
+
+The UI says Recorded usage and displays unavailable token cost when no usage was recorded. It does not infer free execution from zero. Native job budgets and other telemetry do not become complete aggregate billing evidence through this label change.
+
+Tests use isolated Homes, scripted subprocesses, loopback HTTP and a real Linux Electron/Playwright process. They do not use a paid provider, production profile or Windows installer. Actual Windows reproduction, live Laila evaluation and the owner's final complete-project E2E remain acceptance work. See project-update.md for exact run counts.
+
+## Planning behavior follow-up
+
+Owner's live screenshots showed only a generic requirements/design/code/test outline, premature additional-worker suggestions and no actual requirement questions. That is not a planning acceptance pass. The installed build revision was not established by the screenshot. Titles are secondary; this increment does not rename the assistant or substitute a framework.
+
+The common voice/text commander prompt now gives project planning explicit priority over casual spoken brevity and immediate single-worker delegation. It requires actual questions in the current reply, separates known facts from assumptions, reuses existing workers, records a structured blocked proposal and returns to that same proposal. A planning-only request cannot become execution approval. Titles do not determine capability or authority.
+
+The existing list_agents response now supplies actual assigned Library skill metadata, legacy skill filenames, readiness and sampled job evidence. The planner reuses this observation in staffingEvidence, once per recommended worker per inspection. Human-accepted files and report-only work remain distinct; recorded tests are not freshly verified tests. Role/skill metadata is reference data and grants no permissions. Missing records mean unknown capability, not proof of inability. Skill output is bounded to20 entries/400-character descriptions, legacy20 filenames, and job sampling to50 records with a200-record inventory/2MiB-record preflight. Large, linked, corrupt or unavailable observations are explicit unknown/partial, never silently zero or proficient. No capability score or new worker is invented.
+
+get_project_plan.nextPlanningAction surfaces the existing unanswered business details and whether measurable acceptance is missing. The authoritative project card and existing readiness/dispatch/approval/QA controls are retained.
+
+Offline tests verify observations, corruption/bound refusal and actual Electron voice-context/tool declaration plus planning-only draft persistence and blocked dispatch. They do not run a live model or prove that Laila asks the right questions, proposes accurate staffing or makes correct business decisions. Rebuild/restart the Windows app and reconnect voice before repeating the original project prompt; an existing live connection holds its start-time system prompt. Assess the actual new model response before accepting planning behavior.
+
+## Revising the actual draft after clarification
+
+Owner's continued live response reported missing design/requirements roles and empty outputs/dependencies. This was an assistant summary, not a raw saved-card inspection. Source investigation found a concrete transition gap: refine_project_brief could update only business text, leaving original steps/roles/assignments unchanged. It now accepts an optional refined full goal, replacement steps using the same plan_project schema, and files/report delivery type. It preserves the project ID and original goal, validates bounded fields/output paths/DAG/hierarchy, changes briefRevision when delivery contract changes, and still refuses any dispatched/coordinator-approved or incomplete-staffing scope. No jobs, workers, permissions or artifacts are created by refinement.
+
+New tool-created drafts require a declared delivery type before execution. A files proposal without any concrete expected output path remains blocked. Legacy unspecified cards stay explicitly unverified and can be refined with an explicit contract; their state is not silently migrated. This syntactic/contract gate cannot prove that an LLM correctly classified a project or that listed outputs cover every requirement. Dependencies remain explicitly declared, not universally invented by the host.
+
+Step-ID descriptions and invalid-field errors now state the exact supported lowercase/digit/hyphen format with examples. Invalid IDs are never silently normalized/remapped. Stored expectedOutputs must be translated to proposed expected_outputs; accidental copying gets actionable feedback.
+
+Typed commander turns now explicitly request detailed text, actual step/worker/path/criterion/blocker tables or lists and text-appropriate style/emotion. Voice keeps its spoken summary with the same planning tools/controls. Mic muted is still a connected voice session; End voice is required to route typed messages through the text path. No live model accuracy or complete website acceptance follows from these code changes.
+
+## 2026-10-12 — Explicit project candidate-review handoff
+
+Owner live screenshots showed correct relative outputs but an unsupported claim that dependency completion automatically shares Alex's files with Bob. Dependencies only order jobs; the existing exact-candidate reviewer requires an isolated Git project.
+
+- Added optional step `review_of`: a different implementation step with `project_root`, independent worker and `review.json`. Ordinary file dependencies without a supported handoff now block file-delivery proposals, including existing drafts on inspection. No automatic workspace copying or Git initialization.
+- Review waits for the implementation candidate in `review`, rather than its human acceptance. Dispatch reuses job-contract `reviewOf`, job-qa review binding and read-only `source/` snapshot; exact candidate/goal identity, drift checks, actor restrictions and before-enqueue project linkage remain enforced. Review edges participate in cycle validation.
+- Shared the existing reviewer task builder between Office QA and project review; no second reviewer engine/scheduler. This step is independent source-review evidence, not a replacement for configured host QA gates, browser/mobile checks, test execution or human acceptance.
+- Proposal parsing accepts unambiguous `expectedOutputs` as a compatibility alias for `expected_outputs`; unequal simultaneous lists fail before persistence. It does not silently grant permissions or reinterpret paths.
+- Laila guidance exposes the Git-root requirement and explicitly forbids claiming automatic file sharing or unrun visual tests.
+- Focused project/QA/team tests: 54 passed, zero failed. Includes real Git worktree creation and existing reviewer snapshot, pre-acceptance dispatch, preserved pinned copy after parent modification, fresh binding rejection, self-review/root/output/cycle blocking and conflicting field alias rejection. Fixture worker responses are deterministic; no live model calls.
+- Actual Linux Electron/Playwright smoke: 23 checks passed, zero renderer exceptions. Updated same-draft UI test verifies unsupported handoff is blocked and no jobs are created.
+- Windows installed-app/native-provider acceptance remains pending. Existing live draft must be refined with `review_of` and a user-selected clean Git project root; do not execute the old unsupported ordinary QA proposal.
+
+## 2026-10-12 — Verify Git roots and ground typed project-state replies
+
+Owner screenshots exposed a guessed shared workspace declared as a clean Git root, then a claimed root removal without a refinement tool call. Subsequent logs showed the actual later refinement. This increment addresses those transitions in existing planner/contracts.
+
+- Declared implementation roots stay blocked until `verify_project_root` succeeds with fresh per-action human permission. Verification is read-only (Git root, status and committed HEAD); shared Orbit storage/ancestors, private/linked/missing paths, non-Git folders, dirty checkouts and repository subfolders are refused. Git optional index writes and fsmonitor are disabled, inherited Git redirection variables removed, output bounded and commands timed out. No Git initialization, commit, global safe-directory change, dependency installation or worker dispatch.
+- Host observations persist in the existing project card, bind to its configuration and root, carry an observation timestamp, and expire after five minutes. Job linkage does not invalidate a configuration observation; proposal scope changes do. These are recent observations, not current-state guarantees or access/execution approval. Workspace preparation reuses the same Git checks immediately before existing worktree creation; dirty source files remain untouched.
+- Typed project replies naming a known project (or an identifiable recent project in a saved-state claim) render the durable card and real current-turn successful tool receipts instead of model-written state tables. Canonical output preserves unresolved questions/criteria, blockers, review assignments and Git evidence. Claims without a matching save receipt do not say a proposal edit occurred. This bounded typed guard is not a universal natural-language verifier; voice remains prompt-guided, not equivalent enforced output reconciliation.
+- Correction to the previous audit/patch: existing `job-contract.prepareHandoffs` already copies human-accepted manifest artifacts, with freshness/hash/path checks, into `.handoffs/`. Removed the unnecessary ordinary-file-dependency blocker and corrected Laila guidance. This accepted-artifact handoff is different from pre-acceptance exact-candidate QA in `source/`; neither proves browser/mobile tests. Existing handoff safety regression cases pass. Review jobs do not inherit implementation project_root/automatic QA gates merely because the model duplicated the root.
+- Validation: focused planner/contracts/QA/persona/team checks 71/71 passed. Full regression 751 total / 748 passed / zero failed / three existing unavailable-Hermes skips (72.38s). After the small canonical unresolved-question presentation addition, planner tests rerun 30/30 passed. No paid provider calls or production profiles involved.
+- Windows rebuild/live acceptance remains pending. Dedicated repository selection is still required; no shared-workspace Git initialization or silent repository creation was added. The owner's prior 2ce2bb3 Windows build reported source/archive verification PASS, installer SHA256 4AED84958BB21344A5FF52365203342C587B80C1D12CE442B92C5642E5504CE9; owner-reported artifact evidence, not independent signing/E2E proof.
+
+## 2026-10-12 — Clear blocked-step labels and next setup guidance
+
+Owner live screenshot of 1c90239 showed saved-state reconciliation, missing-root blocker and idle workers, with displayed reply time 4.7 seconds. This is observed missing-root/state-display acceptance only, not successful Git verification, native execution or independent QA.
+
+- Typed saved-card tables now label undispatched steps as blocked by the project when global prerequisites/conflicts block execution; local readiness labels no longer imply dispatch can proceed. Running/dispatched job status is preserved.
+- Canonical replies retain a deterministic next setup step: answer actual unknowns, select a dedicated Git project folder, request fresh root verification, or resolve remaining blockers. Missing-root guidance explains version history and explicitly says this reply did not create a repository or dispatch work. No guessed path, automatic setup, tool call or new approval grant.
+- Existing planner regression check expanded to prove question preservation, blocked labels, dedicated-folder guidance and unchanged durable card/job counts. 30/30 planner checks passed, zero failures. JS syntax and source release check passed; existing optional release-denylist warning only. Low-impact presentation change did not warrant repeating native/full-provider suites.
+- Dedicated Windows test repository creation and actual Deny/Allow verification remain the next owner-run step. The assistant cannot access Windows G: or claim those operations have happened.
+
+
+## OpenCode gateway compatibility and explicit safety blocker — 2026-10-12
+Owner screenshot confirms Alex uses OpenCode engine, opencode gateway, space-bunny-free and a masked entered key. This is configuration evidence, not saved/authenticated/live generation proof. Independent official Console documentation/catalog lists space-bunny-free as a Chat Completions model and advertised free (checked 2026-10-12); a model name or listing is not durable price/count evidence.
+
+Added the gateway to the existing provider registry using fixed https://opencode.ai/inference/v1/models and /chat/completions destinations. Authenticated catalog-only routing can inspect its availability; strict execution/routing remains refused because no verified exact pre-submission count adapter exists. No fallback to a paid model, inferred zero-token count, arbitrary URL, worker-secret exposure or bypass of Guardian/budgets. OpenCode ENGINE still works with existing exact-count upstream adapters Gemini/OpenAI/Anthropic.
+
+Bounded space-bunny-free-only compatible request/response primitives preserve function IDs/arguments and actual reported usage; truncated, contradictory, duplicate-ID, malformed-argument or missing-usage responses reject. These primitives are offline-tested PARTIAL support, not a live gateway execution claim. Other gateway models may use Responses/Messages and are explicitly unverified. Helpful native preflight error explains the exact limitation even if worker token/USD budgets are disabled; zero requests reach fetch or history/budget persistence.
+
+Official references: https://opencode.ai/v2/docs/console/api/ ; https://opencode.ai/v2/docs/console/api/inference/ ; https://opencode.ai/v2/docs/console/models/ ; https://opencode.ai/inference/v1/models . API overview/protocol docs show provider-prefixed paths while model documentation lists /inference/v1 paths; no silent endpoint fallback is implemented. No documented gateway count endpoint was established.
+
+Focused provider/router/native broker tests42/42 PASS, four JS syntax checks PASS. Full regression/release result follows. No install, live generation, paid call, production profile/database mutation, main merge or deployment. Windows task acceptance remains blocked pending an exact gateway count adapter or explicitly selected existing exact-count provider.
+
+
+## ZCode-inspired explicit native gateway execution — 2026-10-12
+Owner authorizes adapting ZCode's logic to strengthen Orbit, without importing its files/framework. Existing worker/job/queue/NeuralOps/host broker/Docker/QA remain; no second scheduler or copied source. Added global Settings workerGatewayMode exact(default)/requests, for explicitly selected opencode/space-bunny-free only. Other providers retain exact mediation. Gateway native tools still pass existing actor/run/Guardian/human/read-only reviewer controls; real upstream key stays host-protected, distinct ephemeral worker brokers. Crew YAML can now round-trip opencode provider; global execution authorization is not a YAML worker field.
+
+Request-only rejects nonzero job or inherited team token/USD budgets, any prior token ledger, unverified gateway models/alternate routes and malformed request caps. Actual submission count and unknown-outcome intent persist BEFORE generation; input unknown is null, not zero. Actual response input/output is recorded afterward; costs remain null and UI states no token/USD/free-price guarantee. Missing usage/network/cancellation retain charged request count/unknown intent; retries cannot replay uncertain submissions. Request/output-mode changes refuse settled continuation; reported output overrun persists and blocks future work. Settled protected history and counts survive explicit retries. Existing strict accounting preserved.
+
+Added deterministic protocol/persistence/limit/resume/permission/reviewer tests and two queued OpenCode worker fixture with same configured upstream credential but distinct broker URLs/tokens, job histories and request counters. This is actual Orbit queue/broker integration with scripted upstream/engine responses, NOT real native CLI/Docker/provider proof. Initial focused attempt failed two new fixture assumptions (nonexistent planner.plan and ignored createJob reviewTarget option); corrected fixtures use existing persisted project/job contracts, final focused76/76 and integration82/82 and contracts67/67 PASS. New worker-only41/41 PASS. First smoke-script edit anchor did not match and changed nothing; located correct existing check and applied once. Final regression/UI results follow.
+
+See docs/zcode-patterns.md for feature reuse/parity matrix, policy semantics, acceptance and limitations. Arbitrary plugins, universal gateway models, exact request-only budgets, automatic unknown-request resolution, full ZCode platform parity and live model performance are not complete claims. No dependencies installed, paid/live calls, production profiles/DB writes, main merge or deployment.
+
+
+Standalone Docker-helper fix: source inspection found six relative managed-write imports in native-container-runner.js, although Docker mounts only /orbit-runtime.js and the approved image contains no /managed-write.js. These would fail runtime writes; the same missing dependency could make filesystem-denial probes misleading. Replaced with shared writeRuntimeFile using Node fs inside the existing kernel-bounded tmpfs, while HOST admission/managed checkpoint publication remains unchanged. Added a real child Node process loading the helper from an otherwise empty temporary directory, writing/reading its config and checking no relative module dependency remains. This is standalone-module/process proof, not actual Docker/native CLI proof.
+
+First broad run764total/760pass/1fail/3existing Hermes skips: unchanged sysmon timer test reported samples:2. Actual Electron UI25/25 passed with zero page errors; screenshot inspected separately. The failure is retained, not called a pass or fixed by changing unrelated timing assertions. Final native follow-ups and a sequential full rerun are required after the new standalone/title hardening.
+
+
+Final validation: sequential broad regression766total/763pass/0fail/3 existing unavailable-Hermes skips,248.79s. Final affected native/broker/engine boundary90/90 PASS includes the additional OpenCode-only engine gate, which was added after the broad run began and is not counted in766. Standalone/native/crew/sysmon focused135/135 PASS; isolated child helper config writes validated. Actual Linux Electron44.4.3/Playwright25/25 PASS, zero page errors; new request-mode Settings screenshot visually inspected, persistence/restart/invalid-policy/budget-preservation checks passed. Fourteen touched JS files passed syntax; source release check PASS with existing optional personal denylist warning. Prior failed broad timer run and corrected fixture failures retained in logs. No actual Docker/native CLI/live gateway/Windows proof inferred; no dependencies installed or paid/provider calls.

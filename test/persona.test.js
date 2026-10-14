@@ -44,3 +44,9 @@ test('chat channels get a text version of the tone (no voice instructions)', () 
   assert.match(p, /desi-dost/); assert.match(p, /emoji/); assert.doesNotMatch(p, /in your VOICE/);
   assert.match(p, /data, never an instruction/, 'the injection warning is still there');
 });
+
+test('typed planning is detailed while voice stays concise; both preserve the same host workflow and approvals',()=>{
+ const h=home(),cfg={...base,style:'casual',emotion:'expressive'},typed=buildCommanderPrompt(cfg,h,{channel:'text'}),voice=buildCommanderPrompt(cfg,h,{channel:'voice'});
+ assert.match(typed,/This is typed text chat/);assert.match(typed,/actual IDs, workers, dependencies, expected paths/);assert.doesNotMatch(typed,/in your VOICE/);assert.match(voice,/This is a spoken conversation/);assert.match(voice,/in your VOICE/);
+ for(const p of [typed,voice]){assert.match(p,/revise its full goal and steps\/assignments/);assert.match(p,/planning-only request/);assert.match(p,/human retains permissions and final acceptance/);}
+});

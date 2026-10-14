@@ -39,7 +39,7 @@ test('cancel_job belongs to the commander only, and the shell tool says it is Wi
 test('the commander is told how to share work: small jobs are offered first (even when an agent is named), unclear phrases never cancel, every tool call gets a spoken result, Windows commands', () => {
   const p = buildCommanderPrompt({ aiName: 'Laila', gender: 'female', userName: 'Zee', userTitle: 'Commander', lang: 'mix' }, rig().home);
   assert.match(p, /SMALL job/); assert.match(p, /Me or Bob\?/); assert.match(p, /This applies even when the user named a crew member/); assert.match(p, /Bob se hi karwao/);
-  assert.match(p, /BIG or long jobs: give them to the named crew member/);
+  assert.match(p, /BIG or long single-worker jobs with clear requirements/); assert.match(p,/Multi-step projects must first follow the planning workflow/);
   assert.match(p, /use cancel_job only when the user clearly says to stop/); assert.match(p, /half-heard or unclear phrase is NOT an instruction to cancel/); assert.match(p, /walk back to the lounge on their own/);
   assert.match(p, /After EVERY tool call, tell the user the outcome/); assert.match(p, /Always say who did the work/); assert.match(p, /call the tool BEFORE you say it is done/);
   assert.match(p, /shell is Windows cmd\.exe.*never Unix ones \(mkdir -p/s);

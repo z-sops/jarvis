@@ -23,35 +23,61 @@ const lock = SHOTS ? true : app.requestSingleInstanceLock();
 if (!lock) app.quit();
 
 let win = null, tray = null, quitting = false;
-const store = createStore(path.join(app.getPath('userData'), 'settings.json'));
-const home = new Home(store.get().homeDir);
+require('./lib/ipc-origin').installMainFrameGuard(ipcMain, () => win);
+const secretStorage = require('./lib/secret-storage').createSecretStorage(require('electron').safeStorage, process.platform, {
+  beforeSeal: () => !!require('./lib/windows-key-state').keyRecord(app.getPath('sessionData'), true).key
+});
+const store = createStore(path.join(app.getPath('userData'), 'settings.json'), { secretStorage });
+const home = new Home(store.get().homeDir, { secretStorage });
 const bus = new EventEmitter();
 const pending = new Map();
+const runs = require('./lib/job-runs').createJobRuns();
 
 const send = (type, payload) => { if (win && !win.isDestroyed()) win.webContents.send('bus', { type, payload }); };
-for (const t of ['tool', 'agent:state', 'agent:created', 'agent:updated', 'job:created', 'job:progress', 'comms:event', 'ui:show', 'tag', 'anomaly']) bus.on(t, p => send(t, p));
+for (const t of ['tool', 'agent:state', 'agent:created', 'agent:updated', 'job:created', 'job:progress', 'job:reviewed', 'comms:event', 'ui:show', 'tag', 'anomaly']) bus.on(t, p => send(t, p));
 bus.on('job:done', ({ agent, job }) => {
   send('job:done', { agent, job });
   if (job.status === 'cancelled') return; // the user stopped it: no failure report
-  const ok = job.status === 'done';
-  const secs = job.startedAt && job.finishedAt ? Math.max(0, Math.round((Date.parse(job.finishedAt) - Date.parse(job.startedAt)) / 1000)) : null;
-  const text = `[CREW REPORT] ${agent.name} ${ok ? 'finished' : 'failed'} job ${job.id}${secs != null ? ` after ${secs} seconds` : ''}. Task: "${job.task}". ${ok ? 'Result: ' + String(job.result || '').slice(0, 1500) : 'Error: ' + job.error}`;
-  send('report', { text, agent: agent.name, ok, secs });
-  if (!win?.isVisible() && Notification.isSupported()) new Notification({ title: `${agent.name} ${ok ? 'finished a job' : 'hit a problem'}`, body: job.task.slice(0, 100) }).show();
+  const report = require('./lib/jobreport').completionReport(agent,job);
+  const {ok,reviewReady}=report;
+  send('report', report);
+  if (!win?.isVisible() && Notification.isSupported()) new Notification({ title: `${agent.name} ${reviewReady ? 'has a report to review' : ok ? 'finished a job' : 'hit a problem'}`, body: job.task.slice(0, 100) }).show();
+});
+bus.on('job:storage-error', ({ agent, jobId, error }) => {
+  send('report', { text: `[CREW REPORT] ${agent.name}: job ${jobId} has an unknown stored outcome. ${error}`, agent: agent.name, ok: false });
+  audit.add({ kind: 'job', event: 'storage_error', agent: agent.name, detail: error });
 });
 
 function showWindow() { if (!win) return; if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
-function ask(req) {
+function askUser(req) {
   return new Promise(resolve => {
+    const { signal, onDecision, ...display } = req;
+    if (signal?.aborted) return resolve('deny');
     const id = Math.random().toString(36).slice(2, 10);
-    pending.set(id, resolve);
+    let settled = false, timer;
+    const settle = (answer, origin = 'human_main_window') => { if (settled) return; settled = true; pending.delete(id); clearTimeout(timer); signal?.removeEventListener('abort', expire); try { onDecision?.({ id, origin, decision: answer, at: new Date().toISOString() }); } catch { answer = 'deny'; } resolve(answer); };
+    const expire = () => { if (!settled) { send('permission:expired', { id }); settle('deny', 'permission_timeout_or_abort'); } };
+    pending.set(id, settle);
     showWindow();
-    send('permission', { id, ...req });
-    setTimeout(() => { if (pending.has(id)) { pending.delete(id); send('permission:expired', { id }); resolve('deny'); } }, 120000);
+    send('permission', { id, ...display });
+    timer = setTimeout(expire, 120000); timer.unref?.();
+    signal?.addEventListener('abort', expire, { once: true });
+    if (signal?.aborted) expire();
   });
 }
 
-const runtime = {};
+async function ask(req) {
+  runs.assertCurrent();
+  const run = runs.current();
+  const answer = await askUser({ ...req, signal: req.signal || run?.signal, onDecision: receipt => {
+    require('./lib/permission-history').record(home,runs,run,req,receipt);
+    req.onDecision?.(receipt);
+  } });
+  runs.assertCurrent();
+  return answer;
+}
+
+const runtime = { runs };
 const tools = createTools({ home, getCfg: store.get, gemini, bus, ask, runtime, openExternal: u => shell.openExternal(u) });
 const hermes = new HermesEngine({ home, getCfg: store.get });
 const opencode = new OpenCodeEngine({ home, getCfg: store.get });
@@ -60,13 +86,18 @@ const panels = require('./lib/panels');
 const usage = panels.makeUsage({ home });
 const audit = panels.makeAudit({ home, bus });
 gemini.setUsageHook(u => usage.add(u));
-const workers = createWorkers({ home, getCfg: store.get, gemini, tools, bus, hermes, usage, opencode });
+const workers = createWorkers({ askNative: ask, home, getCfg: store.get, gemini, tools, bus, hermes, usage, opencode, runs, getGuidance: () => runtime.guidance, getPlanner: () => runtime.planner, getNativeGateway: agent => runtime.browser?.containedEndpoint(agent) || null });
+runtime.workers=workers;
+const qa = require('./lib/job-qa').createQA({ home, workers, ask, bus });
+workers.qaPending = qa.hasPending;
 Object.assign(runtime, { dispatch: workers.dispatch, cancel: workers.cancel, stateOf: workers.stateOf });
+runtime.planner = require('./lib/project-plan').createPlanner({ home, dispatch: workers.dispatch, bus });
+require('./lib/team-control').register({home,planner:runtime.planner,ipcMain,isTrusted:e=>!!win&&!win.isDestroyed()&&e.sender===win.webContents&&e.senderFrame===win.webContents.mainFrame});
 const chat = panels.chatGuard(bus);
 // Orbit Browser: Orbit's own private browser (isolated sessions). Laila uses it through tools, the crew through a local MCP server.
-const orbitBrowser = require('./lib/browser-panel').create({ electron: { BrowserWindow, session, ipcMain }, home, getCfg: store.get, store, bus, ask, send,
+const orbitBrowser = require('./lib/browser-panel').create({ electron: { BrowserWindow, session, ipcMain }, home, getCfg: store.get, store, bus, ask, send, runs,
   label: a => (a === 'commander' ? (store.get().aiName || 'Commander AI') : (home.getAgent(a)?.name || a)), onNeedsUser: () => showWindow() });
-const connectorsStore = new (require('./lib/connectors').Connectors)({ home, allowInsecureLocal: !!process.env.BRIDGE_SHOTS });   // http://localhost is allowed only in the test mode
+const connectorsStore = new (require('./lib/connectors').Connectors)({ home, allowInsecureLocal: !!process.env.BRIDGE_SHOTS, secretStorage });   // http://localhost is allowed only in the test mode
 orbitBrowser.setConnectors(connectorsStore);
 // The gateway: the crew's one door to outside services and to a few of Orbit's own tools. Orbit holds the tokens; every call goes through the permission hub.
 const { Hub } = require('./lib/hub'), { Gateway } = require('./lib/gateway');
@@ -74,13 +105,14 @@ const { Hub } = require('./lib/hub'), { Gateway } = require('./lib/gateway');
 const { FilesProvider, checkRoots } = require('./lib/fsmcp');
 const fsOpts = { home, userData: app.getPath('userData'), userProfile: require('os').homedir(), defaultRoots: [home.p('workspace')] };
 const makeFiles = c => { const chk = checkRoots(c.roots, fsOpts); if (!chk.ok) throw new Error(chk.error); return new FilesProvider({ roots: chk.roots, forbid: [home.p('connectors'), home.p('browser'), home.p('hermes'), app.getPath('userData')], backupDir: home.p('backups', 'files'), trash: f => shell.trashItem(f) }); };
-const gateway = new Gateway({ connectors: connectorsStore, hub: new Hub({ ask, actorName: a => orbitBrowser.manager.actorName(a) }), bus, actorName: a => orbitBrowser.manager.actorName(a),
+const gateway = new Gateway({ runs, connectors: connectorsStore, hub: new Hub({ ask, actorName: a => orbitBrowser.manager.actorName(a) }), bus, actorName: a => orbitBrowser.manager.actorName(a),
   providers: { files: makeFiles, library: () => new (require('./lib/library-provider').LibraryProvider)({ home }), leads: () => new (require('./lib/leads-provider').LeadsProvider)({ home }) },
-  native: { web_search: a => tools.exec('web_search', a, 'commander'), look_at_screen: a => require('./lib/screen').describe(a, { getCfg: store.get, gemini, bus }) } });
+  native: { ...Object.fromEntries(['send_agent_message','agent_messages','ack_agent_message','get_team_plan','delegate_team_step'].map(name=>[name,async (a,ctx)=>{const r=await tools.exec(name,a,ctx.actor);if(r.error)throw new Error(r.error);return r;} ])), use_skill: async (a, ctx) => { const r = await tools.exec('use_skill', a, ctx.actor); if (r.error) throw new Error(r.error); return r; }, web_search: a => tools.exec('web_search', a, 'commander'), look_at_screen: a => require('./lib/screen').describe(a, { getCfg: store.get, gemini, bus }) } });
 orbitBrowser.setGateway(gateway); runtime.gateway = gateway; runtime.store = store;
+runtime.guidance = require('./lib/job-guidance').createGuidance({ home, runs, gateway });
 const decider = require('./lib/decide').createDecider({ getCfg: store.get, gemini });
 for (const bid of ['library', 'leads']) (async () => { try { if (!connectorsStore.get(bid)) { const sp = require('./lib/connectors').checkSpec({ catalogId: bid }); if (sp.ok) connectorsStore.add(sp); } const t = await gateway.test(bid); if (t.ok) { connectorsStore.applyTools(bid, t.tools); if (!connectorsStore.get(bid).enabled) connectorsStore.update(bid, { enabled: true }); } } catch { /* the crew simply lacks it until the next start */ } })();   // skills and knowledge packs reach the crew through the same door as every other tool
-runtime.browser = orbitBrowser; hermes.extraYaml = agent => ({ ...orbitBrowser.crewYaml(agent, { force: !!agent.forceBrowser }), terminal: require('./lib/sandbox').terminalLines(agent, { ws: home.p('workspace', agent.id) }) });
+runtime.browser = orbitBrowser; hermes.extraYaml = agent => ({ ...orbitBrowser.crewYaml(agent, { force: !!agent.forceBrowser }), terminal: require('./lib/sandbox').terminalLines(agent, { ws: agent.workspaceDir || home.p('workspace', agent.id) }) });
 hermes.extraSig = agent => JSON.stringify(orbitBrowser.crewYaml(agent, { force: !!agent.forceBrowser })) + connectorsStore.signature(agent.id) + (agent.allowCode === false ? '|nocode' : '');
 orbitBrowser.start().catch(e => console.error('Orbit Browser link failed:', e.message));
 
@@ -101,8 +133,9 @@ async function slashRun(text) {
   return { kind: 'done', result: { text: reply } };
 }
 async function commanderTurn(text) {
-  chat.begin();
-  try { return await commanderTurnInner(text); } finally { chat.end(); }
+  const latency=require('./lib/latency'),trace=latency.create('commander',{engine:'builtin'});
+  chat.begin();let outcome='failed';
+  try { return await latency.within(trace,async()=>{const result=await commanderTurnInner(text);trace.mark('response_ready');outcome=result.cancelled?'cancelled':result.error?'failed':'success';return {...result,latencyTraceId:trace.id};}); } finally { trace.finish(outcome);chat.end(); }
 }
 async function commanderTurnInner(text) {
   const slash = await slashRun(text); if (slash && slash.kind === 'done') return slash.result; if (slash && slash.kind === 'laila') text = slash.rest;
@@ -129,7 +162,7 @@ ${seen}`;
   try {
     const lastModel = [...hist].reverse().find(m => m && m.role === 'model');
     const recent = lastModel && lastModel.parts ? lastModel.parts.map(p => p.text || '').join(' ') : '';
-    const dec = slash && slash.kind === 'laila' ? null : await decider.routeMessage(text, { crewNames: home.listAgents().map(a => a.name), recent, cfg });
+    const dec = slash && slash.kind === 'laila' ? null : await require('./lib/latency').timed('decision',()=>decider.routeMessage(text, { crewNames: home.listAgents().map(a => a.name), recent, cfg }));
     if (dec) {
       const decId = 'dec' + Math.random().toString(36).slice(2, 6); bus.emit('tool', { callId: decId, actor: 'commander', actorName: cfg.aiName, name: 'decision', args: {}, status: 'start' });
       bus.emit('tool', { callId: decId, actor: 'commander', actorName: cfg.aiName, name: 'decision', args: { route: dec.route, urgency: dec.urgency, by: dec.by + (dec.why ? ' (' + dec.why + ')' : ''), model: dec.model || undefined }, status: dec.by === 'none' ? 'error' : 'done', ms: dec.ms, reason: dec.by === 'none' ? dec.why : undefined });
@@ -139,11 +172,13 @@ ${seen}`;
     }
   } catch (e) { try { bus.emit('tool', { callId: 'dec-err', actor: 'commander', actorName: cfg.aiName, name: 'decision', args: {}, status: 'start' }); bus.emit('tool', { callId: 'dec-err', actor: 'commander', actorName: cfg.aiName, name: 'decision', args: {}, status: 'error', ms: 0, reason: String((e && e.message) || e).slice(0, 160) }); } catch { /* ignore */ } }
   const contents = [...hist, { role: 'user', parts: [{ text: turnText }] }];
-  const { text: reply } = await gemini.runLoop({
-    cfg, system: buildCommanderPrompt(cfg, home, { noHistory: true }), contents,
-    tools: cmdTools, model: cmdModel, exec: (n, a) => tools.exec(n, a, 'commander'), shouldStop: () => chat.stopped()
+  const projectReceipts=[];
+  const { text: modelReply } = await gemini.runLoop({
+    cfg, system: buildCommanderPrompt(cfg, home, { noHistory: true, channel:'text' }), contents,
+    tools: cmdTools, model: cmdModel, exec: async (n,a)=>{const out=await tools.exec(n,a,'commander');if(['plan_project','refine_project_brief','get_project_plan','verify_project_root'].includes(n)&&out?.ok===true&&out.id&&projectReceipts.length<20)projectReceipts.push({name:n,id:out.id});return out;}, shouldStop: () => chat.stopped()
   });
   if (chat.stopped()) return { text: 'Stopped.', cancelled: true };
+  const reply=require('./lib/project-reply').reconcile({reply:modelReply,userText:text,recentText:[...hist].reverse().find(m=>m.role==='model')?.parts?.map(p=>p.text||'').join(' ')||'',receipts:projectReceipts,planner:runtime.planner});
   home.saveConversation([...hist, { role: 'user', parts: [{ text }] }, { role: 'model', parts: [{ text: reply }] }]);
   return { text: reply };
 }
@@ -158,12 +193,14 @@ const publicCfg = () => ({ ...store.get(), voices: VOICES });
 ipcMain.handle('config:get', () => publicCfg());
 ipcMain.handle('config:save', (_e, patch) => {
   const before = store.get();
+  if (patch && patch.homeDir && patch.homeDir !== before.homeDir && (workers.hasPending() || qa.hasPending())) throw new Error('Stop or finish crew/QA jobs before changing the home folder.');
   const cfg = store.set(patch);
-  if (cfg.homeDir !== before.homeDir) { home.root = cfg.homeDir; home.ensure(); }
+  if (cfg.homeDir !== before.homeDir) { tools.dispose(); home.root = cfg.homeDir; home.ensure(); home.recoverJobs(); }
   applyLoginItem();
   return { ...cfg, voices: VOICES };
 });
 ipcMain.handle('config:commission', (_e, c) => {
+  if (workers.hasPending() || qa.hasPending()) throw new Error('Stop or finish crew/QA jobs before commissioning a different home folder.');
   const clean = {
     aiName: String(c.aiName || '').trim().slice(0, 24), gender: c.gender === 'male' ? 'male' : 'female', voice: c.voice, lang: ['mix', 'en', 'ur'].includes(c.lang) ? c.lang : 'mix',
     userName: String(c.userName || '').trim().slice(0, 40), userTitle: String(c.userTitle || 'Commander').trim().slice(0, 24) || 'Commander',
@@ -171,7 +208,7 @@ ipcMain.handle('config:commission', (_e, c) => {
   };
   if (!clean.aiName || !clean.userName) throw new Error('A name for the AI and for you are both required');
   const cfg = store.set(clean);
-  home.root = cfg.homeDir; home.ensure(); home.writeCommanderSoul(cfg, true);
+  tools.dispose(); home.root = cfg.homeDir; home.ensure(); home.writeCommanderSoul(cfg, true);
   home.appendMemory(COMMANDER, `Commissioned by ${cfg.userName} (${cfg.userTitle}). I am ${cfg.aiName}.`);
   applyLoginItem();
   return { ...cfg, voices: VOICES };
@@ -184,24 +221,39 @@ ipcMain.handle('dialog:pickDir', async () => {
 ipcMain.handle('key:test', (_e, k) => gemini.testKey(String(k || '')));
 ipcMain.handle('shell:openExternal', (_e, u) => { if (/^https:\/\//.test(u)) shell.openExternal(u); });
 ipcMain.handle('shell:showInFolder', (_e, p) => { if (isInside(home.root, p)) shell.showItemInFolder(p); });
-ipcMain.handle('chat:send', async (_e, text) => { try { return await commanderTurn(String(text)); } catch (e) { return { text: `Something went wrong on my side: ${e.message}`, error: true }; } });
+ipcMain.handle('chat:send', async (_e, text) => { try { return await commanderTurn(String(text)); } catch (e) { return { text: `Something went wrong on my side: ${gemini.describeFailure(e)}`, error: true }; } });
+ipcMain.handle('latency:rendered',(e,id,metrics)=>{if(!win||win.isDestroyed()||e.sender!==win.webContents||e.senderFrame!==win.webContents.mainFrame)throw Error('Use the trusted main window.');return require('./lib/latency').rendered(id,metrics);});
+ipcMain.handle('latency:get', e => { if(!win||win.isDestroyed()||e.sender!==win.webContents||e.senderFrame!==win.webContents.mainFrame)throw Error('Use the trusted main window.');return require('./lib/latency').summarize(); });
 ipcMain.handle('chat:reset', () => { home.saveConversation([]); return true; });
 ipcMain.handle('chat:pickFile', async () => { const r = await dialog.showOpenDialog(win, { properties: ['openFile'], title: 'Attach a file for Laila' }); return r.canceled ? null : r.filePaths[0]; });
 ipcMain.handle('live:context', () => {
   const cfg = store.get();
-  return { systemPrompt: buildCommanderPrompt(cfg, home), tools: tools.declarationsFor('commander'), voice: cfg.voice, model: cfg.liveModel, apiKey: cfg.apiKey, aiName: cfg.aiName, idleMinutes: cfg.idleMinutes };
+  return { systemPrompt: buildCommanderPrompt(cfg, home, {channel:'voice'}), tools: tools.declarationsFor('commander'), voice: cfg.voice, model: cfg.liveModel, apiKey: cfg.apiKey, aiName: cfg.aiName, idleMinutes: cfg.idleMinutes };
 });
 ipcMain.handle('tool:exec', (_e, name, args) => tools.exec(String(name), args || {}, 'commander'));
 ipcMain.handle('agents:list', () => home.listAgents().map(a => ({ ...a, ...workers.stateOf(a.id) })));
 ipcMain.handle('agents:create', (_e, a) => tools.exec('create_agent', a, 'commander'));
+// These decisions exist only on the trusted application UI bridge, never in model tool declarations.
+require('./lib/managed-write').register(home,store.get);
+home.storageCheck=(jobId,neededBytes)=>require('./lib/storage-admission').check(home,store.get(),{jobId,neededBytes});
+require('./lib/checkpoint-retention').register({ipcMain,home,getCfg:store.get,isBusy:()=>workers.hasPending()||qa.hasPending()||chat.active(),
+  isTrusted:e=>!!win&&!win.isDestroyed()&&e.sender===win.webContents&&e.senderFrame===win.webContents.mainFrame});
+require('./lib/communication-control').register({ipcMain,home,isBusy:()=>workers.hasPending()||qa.hasPending()||chat.active(),isTrusted:e=>!!win&&!win.isDestroyed()&&e.sender===win.webContents&&e.senderFrame===win.webContents.mainFrame});
+require('./lib/job-control').registerJobControls({ ipcMain, workers, qa, home,
+  isTrusted: e => !!win && !win.isDestroyed() && e.sender === win.webContents && e.senderFrame === win.webContents.mainFrame });
+require('./lib/crew-config').register({ ipcMain, home, bus, getCfg: store.get,
+  isBusy: () => workers.hasPending() || qa.hasPending() || chat.active(),
+  isTrusted: e => !!win && !win.isDestroyed() && e.sender === win.webContents && e.senderFrame === win.webContents.mainFrame });
 ipcMain.handle('agents:inspect', (_e, id) => {
   const isC = id === COMMANDER; const agent = isC ? { id: COMMANDER, name: store.get().aiName, role: 'Chief of staff' } : home.getAgent(id);
   if (!agent) return null;
   const rd = f => { try { return fs.readFileSync(path.join(home.agentDir(agent.id), f), 'utf8'); } catch { return ''; } };
-  return { agent, folder: home.agentDir(agent.id), soul: rd('brain/soul.md'), skills: home.readSkills(agent.id).map(s => s.name), jobs: home.listJobs(agent.id, 5).map(j => ({ id: j.id, status: j.status, task: j.task, result: j.result })), memory: home.readMemory(agent.id, 600) };
+  const recentJobs = home.listJobs(agent.id, 20);
+  return { agent, activity: workers.activityOf(agent.id) || recentJobs.find(j => j.activity)?.activity || null, folder: home.agentDir(agent.id), soul: rd('brain/soul.md'), skills: home.readSkills(agent.id).map(s => s.name), jobsError: home.recoveryFaults.get(agent.id), jobs: recentJobs.map(j => ({ id: j.id, status: j.status, task: j.task, result: j.result, error: j.error, recoveryNeeded: j.recoveryNeeded, nativeContinuity: j.nativeContinuity, containment: j.containment ? {status:j.containment.status} : null, nativeCheckpoint: j.nativeCheckpoint ? {at:j.nativeCheckpoint.at,engineState:require('./lib/native-engine-state').publicSummary(j.nativeCheckpoint.engineState)} : null, managed: j.managed, guidance: j.guidance, remoteOutcomes: j.remoteOutcomes, expectedOutputs: j.expectedOutputs, verification: j.verification, qa: j.qa, reviewTarget: j.reviewTarget, completionKind: j.completionKind, acceptedAt: j.acceptedAt, dependencies: j.dependencies, workspaceDir: j.workspaceDir, isolation: j.isolation, selectedSkills: (j.selectedSkills || []).map(s => ({ slug: s.slug, selectedBy: s.selectedBy })) })), memory: home.readMemory(agent.id, 600) };
 });
-ipcMain.handle('agents:update', (_e, id, patch) => { try { return { ok: true, agent: home.updateAgent(id, patch || {}) }; } catch (e) { return { ok: false, error: e.message }; } });
+ipcMain.handle('agents:update', (_e, id, patch) => { try { if(patch&&'desiredLifecycle' in patch)throw Error('Use trusted crew lifecycle controls.');return { ok: true, agent: home.updateAgent(id, patch || {}) }; } catch (e) { return { ok: false, error: e.message }; } });
 ipcMain.handle('hermes:check', async (_e, opts) => { try { return { steps: await hermes.check(opts || {}) }; } catch (e) { return { steps: [{ name: 'Check', ok: false, detail: e.message }] }; } });
+ipcMain.handle('opencode:models',async(_e,id)=>{try{return {ok:true,...await require('./lib/opencode-models').list({home,getCfg:store.get,actor:String(id)})};}catch{return {ok:false,error:'OpenCode model catalogue could not be loaded. Check saved provider/key and network; no model request was submitted.'};}});
 ipcMain.handle('opencode:check', async (_e, opts) => { try { return { steps: await opencode.check(opts || {}) }; } catch (e) { return { steps: [{ name: 'Check', ok: false, detail: e.message }] }; } });
 ipcMain.handle('comms:get', () => ({ settings: comms.settings(), status: comms.status() }));
 ipcMain.handle('comms:save', async (_e, c) => { try { return await comms.save(c); } catch (e) { return { ok: false, errors: [e.message] }; } });
@@ -211,7 +263,7 @@ ipcMain.handle('comms:pair', () => comms.pairWhatsApp());
 require('./lib/screen').register({ ipcMain, store, gemini, bus, send });
 require('./lib/panels').register({ ipcMain, shell, home, bus, send, workers, usage, audit, chat, getCfg: store.get });
 require('./lib/browser-panel').register({ ipcMain, browser: orbitBrowser, store, hermes, win: () => win });
-require('./lib/connectors-panel').register({ ipcMain, connectors: connectorsStore, gateway, store, bus, send, win: () => win, fsOpts, pickFolder: async () => { const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'], title: 'Choose a folder the crew may use' }); return r.canceled ? '' : r.filePaths[0]; } });
+require('./lib/connectors-panel').register({ ipcMain, connectors: connectorsStore, gateway, store, bus, send, win: () => win, workerIds: () => home.listAgents().map(a => a.id), fsOpts, pickFolder: async () => { const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'], title: 'Choose a folder the crew may use' }); return r.canceled ? '' : r.filePaths[0]; } });
 require('./lib/memory-panel').register({ ipcMain, home, store, bus, shell, win: () => win });
 require('./lib/topics-panel').register({ ipcMain, home, win: () => win });
 require('./lib/quota-panel').register({ ipcMain, home, usage, store, send, win: () => win });
@@ -235,7 +287,7 @@ ipcMain.handle('shutdown:step', async (e, step) => {
   if (win && e.sender !== win.webContents) return { ok: false, detail: 'not allowed' };
   try {
     if (step === 'crew') { const n = workers.cancelAll(); hermes.stopAll(); return { ok: true, detail: n ? `${n} job${n === 1 ? '' : 's'} stopped` : 'all engines stopped' }; }
-    if (step === 'browser') { const t = orbitBrowser.manager.state().contexts.reduce((n, c) => n + c.tabs.length, 0); orbitBrowser.dispose(); gateway.closeAll().catch(() => {}); return { ok: true, detail: t ? `${t} tab${t === 1 ? '' : 's'} closed` : 'no tabs open' }; }
+    if (step === 'browser') { tools.dispose(); const t = orbitBrowser.manager.state().contexts.reduce((n, c) => n + c.tabs.length, 0); orbitBrowser.dispose(); gateway.closeAll().catch(() => {}); return { ok: true, detail: t ? `${t} tab${t === 1 ? '' : 's'} closed` : 'no tabs open' }; }
     if (step === 'comms') { comms.stop(); return { ok: true, detail: 'closed' }; }
   } catch (err) { return { ok: false, detail: String(err.message || err).slice(0, 80) }; }
   return { ok: false, detail: 'unknown step' };
@@ -277,13 +329,19 @@ if (lock) {
   STARTUP.mark('all program modules loaded');
 const flushStartup = () => STARTUP.flush(path.join(store.get().homeDir || app.getPath('userData'), 'logs'), { electron: process.versions.electron, platform: process.platform });
 ipcMain.handle('startup:mark', (_e, name) => { STARTUP.mark('page: ' + String(name).slice(0, 60)); flushStartup(); return true; });
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
     STARTUP.mark('Electron is ready');
+    const credentialFaults = [];
+    for (const protect of [() => store.protect(), () => connectorsStore.protectSecrets(), () => home.protectAgents()]) {
+      try { protect(); } catch { credentialFaults.push('Protected credential storage is unavailable or locked. Existing files were preserved. Unlock the OS key store before using or saving credentials.'); }
+    }
     session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'media' || perm === 'audioCapture'));
     session.defaultSession.setPermissionCheckHandler((_wc, perm) => perm === 'media' || perm === 'audioCapture');
-    if (store.get().commissioned) home.ensure();
+    if (store.get().commissioned) { home.ensure(); const recovered = home.recoverJobs(); if (recovered.length) audit.add({ kind: 'job', event: 'restart_recovery', detail: `${recovered.length} job record(s) recovered. No jobs were automatically replayed.` }); }
+    if (store.get().commissioned) await require('./lib/native-containment').reconcile(home);
     STARTUP.mark('home folder checked');
     createWindow(); STARTUP.mark('window created'); win.webContents.once('did-finish-load', () => { STARTUP.mark('page loaded (all its scripts were read)'); flushStartup(); });
+    if (credentialFaults.length) win.webContents.once('did-finish-load', () => send('report', { text: credentialFaults[0], ok: false }));
     if (!SHOTS) {
       createTray();
       globalShortcut.register('CommandOrControl+Alt+J', () => { showWindow(); send('wake'); });
@@ -296,7 +354,7 @@ app.whenReady().then(() => {
     }
     if (SHOTS) win.webContents.once('did-finish-load', () => require('./scripts/shots.js')(win, app, { store, home }));
   });
-  app.on('before-quit', () => { quitting = true; hermes.stopAll(); comms.stop(); try { orbitBrowser.dispose(); } catch {} try { gateway.closeAll(); } catch {} try { sysPanel.stop(); } catch {} });
+  app.on('before-quit', () => { quitting = true; tools.dispose(); qa.cancel(); workers.cancelAll(); hermes.stopAll(); comms.stop(); try { orbitBrowser.dispose(); } catch {} try { gateway.closeAll(); } catch {} try { sysPanel.stop(); } catch {} });
   app.on('will-quit', () => globalShortcut.unregisterAll());
   require('./lib/diag').install({ app, getDir: () => path.join(store.get().homeDir, 'logs') });
   app.on('window-all-closed', () => { if (SHOTS) app.quit(); /* otherwise stay alive in the tray */ });

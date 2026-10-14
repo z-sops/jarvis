@@ -6,8 +6,48 @@
   if (!window.bridge || !window.OfficeCore) return;
   const O = window.OfficeCore, COMMANDER = 'jarvis';
   const h = (tag, attrs = {}, ...kids) => { const el = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') el.className = v; else if (k.startsWith('on')) el.addEventListener(k.slice(2), v); else if (v != null && v !== false) el.setAttribute(k, v === true ? '' : v); } for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(kid)); return el; };
+  let cancelInput = null;
+  // Electron does not support window.prompt. Input alone never grants approval.
+  function jobInput(question, value = '', multiline = false) {
+    if (cancelInput) cancelInput();
+    return new Promise(resolve => {
+      const previous = document.activeElement;
+      const field = h(multiline ? 'textarea' : 'input', { 'aria-label': question, maxlength: multiline ? 16000 : 1000, ...(multiline ? { rows: 6 } : { type: 'text' }), autocomplete: 'off', spellcheck: 'false' });
+      field.value = value;
+      const cancel = h('button', { type: 'button', class: 'btn' }, 'Cancel');
+      const next = h('button', { type: 'submit', class: 'btn primary' }, 'Continue');
+      const form = h('form', { class: 'modal job-input', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Job input' },
+        h('h2', {}, 'Job input'), h('label', { class: 'f' }, question, field),
+        h('div', { class: 'modal-actions' }, cancel, next));
+      const backdrop = h('div', { class: 'modal-back' }, form);
+      let settled = false;
+      const finish = result => {
+        if (settled) return; settled = true;
+        document.removeEventListener('keydown', keys, true); backdrop.remove();
+        if (cancelInput === abort) cancelInput = null;
+        if (previous?.isConnected) previous.focus();
+        resolve(result);
+      };
+      const abort = () => finish(null);
+      const keys = e => {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); abort(); }
+        else if (e.key === 'Tab') {
+          const controls = [field, cancel, next], i = controls.indexOf(document.activeElement);
+          e.preventDefault(); controls[(i + (e.shiftKey ? 2 : 1)) % 3].focus();
+        }
+      };
+      cancel.onclick = abort; form.onsubmit = e => { e.preventDefault(); finish(field.value); };
+      cancelInput = abort; document.body.append(backdrop); document.addEventListener('keydown', keys, true); field.focus();
+    });
+  }
   const NICE = { run_shell: 'Running a command', write_file: 'Writing a file', read_file: 'Reading a file', list_dir: 'Looking in a folder', web_search: 'Searching the web', browser_open: 'Opening a web page', browser_read: 'Reading a web page', browser_click: 'Clicking on a web page', browser_type: 'Typing on a web page', browser_select: 'Using a web page', browser_press: 'Using a web page', browser_scroll: 'Scrolling a web page', browser_nav: 'Using a web page', browser_tabs: 'Using browser tabs', browser_wait: 'Waiting for a web page', open_url: 'Opening a page', look_at_screen: 'Looking at the screen', assign_task: 'Giving out a job', cancel_job: 'Stopping a job', create_agent: 'Adding crew', get_system_info: 'Checking the system', remember: 'Making a note', list_jobs: 'Checking jobs', get_job: 'Reading a report' };
   const clip = (s, n) => (s.length > n ? s.slice(0, n - 1) + '\u2026' : s);
+  const activityText = a => {
+    if (!a) return 'No measured activity yet. No packet measurement is available.';
+    const size = n => (Math.max(0, Number(n) || 0) / 1024).toFixed(1) + ' KB';
+    const source = (a.sources || []).map(s => ({ gemini_http_body: 'Gemini HTTP body', hermes_local_api: 'local Hermes API', opencode_process_output: 'OpenCode process output' })[s] || 'unspecified output').join(', ') || 'no observed source';
+    return `${a.attempts || 0} request attempts · ${size(a.submittedBytes)} submitted · ${size(a.receivedBytes)} received. Source: ${source}. Job ${a.jobId}. Application data only; no packet measurement or guarantee of progress.`;
+  };
   const now = () => performance.now() / 1000;
   const state = { agents: new Map(), files: new Map(), total: 0, sel: null, hover: null, visible: false, aiName: 'Laila', cmd: { x: 25, y: 15, mode: 'idle', bubble: '', until: 0 }, k: 1, ox: 0, oy: 0, w: 0, h: 0, dpr: 1, last: 0, t: 0 };
 
@@ -61,8 +101,9 @@
     if (type === 'agent:state') { const o = state.agents.get(p.id); if (o) { o.state = p.state === 'working' ? 'working' : 'idle'; o.task = p.task || ''; if (o.state !== 'working') o.label = ''; paintStats(); if (state.sel === p.id || !state.sel) paintSide(); } }
     else if (type === 'agent:created' || type === 'agent:updated') loadAgents();
     else if (type === 'job:progress') { if (p && p.agent) { note(p.agent.id, p.tool, p.label); if (!state.sel) crewListSoon(); } }
+    else if (type === 'job:activity' && p?.actor === state.sel) { const node = side.querySelector('.of-activity'); if (node) node.textContent = activityText(p.activity); }
     else if (type === 'tool') { if (p.status === 'start') { if (p.actor === 'commander') { state.cmd.bubble = NICE[p.name] || p.name; state.cmd.until = now() + 5; } else note(p.actor, p.name); } }
-    else if (type === 'job:done') { const o = state.agents.get(p.agent.id); if (o) { o.label = ''; o.flash = { text: p.job.status === 'done' ? 'Done' : p.job.status === 'cancelled' ? 'Stopped' : 'Problem', tone: p.job.status === 'done' ? 'ok' : 'bad', until: now() + 5 }; } loadFiles(); if (state.sel === p.agent.id) paintSide(); }
+    else if (type === 'job:done' || type === 'job:reviewed') { const o = state.agents.get(p.agent.id); if (o) { o.label = ''; o.flash = { text: p.job.status === 'review' ? 'Review' : p.job.status === 'done' ? 'Accepted' : p.job.status === 'cancelled' ? 'Stopped' : 'Problem', tone: p.job.status === 'done' || p.job.status === 'review' ? 'ok' : 'bad', until: now() + 5 }; } loadFiles(); if (state.sel === p.agent.id) paintSide(); }
     else if (type === 'ws:changed') loadFiles();
   });
   setInterval(() => { const s = ((document.getElementById('hud-status') || {}).textContent || '').toLowerCase(); state.cmd.mode = /speak/.test(s) ? 'speaking' : /listen/.test(s) ? 'listening' : /work|think/.test(s) ? 'working' : 'idle'; }, 400);
@@ -165,12 +206,92 @@
   /* ---------- the side panel ---------- */
   const dot = st => h('i', { class: 'of-dot ' + st });
   const jobTone = s => (s === 'done' ? 'ok' : s === 'failed' ? 'bad' : s === 'cancelled' ? 'warn' : 'run');
+  const jobLabel = j => j.status === 'review' ? 'Ready for review' : j.status === 'done' ? (j.acceptedAt ? 'Accepted by you' : 'Legacy completion (unverified)') : j.status === 'interrupted' ? 'Interrupted — inspect before retry' : j.status === 'queued' && j.recoveryNeeded ? 'Recovered queue — awaiting retry' : j.status;
+  function jobCard(j) {
+    const message = h('small', { role: 'status' });
+    const act = (label, method) => h('button', { class: 'mini', type: 'button', onclick: async e => {
+      const button = e.currentTarget; button.disabled = true; message.textContent = 'Saving…';
+      try { const r = await method(); if (!r || !r.ok) throw new Error(r && r.error || 'The job action failed.'); await paintSide(); }
+      catch (err) { message.textContent = err.message || String(err); button.disabled = false; }
+    } }, label);
+    const actions = [];
+    if (bridge.jobs && j.status === 'review') actions.push(act('Accept result', () => bridge.jobs.review(j.id, 'accept')), act('Reject result', () => bridge.jobs.review(j.id, 'reject')));
+    if (bridge.jobs?.configureQA && j.status === 'review' && j.isolation === 'git_worktree') {
+      actions.push(act(j.qa?.required ? 'Select QA test files' : 'Enable QA gate', async () => {
+        const runner=await jobInput('QA runner: node, python_unittest, pytest, go, cargo or maven. Tools/dependencies must already be installed; no download is performed.',j.qa?.runner||'node'); if(runner===null)return Promise.resolve({ok:true});
+        const files = await jobInput('Workspace-relative test files, one per line. Go needs selected .go files including a _test.go. Cargo/Maven need one Cargo.toml/pom.xml. Running project code requires approval and uses your OS permissions.', (j.qa?.tests || []).join('\n'), true);
+        return files === null ? Promise.resolve({ ok: true }) : bridge.jobs.configureQA(j.id, files.split(/\r?\n/).map(s => s.trim()).filter(Boolean),runner.trim());
+      }));
+      if (j.qa?.tests?.length) {
+        actions.push(act('Queue independent review', async () => {
+          const actor = await jobInput('Choose another existing worker by name or ID. The reviewer receives a separate source snapshot.');
+          return actor === null ? Promise.resolve({ ok: true }) : bridge.jobs.queueQAReview(j.id, actor.trim());
+        }), act('Run QA tests (ask first)', () => bridge.jobs.runQATests(j.id)), act('Stop QA tests', async () => { await bridge.stop.agent(j.agent); return { ok: true }; }));
+      }
+    }
+    if (bridge.jobs && (['interrupted', 'failed', 'cancelled', 'rejected'].includes(j.status) || j.status === 'queued' && j.recoveryNeeded)) actions.push(act('Retry job', () => {
+      if (!window.confirm('Retry this job? Inspect existing files first. An earlier external action may already have happened.')) return Promise.resolve({ ok: true });
+      return bridge.jobs.retry(j.id);
+    }));
+    if (bridge.jobs?.previewNativeRequest && j.nativeContinuity?.requestOutcome==='unknown' && ['interrupted','failed','cancelled','rejected'].includes(j.status)) actions.push(act('Review unknown provider request',async()=>{
+      const preview=await bridge.jobs.previewNativeRequest(j.id);if(!preview.ok)return preview;
+      if(!window.confirm(preview.unknownRequests+' unknown request(s), '+preview.requestsUsed+'/'+preview.requestLimit+' requests already charged.\n\n'+preview.scope+'\n\nAllow a separately initiated continuation with this uncertainty?')){await bridge.jobs.cancelNativeRequest(preview.token);return {ok:true};}
+      return bridge.jobs.applyNativeRequest(preview.token);
+    }));
+    if (bridge.jobs?.previewNativeConversion && j.nativeContinuity && ['interrupted','failed','cancelled','rejected'].includes(j.status)) actions.push(act('Review provider/model conversion', async () => {
+      const provider = await jobInput('Target provider: opencode, openrouter, gemini, openai or anthropic. Visible broker history only; private CLI state is not restored.');
+      if (provider === null) return {ok:true};
+      const model = await jobInput('Target model ID. Configure matching worker credentials/model before explicit Retry; original budget policy must remain valid.');
+      if (model === null) return {ok:true};
+      const includeNativeTodos=window.confirm('Include supported saved native TODO data as untrusted context? This does not recreate native TODOs, import plugins or resume actions. Cancel chooses visible history only.');
+      const preview = await bridge.jobs.previewNativeConversion(j.id,{provider:provider.trim(),model:model.trim(),includeNativeTodos});
+      if (!preview.ok) return preview;
+      if (!window.confirm(`Convert ${preview.messages} visible history messages from ${preview.source.provider}/${preview.source.model} to ${preview.target.provider}/${preview.target.model}? Native TODO data items: ${preview.portableTodoCount||0}. Old approvals remain historical; no job starts automatically.`)) { await bridge.jobs.cancelNativeConversion(preview.token); return {ok:true}; }
+      return bridge.jobs.applyNativeConversion(preview.token);
+    }));
+    if (bridge.jobs?.inspectNative && ['interrupted','failed','cancelled','rejected'].includes(j.status) && Array.isArray(j.nativeContinuity?.pendingTools) && j.nativeContinuity.pendingTools.length) actions.push(act('Record inspected native outcomes', async () => {
+      const outcomes=[];
+      for (const c of j.nativeContinuity.pendingTools) {
+        const outcome=await jobInput('Inspect the effects of '+c.tool+' ('+c.id+'). Outcome: completed, failed, or not_executed. This does not grant permission to repeat it.');
+        if(outcome===null)return Promise.resolve({ok:true});
+        const evidence=await jobInput('Describe the evidence you inspected for '+c.tool+'.');
+        if(evidence===null)return Promise.resolve({ok:true});outcomes.push({id:c.id,outcome,evidence});
+      }
+      return bridge.jobs.inspectNative(j.id,outcomes);
+    }));
+    const remote = j.remoteOutcomes || [], pendingRemote = remote.some(e => e.delivery !== 'synced');
+    if (bridge.jobs?.syncOutcome && pendingRemote) actions.push(act('Sync NeuralOps outcome', () => bridge.jobs.syncOutcome(j.id)));
+    const v = j.verification;
+    const evidenceText = v ? v.status === 'files_checked' ? (j.status === 'done' ? 'Requested files checked and accepted by you. Correctness was decided in human review.' : 'Requested files checked. Review their correctness before accepting.') : v.status === 'failed' ? 'Output checks failed: ' + v.issues.map(i => (i.path ? i.path + ': ' : '') + i.reason).join(' ') : j.status === 'done' ? 'You accepted the report. No automatic artifact checks were requested.' : 'Worker report is unverified. Review before accepting.' : '';
+    return h('details', { class: 'of-job', 'data-job-id': j.id },
+      h('summary', {}, dot(jobTone(j.status)), h('span', {}, clip(String(j.task || ''), 70))),
+      h('p', { class: 'of-job-state' }, jobLabel(j)),
+      j.nativeContinuity ? h('p', {}, 'Native model history: ' + j.nativeContinuity.requests + ' requests; ' + (j.nativeContinuity.restored ? 'restored' : 'saved') + '. Provider request outcome: '+(j.nativeContinuity.requestOutcome||'not recorded')+'. Retained unknown requests: '+(j.nativeContinuity.unknownRequestCount||0)+'. Pending tool outcomes: ' + (j.nativeContinuity.pendingTools?.length || 0) + '.') : null,
+      j.containment ? h('p', {}, 'Native container: '+j.containment.status+'. '+(j.containment.status==='cleanup_unknown'?'Restore Docker and restart Orbit before retrying.':'Direct network and host writes are blocked.')) : null,
+      j.nativeCheckpoint ? h('p', {}, 'Saved file checkpoint: '+j.nativeCheckpoint.at+'. Explicit retry restores this snapshot after cleanup; inspect uncertain actions first.') : null,
+      j.nativeCheckpoint?.engineState ? h('p', {}, 'Protected private engine state: '+j.nativeCheckpoint.engineState.engine+'. Session: '+(j.nativeCheckpoint.engineState.sessionPresent?'saved':'not yet created')+'. Unresolved native effects: '+j.nativeCheckpoint.engineState.pendingEffects+'. Retired queue/routing records: '+j.nativeCheckpoint.engineState.retiredQueueRows+'. Credentials and grants are regenerated.') : null,
+      j.workspaceDir ? h('p', {}, 'Isolated project folder: ' + j.workspaceDir) : null,
+      v?.revision ? h('p', {}, 'Project content fingerprint: ' + v.revision.sha256.slice(0, 16) + ' · ' + v.revision.files + ' files. This is not independent QA evidence.') : null,
+      j.qa?.required ? h('p', {}, 'QA gate required. Reviewer: ' + (j.qa.reviewJobId || 'not queued') + '. Host tests: ' + (j.qa.test?.status || 'not run') + '. Human acceptance is still required.') : null,
+      j.reviewTarget ? h('p', {}, 'Independent review of ' + j.reviewTarget.jobId + '. Candidate source is in source/. Your review report needs human acceptance.') : null,
+      j.dependencies?.length ? h('p', {}, 'Prerequisite jobs: ' + j.dependencies.join(', ')) : null,
+      j.selectedSkills?.length ? h('p', {}, 'Job skills: ' + j.selectedSkills.map(s => s.slug).join(', ')) : null,
+      j.managed ? h('p', {}, 'Managed NeuralOps job' + (j.guidance?.taskId ? ': ' + j.guidance.taskId : ' — waiting for task binding')) : null,
+      remote.length ? h('p', { class: 'of-remote-outcome' }, pendingRemote ? (remote.some(e => e.delivery === 'unknown') ? 'Remote outcome unconfirmed. Inspect NeuralOps before Sync.' : 'Remote outcome pending. Use Sync to record it in NeuralOps.') : 'Outcome recorded in NeuralOps. Local acceptance is a client claim; remote approval and completion remain separate.') : null,
+      h('p', {}, j.result ? clip(String(j.result), 700) : j.status === 'running' ? 'Still working on it.' : j.status === 'queued' ? 'Waiting in line.' : 'No report.'),
+      j.error ? h('p', {}, j.error) : null, evidenceText ? h('p', {}, evidenceText) : null,
+      v && v.artifacts.length ? h('ul', {}, v.artifacts.map(a => h('li', {}, `${a.path} · ${a.bytes} bytes · SHA-256 ${a.sha256.slice(0, 12)}…`))) : null,
+      h('div', { class: 'of-actions' }, actions), message);
+  }
   function paintStats() { const list = [...state.agents.values()], working = list.filter(o => o.state === 'working').length; stats.textContent = ''; stats.append(h('span', {}, h('b', {}, String(list.length)), ' crew'), h('span', {}, h('b', { class: working ? 'hot' : '' }, String(working)), ' working'), h('span', {}, h('b', {}, String(state.total)), ' files')); }
   function select(id) { state.sel = id; paintSide(); }
+  let sideVersion = 0;
+  const jobDrafts = new Map();
   async function paintSide() {
+    const version = ++sideVersion;
     if (!state.sel) return paintCrewList();
     const id = state.sel, o = state.agents.get(id), isC = id === COMMANDER; let r = null; try { r = await bridge.agents.inspect(isC ? COMMANDER : id); } catch { /* the list below still works */ }
-    if (state.sel !== id) return; if (!r && !o && !isC) { state.sel = null; return paintCrewList(); }
+    if (state.sel !== id || version !== sideVersion) return; if (!r && !o && !isC) { state.sel = null; return paintCrewList(); }
     const name = isC ? state.aiName : (o && o.name) || (r && r.agent.name), role = isC ? 'Chief of staff' : (o && o.role) || (r && r.agent.role) || '', color = isC ? '#FFB23E' : (o && o.color) || '#6fe3e0', working = isC ? state.cmd.mode !== 'idle' : o && o.state === 'working';
     const now1 = isC ? (state.cmd.until > now() ? state.cmd.bubble : state.cmd.mode === 'idle' ? 'Standing by' : state.cmd.mode) : working ? (o.label || o.task || 'Working\u2026') : 'Resting';
     const files = (state.files.get(id) || []).slice(0, 6), jobs = (r && r.jobs) || [];
@@ -178,9 +299,13 @@
     // Per-worker engine/model override (blank fields inherit the crew default from Settings).
     const engineRow = isC ? null : (() => {
       const eng = h('select', {}, [['', 'Crew default'], ['builtin', 'Built-in'], ['hermes', 'Hermes Agent'], ['opencode', 'OpenCode']].map(([v, t]) => h('option', { value: v, selected: v === ((r && r.agent && r.agent.engine) || '') }, t)));
-      const prov = h('input', { value: (r && r.agent && r.agent.workerProvider) || '', placeholder: 'gemini / openrouter / anthropic / openai / custom' });
+      const prov = h('input', { value: (r && r.agent && r.agent.workerProvider) || '', placeholder: 'gemini / opencode / openrouter / anthropic / openai / custom' });
       const model = h('input', { value: (r && r.agent && r.agent.workerModel) || '', placeholder: 'blank = crew model' });
-      const key = h('input', { type: 'password', autocomplete: 'off', value: (r && r.agent && r.agent.workerApiKey) || '', placeholder: 'blank = crew key' });
+      const picker=h('select',{'aria-label':'Available OpenCode models'},h('option',{value:''},'Choose a model'));picker.onchange=()=>{if(picker.value)model.value=picker.value;};
+      const loadModels=h('button',{class:'mini',type:'button',onclick:async()=>{out.textContent='Loading model catalogue…';try{const current=await bridge.agents.inspect(id);if((current?.agent?.workerProvider||'')!==prov.value.trim())throw Error('Save the provider and its API key before loading models.');const result=await bridge.opencode.models(id);if(!result.ok)throw Error(result.error);picker.replaceChildren(h('option',{value:''},'Choose a model'),...result.models.map(v=>h('option',{value:v},v+(result.prices?.find(p=>p.id===v)?.freeTextPricing?' — Free text pricing':''))));out.textContent='Choose a model, then Save engine. Catalogue does not prove access or free pricing. Existing stopped jobs need reviewed model conversion.';}catch(e){out.textContent=e.message;}}},'Load OpenCode / OpenRouter models');
+      let savedProvider=(r&&r.agent&&r.agent.workerProvider)||'';
+      const key = h('input', { type: 'password', autocomplete: 'off', value: (r && r.agent && r.agent.workerApiKey) || '', placeholder: 'blank = matching provider crew key' });
+      prov.addEventListener('change',()=>{if(prov.value.trim()!==savedProvider){key.value='';out.textContent='Provider changed. Enter that provider’s API key before Save engine.';}});
       const base = h('input', { value: (r && r.agent && r.agent.workerBaseUrl) || '', placeholder: 'https://.../v1 (custom only)' });
       const out = h('small', {});
       return sec(`${name}'s own engine (blank = crew default)`,
@@ -190,12 +315,17 @@
           h('label', { class: 'field' }, h('span', {}, 'Model'), model),
           h('label', { class: 'field' }, h('span', {}, 'API key'), key),
           h('label', { class: 'field' }, h('span', {}, 'Base URL'), base)),
-        h('div', {}, h('button', { class: 'mini', type: 'button', onclick: async () => {
+        h('div', {}, loadModels,picker,h('button', { class: 'mini', type: 'button', onclick: async () => {
           out.textContent = 'Saving…';
-          try { await bridge.agents.update(id, { engine: eng.value, workerProvider: prov.value.trim(), workerModel: model.value.trim(), workerApiKey: key.value.trim(), workerBaseUrl: base.value.trim() }); out.textContent = 'Saved.'; }
+          try { const saved=await bridge.agents.update(id, { engine: eng.value, workerProvider: prov.value.trim(), workerModel: model.value.trim(), workerApiKey: key.value.trim(), workerBaseUrl: base.value.trim() });if(!saved?.ok)throw Error(saved?.error||'Worker settings were not saved.'); savedProvider=prov.value.trim(); out.textContent = 'Saved.'; }
           catch (e) { out.textContent = String((e && e.message) || e); }
         } }, 'Save engine'), out));
     })();
+    let healthRow=null;
+    if(!isC&&bridge.crewHealth){try{
+      const response=await bridge.crewHealth.get(),health=response.job?.workers?.find(w=>w.id===id),msg=h('small',{role:'status'});
+      if(health)healthRow=sec('Worker health',h('p',{},'Desired: '+health.desired+' · Actual: '+health.actual+' · Queued: '+health.queued),h('p',{},health.issues.length?health.issues.join(', '):'No observed lifecycle mismatch. Provider health and result correctness are not established.'),h('button',{class:'mini',type:'button',onclick:async()=>{try{const result=await bridge.crewHealth.setDesired(id,health.desired==='paused'?'ready':'paused');if(!result.ok)throw Error(result.error);await paintSide();}catch(e){msg.textContent=e.message;}}},health.desired==='paused'?'Make worker ready (no auto-resume)':'Pause worker and cancel queued work'),msg);
+    }catch{healthRow=sec('Worker health',h('p',{},'Health records unavailable. Inspect before assigning work.'));}}
     let usageRow = null;
     if (!isC) {
       try {
@@ -205,6 +335,7 @@
           h('p', { class: 'of-dim' }, `${ua.req} request${ua.req === 1 ? '' : 's'}, ${ua.runs} run${ua.runs === 1 ? '' : 's'} \u00B7 ${(ua.inTok + ua.outTok).toLocaleString()} tokens \u00B7 ~$${ua.cost.toFixed(3)}`));
       } catch { /* usage is a convenience, never block the panel for it */ }
     }
+    if (state.sel !== id || version !== sideVersion) return;
     side.replaceChildren(...[
       h('div', { class: 'of-head' }, h('div', { class: 'of-avatar', style: `border-color:${color};color:${color}` }, name[0].toUpperCase()), h('div', { class: 'of-who' }, h('b', {}, name), h('span', {}, role)), h('button', { class: 'of-x', type: 'button', 'aria-label': 'Close', onclick: () => select(null) }, '\u00D7')),
       h('div', { class: 'of-now ' + (working ? 'on' : '') }, dot(working ? 'run' : 'idle'), h('span', {}, now1)),
@@ -212,11 +343,46 @@
         isC ? h('button', { class: 'mini danger', type: 'button', onclick: async () => { await bridge.stop.all(); paintSide(); } }, 'Stop everything')
             : h('button', { class: 'mini danger', type: 'button', disabled: !working && !jobs.some(j => j.status === 'queued' || j.status === 'running'), onclick: async () => { await bridge.stop.agent(id); setTimeout(paintSide, 400); } }, 'Stop this job'),
         h('button', { class: 'mini', type: 'button', onclick: () => window.__ws && __ws.focus(isC ? '' : id) }, 'Workspace'), r && r.folder ? h('button', { class: 'mini', type: 'button', onclick: () => bridge.showInFolder(r.folder) }, 'Folder') : null),
-      isC ? null : sec('Jobs', jobs.length ? jobs.slice(0, 5).map(j => h('details', { class: 'of-job' }, h('summary', {}, dot(jobTone(j.status)), h('span', {}, clip(String(j.task || ''), 70))), h('p', {}, j.result ? clip(String(j.result), 700) : j.status === 'running' ? 'Still working on it.' : j.status === 'queued' ? 'Waiting in line.' : 'No report.'))) : h('p', { class: 'of-dim' }, 'No jobs yet.')),
+      isC ? null : sec('Jobs', r && r.jobsError ? h('p', { role: 'alert' }, r.jobsError) : null, jobs.length ? jobs.slice(0, 20).map(jobCard) : h('p', { class: 'of-dim' }, 'No jobs yet.')),
       sec(`Files (${(state.files.get(id) || []).length})`, files.length ? files.map(f => h('button', { class: 'of-file', type: 'button', title: f.rel, onclick: () => window.__ws && __ws.open(f.rel) }, h('span', {}, f.name), h('em', {}, f.size < 1024 ? f.size + ' B' : (f.size / 1024).toFixed(f.size < 10240 ? 1 : 0) + ' KB'))) : h('p', { class: 'of-dim' }, isC ? 'Files saved straight into the workspace.' : 'Nothing saved yet.')),
       r && r.skills && r.skills.length ? sec('Skills', h('div', { class: 'of-chips' }, ...r.skills.slice(0, 12).map(s => h('span', {}, s)))) : null,
       r && r.soul ? sec('Character', h('p', { class: 'of-dim' }, clip(r.soul.replace(/^#.*\n+/, '').split('\n').filter(Boolean).slice(0, 4).join(' '), 260))) : null].filter(Boolean));
+    if (!isC) side.appendChild(sec('Observed activity', h('p', { class: 'of-dim of-activity' }, activityText(r?.activity))));
+    if(bridge.communication){
+      const inbox=sec('Agent communication',h('p',{},'Loading inbox…'));side.appendChild(inbox);
+      const paintInbox=async()=>{try{const data=await bridge.communication.inspect(id);if(state.sel!==id||version!==sideVersion)return;if(!data.ok)throw Error(data.error);inbox.replaceChildren(h('h4',{},'Agent communication'),h('p',{},data.scope));
+        const messages=[...data.received.map(m=>({...m,direction:'Received'})),...data.sent.map(m=>({...m,direction:'Sent'}))].sort((a,b)=>b.t.localeCompare(a.t));
+        if(!messages.length)inbox.appendChild(h('p',{},'No reliable messages yet.'));
+        for(const m of messages.slice(0,40))inbox.appendChild(h('div',{class:'of-message'},h('b',{},m.direction+' · '+m.kind+' · '+(m.ack?'Receipt acknowledged':'Awaiting acknowledgement')),h('p',{},m.text),h('small',{},m.from+' → '+m.to+' · '+m.sourceJobId+' · '+(m.targetJobId||'Assistant'))));
+        inbox.appendChild(h('button',{class:'mini',onclick:paintInbox},'Refresh inbox'));
+        if(data.retention?.status==='prepared'){inbox.appendChild(h('p',{role:'alert'},'Interrupted receipt release: '+data.retention.present.length+' still present, '+data.retention.absent.length+' already removed. Nothing is automatically replayed.'));if(!data.retention.present.length)inbox.appendChild(h('button',{class:'mini',onclick:async()=>{const r=await bridge.communication.finish(data.retention.id);if(!r.ok){inbox.appendChild(h('p',{role:'alert'},r.error));return;}await paintInbox();}},'Confirm inspected release'));}
+        if(data.eligible.length)inbox.appendChild(h('button',{class:'mini',onclick:async()=>{let token;try{const p=await bridge.communication.preview(id,data.eligible.slice(0,100));if(!p.ok)throw Error(p.error);token=p.token;const preview=h('div',{'aria-label':'Receipt release preview'},h('p',{},'Release '+p.ids.length+' acknowledged receipts. Payload estimate '+p.bytes+' bytes; actual reclaimed bytes reported after release.'),h('p',{},p.ids.join(', ')));const out=h('small',{role:'status'});inbox.append(preview,out);preview.append(h('button',{class:'mini',onclick:async()=>{await bridge.communication.cancel(token);preview.remove();}},'Cancel release'),h('button',{class:'mini danger',onclick:async()=>{const result=await bridge.communication.apply(token);if(!result.ok){out.textContent=result.error;return;}await paintInbox();inbox.appendChild(h('p',{role:'status'},'Inbox bytes reclaimed: '+result.reclaimedInboxBytes));}},'Apply receipt release'));}catch(e){inbox.appendChild(h('p',{role:'alert'},e.message));}}},'Preview eligible receipt release'));
+      }catch(e){inbox.replaceChildren(h('h4',{},'Agent communication'),h('p',{role:'alert'},e.message));}};await paintInbox();
+    }
     if (engineRow) side.appendChild(engineRow);
+    if (healthRow) side.appendChild(healthRow);
+    if (!isC && bridge.jobs) {
+      const task = h('textarea', { class: 'of-job-field', 'aria-label': 'New job task', placeholder: 'Describe the job' });
+      const expected = h('textarea', { class: 'of-job-field', 'aria-label': 'Expected output files', placeholder: 'Optional: workspace-relative output files, one per line' });
+      const project = h('input', { class: 'of-job-field', 'aria-label': 'Project folder', placeholder: 'Optional: full path to a clean Git project' });
+      const dependencies = h('input', { class: 'of-job-field', 'aria-label': 'Prerequisite jobs', placeholder: 'Optional: prerequisite job IDs, comma separated' });
+      const skills = h('input', { class: 'of-job-field', 'aria-label': 'Library skills', placeholder: 'Optional: library skill names; blank selects relevant skills' });
+      const managed = h('input', { type: 'checkbox', 'aria-label': 'Managed NeuralOps job' });
+      const draft = jobDrafts.get(id); task.value = draft?.task || ''; expected.value = draft?.expected || '';
+      project.value = draft?.project || ''; dependencies.value = draft?.dependencies || ''; skills.value = draft?.skills || '';
+      managed.checked = draft?.managed === true;
+      const saveDraft = () => jobDrafts.set(id, { managed: managed.checked, task: task.value, expected: expected.value, project: project.value, dependencies: dependencies.value, skills: skills.value });
+      managed.addEventListener('change', saveDraft);
+      task.addEventListener('input', saveDraft); expected.addEventListener('input', saveDraft);
+      for (const field of [project, dependencies, skills]) field.addEventListener('input', saveDraft);
+      const out = h('small', { role: 'status' });
+      side.appendChild(sec('Give a job', task, expected, project, dependencies, skills, h('label', { class: 'of-job-mode' }, managed, 'Managed NeuralOps job (built-in only; no shell)'), h('small', { class: 'of-job-help' }, 'Managed jobs require an updated NeuralOps server and policy or direct authority. Project jobs use a separate worktree. Prerequisites wait for your acceptance. Changes are never merged automatically.'), h('button', { class: 'mini', type: 'button', onclick: async e => {
+        if (!task.value.trim()) { out.textContent = 'Describe the job first.'; return; }
+        const button = e.currentTarget; button.disabled = true; out.textContent = 'Queueing…';
+        try { const names = value => value.split(',').map(s => s.trim()).filter(Boolean); const result = await bridge.jobs.dispatch(id, task.value.trim(), expected.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean), { managed: managed.checked, dependencies: names(dependencies.value), ...(skills.value.trim() ? { skills: names(skills.value) } : {}), ...(project.value.trim() ? { projectRoot: project.value.trim() } : {}) }); if (!result || !result.ok) throw new Error(result && result.error || 'Could not queue the job.'); jobDrafts.delete(id); await paintSide(); }
+        catch (err) { out.textContent = err.message || String(err); button.disabled = false; }
+      } }, 'Queue job'), out));
+    }
     if (!isC) {
       const cb = h('input', { type: 'checkbox', style: 'width:auto;margin:0' }); cb.checked = !(r && r.agent && r.agent.allowCode === false);
       const codeOut = h('small', {});
@@ -235,6 +401,7 @@
       h('button', { class: 'of-row', type: 'button', onclick: () => select(COMMANDER) }, h('div', { class: 'of-avatar sm', style: 'border-color:#FFB23E;color:#FFB23E' }, state.aiName[0].toUpperCase()), h('div', { class: 'of-who' }, h('b', {}, state.aiName), h('span', {}, 'Chief of staff \u00B7 ' + (state.cmd.mode === 'idle' ? 'standing by' : state.cmd.mode)))),
       ...list.map(o => h('button', { class: 'of-row', type: 'button', onclick: () => select(o.id) }, h('div', { class: 'of-avatar sm', style: `border-color:${o.color};color:${o.color}` }, (o.name || '?')[0].toUpperCase()), h('div', { class: 'of-who' }, h('b', {}, o.name), h('span', {}, o.state === 'working' ? clip(o.label || o.task || 'working', 40) : 'resting \u00B7 ' + (o.role || ''))), dot(o.state === 'working' ? 'run' : 'idle'))),
       h('button', { class: 'mini', type: 'button', onclick: () => { window.__ws && __ws.show('bridge'); const b = document.getElementById('add-crew'); if (b) b.click(); } }, 'Add crew'));
+    if(bridge.crewHealth)side.appendChild(h('button',{class:'mini',type:'button',onclick:async()=>{const area=h('section',{class:'of-sec','aria-label':'Crew health overview'});side.appendChild(area);try{const result=await bridge.crewHealth.get();if(!result.ok)throw Error(result.error);area.appendChild(h('h4',{},'Crew health'));for(const w of result.job.workers)area.appendChild(h('p',{},w.name+': desired '+w.desired+', actual '+w.actual+', '+w.queued+' queued. '+(w.issues.length?w.issues.join(', '):'No observed mismatch.')));area.appendChild(h('small',{},result.job.scope));}catch(e){area.textContent=e.message;}}},'Inspect crew health'));
   }
 
   /* ---------- entering and leaving ---------- */
@@ -243,7 +410,7 @@
     root.style.setProperty('--ox', ox + 'px'); root.style.setProperty('--oy', oy + 'px'); root.classList.add('pre'); state.visible = true; state.snap = true; state.last = 0; resize(); loadAgents(); loadFiles(); paintSide();
     requestAnimationFrame(() => requestAnimationFrame(() => { root.classList.remove('pre'); resize(); })); requestAnimationFrame(loop);
   }
-  function leave() { state.visible = false; }
+  function leave() { if (cancelInput) cancelInput(); state.visible = false; }
   // the way in from the Orbit: a button and a double click on the crew deck
   const deckHead = document.querySelector('.panel.crew .ph'), deck = document.getElementById('town');
   if (deckHead) { const b = h('button', { class: 'mini', type: 'button', title: 'Walk into the office (Alt+2)', onclick: () => window.__ws && __ws.show('office', { from: deckHead.closest('.panel').getBoundingClientRect() }) }, 'Enter office'); deckHead.insertBefore(b, deckHead.querySelector('#add-crew')); }

@@ -44,7 +44,7 @@ function engineFor(cfgExtra = {}) {
   const bin = launcher(dir);
   const home = new Home(path.join(dir, 'BridgeHome')).ensure();
   const cfg = { aiName: 'Nova', engine: 'opencode', opencodePath: bin, workerProvider: 'custom', workerModel: 'mock-model', workerApiKey: 'mock-key', workerBaseUrl: 'http://127.0.0.1:1/v1', ...cfgExtra };
-  return { engine: new OpenCodeEngine({ home, getCfg: () => cfg }), home, cfg };
+  return { engine: new OpenCodeEngine({ requireContainment: false, home, getCfg: () => cfg }), home, cfg };
 }
 
 test('detect() runs the configured opencode command', async () => {
@@ -108,7 +108,37 @@ test('workers route jobs to OpenCode when the engine is opencode', async () => {
   const job = home.createJob(agent.id, 'Create proof.txt');
   await workers.run(agent, job);
   const got = home.findJob(job.id);
-  assert.equal(got.status, 'done', got.error); assert.equal(got.engine, 'opencode'); assert.match(got.result, /Done:/);
+  assert.equal(got.status, 'review', got.error); assert.equal(got.engine, 'opencode'); assert.match(got.result, /Done:/);
   assert.ok(seen.includes('opencode:running')); assert.ok(states.includes('working')); assert.equal(states[states.length - 1], 'idle');
   assert.ok(fs.existsSync(path.join(home.p('workspace', 'bilal'), 'proof.txt')));
+});
+
+function eventEngine(cfg={}) {
+  const {EventEmitter}=require('events');const child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();let killed=0;
+  child.kill=()=>{killed++;};
+  const engine=new OpenCodeEngine({requireContainment:false,home:{root:'.'},getCfg:()=>({workerTimeoutSeconds:1,opencodeIdleMs:5000,opencodeJson:false,...cfg})});
+  engine.preflight=async()=>({ok:true});engine.writeProjectConfig=()=>({ws:'.',env:{}});engine._spawn=()=>child;
+  return {engine,child,killed:()=>killed};
+}
+test('active output cannot turn the total deadline into a silence error; late output is ignored',async t=>{
+  const r=eventEngine(),events=[];let bytes=0;
+  const timer=setInterval(()=>r.child.stdout.emit('data',Buffer.from('working')),20);t.after(()=>clearInterval(timer));
+  await assert.rejects(r.engine.runTask({id:'bob'},'work',{onProgress:p=>events.push(p),onData:n=>bytes+=n}),/total execution deadline.*not a silence timeout/);
+  clearInterval(timer);const before=bytes;r.child.stdout.emit('data',Buffer.from('late'));assert.equal(bytes,before);
+  assert.equal(r.killed(),1);assert.equal(events.at(-1).status,'failed');assert.ok(!events.some(x=>x.label==='Finished'));
+});
+test('silence cutoff is separate and does not diagnose provider failure',async()=>{
+  const r=eventEngine({opencodeIdleMs:20}),events=[];
+  await assert.rejects(r.engine.runTask({id:'bob'},'work',{onProgress:p=>events.push(p)}),/without process output.*health are unknown/);
+  assert.equal(r.killed(),1);assert.equal(events.at(-1).status,'failed');
+});
+test('abort settles even if the killed child never closes and never emits Finished',async()=>{
+  const r=eventEngine(),ctl=new AbortController(),events=[];
+  const promise=r.engine.runTask({id:'bob'},'work',{signal:ctl.signal,onProgress:p=>events.push(p)});
+  await new Promise(resolve=>setImmediate(resolve));ctl.abort(Error('User stop'));
+  await assert.rejects(promise,/User stop/);assert.equal(r.killed(),1);assert.equal(events.at(-1).status,'cancelled');
+});
+
+test('mediated OpenCode config disables unrelated title requests and preserves complete protected history',t=>{
+ const r=engineFor();t.after(()=>fs.rmSync(path.dirname(r.home.root),{recursive:true,force:true}));const agent=r.home.createAgent({name:'Policy fixture'});const prepared=r.engine.writeProjectConfig(agent,{nativeBroker:true});const cfg=JSON.parse(fs.readFileSync(path.join(prepared.ws,'opencode.json'),'utf8'));assert.deepEqual(cfg.agent,{title:{disable:true}});assert.deepEqual(cfg.compaction,{auto:false,prune:false});assert.deepEqual(cfg.enabled_providers,['custom']);assert.equal(cfg.small_model,cfg.model);assert.equal(cfg.permission.bash,'deny');const policy=require('../lib/native-container-runner').opencodeMediationPolicy();policy.agent.title.disable=false;assert.equal(require('../lib/native-container-runner').opencodeMediationPolicy().agent.title.disable,true);assert.ok(fs.readFileSync(path.join(__dirname,'../lib/native-container-runner.js'),'utf8').includes('...opencodeMediationPolicy()'));
 });

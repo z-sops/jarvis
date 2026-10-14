@@ -91,9 +91,9 @@ test('create_agent + assign_task end to end with background worker', async () =>
   const a = await r.tools.exec('assign_task', { agent: 'alice', task: 'find the dollar rate' });
   assert.equal(a.ok, true); assert.ok(a.job_id);
   const { job } = await done;
-  assert.equal(job.status, 'done'); assert.equal(job.result, 'all done');
+  assert.equal(job.status, 'review'); assert.equal(job.result, 'all done');
   assert.equal(r.home.listJobs('alice').length, 1);
-  assert.match(r.home.readMemory('alice'), /Finished/);
+  assert.match(r.home.readMemory('alice'), /Report ready for review/);
   const missing = await r.tools.exec('assign_task', { agent: 'nobody', task: 'x' });
   assert.equal(missing.ok, false);
 });

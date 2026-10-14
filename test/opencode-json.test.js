@@ -11,9 +11,9 @@ const skip = process.platform === 'win32';
 function engine(extra) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ocjson-'));
   const fake = path.join(dir, 'fake-opencode');
-  fs.writeFileSync(fake, "#!/usr/bin/env node\nconst a=process.argv.slice(2);if(a.includes('--format')&&a.includes('json')){const o=x=>console.log(JSON.stringify(x));o({type:'step_start',part:{}});o({type:'text',part:{text:'All done, 3 files.'}});o({type:'step_finish',part:{tokens:{total:10,input:8,output:2}}});}else{console.log('plain text answer');}\n"); fs.chmodSync(fake, 0o755);
+  fs.writeFileSync(fake, "#!/usr/bin/env node\nif(process.argv.includes('--version')){console.log('1.2.3');process.exit(0);}const a=process.argv.slice(2);if(a.includes('--format')&&a.includes('json')){const o=x=>console.log(JSON.stringify(x));o({type:'step_start',part:{}});o({type:'text',part:{text:'All done, 3 files.'}});o({type:'step_finish',part:{tokens:{total:10,input:8,output:2}}});}else{console.log('plain text answer');}\n"); fs.chmodSync(fake, 0o755);
   const cfg = { opencodePath: fake, workerProvider: 'opencode', workerModel: 'x-free', workerApiKey: 'k', ...(extra || {}) };
-  return new OpenCodeEngine({ home: { root: dir, p: (...a) => path.join(dir, ...a) }, getCfg: () => cfg });
+  return new OpenCodeEngine({ requireContainment: false, home: { root: dir, p: (...a) => path.join(dir, ...a) }, getCfg: () => cfg });
 }
 
 test('a job reads the JSON events: the answer is the text, the steps are reported', { skip }, async () => {

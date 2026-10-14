@@ -32,7 +32,7 @@ function hubFor(prefix, mode, opts = {}) {
   const bin = launcher(dir, mode);
   const home = new Home(path.join(dir, 'BridgeHome')).ensure();
   const cfg = { aiName: 'Nova', gender: 'female', userName: 'Zee', userTitle: 'CEO', lang: 'mix', engine: 'hermes', hermesPath: bin, workerProvider: 'custom', workerModel: 'm', workerApiKey: 'k', workerBaseUrl: 'http://127.0.0.1:1/v1', comms: {} };
-  const engine = new HermesEngine({ home, getCfg: () => cfg });
+  const engine = new HermesEngine({ requireContainment: false, home, getCfg: () => cfg });
   const bus = new EventEmitter(); const events = []; bus.on('comms:event', e => events.push(e.text));
   const hub = new CommsHub({ home, getCfg: () => cfg, setCfg: p => Object.assign(cfg, p), hermes: engine, bus, restartBaseMs: 20, restartMaxMs: 200, ...opts });
   let starts = 0; const orig = hub.start.bind(hub); hub.start = function () { starts++; return orig(); };
@@ -90,7 +90,7 @@ test('CommsHub defaults: production timing is unchanged when no options are pass
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bridge-defaults-'));
   const home = new Home(path.join(dir, 'BridgeHome')).ensure();
   const cfg = { aiName: 'Nova', engine: 'hermes', hermesPath: 'hermes', comms: {} };
-  const hub = new CommsHub({ home, getCfg: () => cfg, setCfg: () => {}, hermes: new HermesEngine({ home, getCfg: () => cfg }), bus: new EventEmitter() });
+  const hub = new CommsHub({ home, getCfg: () => cfg, setCfg: () => {}, hermes: new HermesEngine({ requireContainment: false, home, getCfg: () => cfg }), bus: new EventEmitter() });
   assert.equal(hub.restartBaseMs, 2000); assert.equal(hub.restartMaxMs, 60000);
   assert.equal(hub.maxRestarts, 5); assert.equal(hub.restartWindowMs, 300000);
 });

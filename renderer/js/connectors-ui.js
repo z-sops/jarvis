@@ -3,7 +3,7 @@
 (() => {
   'use strict';
   const h = (tag, attrs = {}, ...kids) => { const el = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') el.className = v; else if (k.startsWith('on')) el.addEventListener(k.slice(2), v); else if (v === true) el.setAttribute(k, ''); else if (v !== false && v != null) el.setAttribute(k, v); } for (const kid of kids.flat()) if (kid != null) el.append(kid.nodeType ? kid : document.createTextNode(String(kid))); return el; };
-  const S = { catalog: [], list: [], native: [], engine: 'builtin', crew: [], open: new Set(), openAgents: new Set(), feed: [] };
+  const S = { catalog: [], list: [], native: [], engine: 'builtin', crew: [], open: new Set(), openAgents: new Set(), feed: [], identityNotices: new Map() };
   const host = u => { try { const x = new URL(u); return x.host + (x.pathname !== '/' ? x.pathname : ''); } catch { return u; } };
   const LEVELS = [['free', 'Free'], ['ask', 'Ask me'], ['blocked', 'Blocked']];
   const levelSelect = (cur, onchange) => h('select', { class: 'cn-btn cn-lv ' + cur, 'aria-label': 'What the crew may do', onchange }, LEVELS.map(([v, t]) => h('option', { value: v, selected: v === cur }, t)));
@@ -43,6 +43,41 @@
     for (const t of c.tools) tools.append(h('div', { class: 'cn-trow' }, h('div', { class: 'cn-tname' }, h('b', {}, t.name, ' ', h('i', { class: t.read ? '' : 'w' }, t.read ? 'reads' : 'changes')), t.desc ? h('small', {}, t.desc) : null), levelSelect(t.level, async e => { const r = await bridge.connectors.level(c.id, t.name, e.target.value); if (r.ok) { const i = S.list.findIndex(x => x.id === c.id); S.list[i] = r.connector; paint(); } })));
     const all = c.agents === 'all'; agents.append(h('label', {}, h('input', { type: 'checkbox', checked: all, onchange: e => { bridge.connectors.update(c.id, { agents: e.target.checked ? 'all' : [] }).then(refresh); } }), 'Everyone in the crew'));
     for (const a of S.crew) agents.append(h('label', {}, h('input', { type: 'checkbox', disabled: all, checked: all || (Array.isArray(c.agents) && c.agents.includes(a.id)), onchange: () => { const ids = [...agents.querySelectorAll('input[data-agent]')].filter(i => i.checked).map(i => i.dataset.agent); bridge.connectors.update(c.id, { agents: ids }).then(refresh); }, 'data-agent': a.id }), a.name));
+    if (c.catalogId === 'neuralops') {
+      const mappings = c.neuralopsIdentities || {}, rows = [{ id: 'commander', name: 'Laila (assistant)' }, ...S.crew.filter(a => a.id !== 'commander')];
+      const inputs = [], status = h('div', { class: 'cn-status', role: 'status', 'aria-live': 'polite' }, S.identityNotices.get(c.id) || '');
+      agents.append(h('div', { style: 'width:100%' }, h('b', {}, 'Worker identities'), h('p', {}, 'Give each worker a different AI identity registered in NeuralOps. The saved token must belong to their broker, and each identity must name that broker as its delegate. Blank workers cannot use NeuralOps. Test checks tool discovery only; it does not verify these identities.')));
+      for (const a of rows) {
+        const input = h('input', { class: 'cn-identity', type: 'text', value: mappings[a.id] || '', placeholder: a.id === 'commander' ? 'agent.laila' : 'agent.' + a.id, maxlength: 69, spellcheck: 'false', autocomplete: 'off', 'aria-label': 'NeuralOps identity for ' + a.name });
+        input.addEventListener('input', () => { status.className = 'cn-status'; status.textContent = 'Unsaved edits. Save worker identities before verification.'; S.identityNotices.delete(c.id); });
+        inputs.push({ actor: a.id, input }); agents.append(h('label', { class: 'cn-row', style: 'width:100%' }, a.name, input));
+      }
+      const save = h('button', { class: 'cn-btn', type: 'button' }, 'Save worker identities');
+      save.onclick = async () => {
+        const identities = {}; for (const row of inputs) identities[row.actor] = row.input.value.trim();
+        save.disabled = true; status.className = 'cn-status'; status.textContent = 'Saving identities...';
+        try { const r = await bridge.connectors.update(c.id, { neuralopsIdentities: identities }); if (!r.ok) { status.className = 'cn-status bad'; status.textContent = r.error; return; } S.identityNotices.set(c.id, 'Mappings saved. Registration and delegation still need verification.'); await refresh(); }
+        catch { status.className = 'cn-status bad'; status.textContent = 'The identities could not be saved. Try again.'; }
+        finally { save.disabled = false; }
+      };
+      const verify = h('button', { class: 'cn-btn', type: 'button' }, 'Verify worker identities');
+      verify.onclick = async () => {
+        if (inputs.some(row => row.input.value.trim() !== (mappings[row.actor] || ''))) { status.className = 'cn-status bad'; status.textContent = 'Save worker identities before verifying. Unsaved names are not checked.'; return; }
+        verify.disabled = true; status.className = 'cn-status'; status.textContent = 'Checking saved broker and worker identities...';
+        try {
+          const r = await bridge.connectors.verifyIdentities(c.id);
+          if (!r.ok) { status.className = 'cn-status bad'; status.textContent = r.error || 'Verification unavailable.'; return; }
+          const v = r.verification, labels = { verified: 'verified', no_mapping: 'no saved identity', access_disabled: 'connector access disabled', authentication_refused: 'token refused or expired', delegation_refused: 'identity or delegation refused', invalid_response: 'service did not return verifiable identity evidence', unexpected_identity: 'service returned a different identity', revoked_or_unknown: 'revoked or revocation status unavailable', broker_required: 'saved token does not belong to a broker', delegate_mismatch: 'delegate does not match this broker', workspace_mismatch: 'workspace does not match this broker', unavailable: 'service unavailable', deadline: 'verification timed out', stale: 'configuration changed; verify again', not_checked: 'not checked' };
+          status.className = 'cn-status' + (v.allPassed ? ' ok' : ' bad'); status.textContent = '';
+          status.append(h('div', {}, v.stale ? 'Configuration changed during verification; results cannot be used.' : 'Read-only check at ' + new Date(v.checkedAt).toLocaleTimeString() + '. This does not grant permission or verify a job.'));
+          status.append(h('div', {}, 'Broker: ' + (labels[v.broker.reason] || 'unverified') + (v.broker.id ? ' (' + v.broker.id + ')' : '')));
+          for (const row of v.workers) status.append(h('div', {}, (rows.find(a => a.id === row.actor)?.name || row.actor) + ': ' + (row.identity || '(blank)') + ' — ' + (labels[row.reason] || 'unverified')));
+          if (!v.workers.length) status.append(h('div', {}, 'Workers were not checked because broker verification failed.'));
+        } catch { status.className = 'cn-status bad'; status.textContent = 'Verification unavailable. No identities or permissions were changed.'; }
+        finally { verify.disabled = false; }
+      };
+      agents.append(save, verify, status);
+    }
     const roots = c.native === 'files' ? h('div', { class: 'cn-agents cn-roots' }, h('b', { style: 'font:600 12px var(--m);color:var(--dim);width:100%' }, 'Folders the crew may use'), c.roots.map(r => h('div', { class: 'cn-root' }, h('span', {}, r), c.roots.length > 1 ? h('button', { class: 'cn-btn danger', type: 'button', title: 'Stop using this folder', onclick: async () => { const x = await bridge.connectors.roots(c.id, c.roots.filter(y => y !== r)); if (!x.ok) alert(x.error); refresh(); } }, 'Remove') : null)),
       h('button', { class: 'cn-btn', type: 'button', onclick: async () => { const pk = await bridge.connectors.pickFolder(); if (!pk.ok || !pk.path) return; const x = await bridge.connectors.roots(c.id, [...c.roots, pk.path]); if (!x.ok) alert(x.error); refresh(); } }, 'Add a folder\u2026')) : null;
     const auto = c.catalogId === 'neuralops' || /127\.0\.0\.1:3031\/mcp/.test(String(c.url || '')); const modeSel = h('select', { class: 'cn-btn', 'aria-label': 'Access', style: auto ? 'display:none' : '', onchange: async e => { const m = e.target.value; if (m === 'read-write' && !confirm(`Let the crew TRY to change things in ${c.name}?\n\nEvery change will ask you first, each time. Reading stays free.\n\nRead only blocks all changes.`)) { e.target.value = c.mode; return; } await bridge.connectors.update(c.id, { mode: m }); await runTest(c, st); } },
@@ -91,3 +126,4 @@
   bridge.onBus(({ type, payload }) => { if (type === 'connector:activity') { S.feed.push(payload); if (S.feed.length > 80) S.feed.shift(); if (document.body.dataset.view === 'connectors') paintFeed(); } });
   window.__connectors = { enter: refresh, leave: close, state: () => S };
 })();
+

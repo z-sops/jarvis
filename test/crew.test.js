@@ -34,11 +34,11 @@ test('jobs for one agent wait in line, the caller is told how many are ahead, an
   assert.equal(r.workers.cancel('bob'), 0, 'nothing left to cancel'); assert.equal(r.workers.cancel('nobody'), 0);
 });
 
-test('a per-minute token quota is waited out once, then the job carries on', async () => {
+test('a per-minute quota does not automatically replay a remote job with an uncertain action history', async () => {
   let n = 0; const err = new Error('Gemini HTTP 429 (RESOURCE_EXHAUSTED): You exceeded your current quota.\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 250000, model: gemini-3.5-flash-lite');
   const r = rig({ quotaWaitMs: 5 }, { runTask: async () => { if (++n === 1) throw err; return 'finished after the wait'; } });
   const job = r.workers.dispatch('bob', 'x'); await until(() => r.done.length === 1);
-  assert.equal(n, 2); assert.equal(r.done[0].status, 'done'); assert.equal(r.done[0].result, 'finished after the wait'); assert.ok(r.progress.some(l => /waiting .*per-minute quota/.test(l)));
+  assert.equal(n, 1); assert.equal(r.done[0].status, 'failed'); assert.match(r.done[0].error, /did not automatically replay/); assert.equal(r.done[0].result, undefined);
   assert.equal(minuteQuota(err.message), true);
 });
 
@@ -68,4 +68,39 @@ test('usage: a finished Hermes run reports its tokens with the model it used', a
   const r = rig({ textModel: 'gemini-3.5-flash-lite' }, { runTask: async (a, t, o) => { o.onUsage({ prompt_tokens: 120000, completion_tokens: 900, total_tokens: 120900 }); return 'done'; } }, {}, usage);
   r.workers.dispatch('bob', 'x'); await until(() => r.done.length === 1);
   assert.equal(seen.length, 1); assert.equal(seen[0].source, 'hermes'); assert.equal(seen[0].model, 'gemini-3.5-flash-lite'); assert.equal(seen[0].inTok, 120000); assert.equal(seen[0].outTok, 900); assert.equal(seen[0].run, true);
+});
+
+test('50 configured workers drain 100 queued jobs with per-worker identity/model/workspace isolation', { timeout: 15000 }, async t => {
+  const fs=require('fs'), os=require('os'), path=require('path'), {EventEmitter}=require('events'), {Home}=require('../lib/home');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-crew-50-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const home=new Home(root).ensure(),bus=new EventEmitter();
+  const active=new Map(),max=new Map(),records=[];let totalActive=0,maxTotal=0;
+  for(let i=0;i<50;i++){const a=home.createAgent({name:'Fixture worker '+i,role:i%2?'Tester':'Developer'});home.updateAgent(a.id,{engine:'hermes',workerModel:'fixture-model-'+i});}
+  const workers=require('../lib/workers').createWorkers({home,bus,getCfg:()=>({engine:'hermes',workerProvider:'custom'}),tools:{},gemini:{},hermes:{runTask:async(agent,task,options)=>{
+    const n=(active.get(agent.id)||0)+1;active.set(agent.id,n);max.set(agent.id,Math.max(max.get(agent.id)||0,n));maxTotal=Math.max(maxTotal,++totalActive);
+    const match=/JOB_(\d)/.exec(task);assert.ok(match);const filename='out-'+match[1]+'.txt';records.push({actor:agent.id,model:options.cfgOverride.workerModel});
+    try{await new Promise(resolve=>setTimeout(resolve,5));assert.equal(options.signal.aborted,false);fs.writeFileSync(home.p('workspace',agent.id,filename),agent.id+':'+filename);return 'Artifact ready for human review: '+filename;}
+    finally{active.set(agent.id,n-1);totalActive--;}
+  }}});t.after(()=>workers.cancelAll());
+  const jobs=[],done=[];let resolveAll;const finished=new Promise(resolve=>{resolveAll=resolve;});bus.on('job:done',e=>{done.push(e.job);if(done.length===100)resolveAll();});
+  for(const agent of home.listAgents())for(let n=1;n<=2;n++)jobs.push(workers.dispatch(agent.id,'JOB_'+n+' produce own artifact',{expectedOutputs:['out-'+n+'.txt']}));
+  await finished;assert.equal(records.length,100);assert.ok(maxTotal>1);assert.equal(max.size,50);for(const n of max.values())assert.equal(n,1);
+  for(const job of jobs){const saved=home.findJob(job.id);assert.equal(saved.status,'review',saved.error);assert.equal(saved.verification.artifacts.length,1);assert.match(fs.readFileSync(home.p('workspace',job.agent,saved.expectedOutputs[0]),'utf8'),new RegExp('^'+job.agent+':'));}
+  for(const rec of records){const i=rec.actor.match(/-(\d+)$/)[1];assert.equal(rec.model,'fixture-model-'+i);}
+  assert.equal(workers.hasPending(),false);
+});
+
+test('deadline settles a signal-ignoring native worker, releases queue and fences late callbacks', {timeout:5000}, async t => {
+  const fs=require('fs'),os=require('os'),path=require('path'),{Home}=require('../lib/home'),{EventEmitter}=require('events');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-deadline-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const home=new Home(root).ensure();home.createAgent({name:'Alex'});const bus=new EventEmitter(),done=[],progress=[];let firstOptions,finishFirst,calls=0;
+  const workers=require('../lib/workers').createWorkers({home,bus,jobTimeoutMs:100,getCfg:()=>({engine:'hermes'}),tools:{},gemini:{},hermes:{runTask:async(_a,_task,o)=>{calls++;if(calls===1){firstOptions=o;return new Promise(resolve=>{finishFirst=resolve;});}return 'Second report';}}});t.after(()=>workers.cancelAll());
+  let resolveDone;const all=new Promise(resolve=>{resolveDone=resolve;});bus.on('job:done',e=>{done.push(e.job);if(done.length===2)resolveDone();});bus.on('job:progress',e=>progress.push(e));
+  const a=workers.dispatch('alex','Hang'),b=workers.dispatch('alex','Next');await all;
+  assert.equal(home.findJob(a.id).status,'failed');assert.match(home.findJob(a.id).error,/deadline exceeded/);assert.equal(firstOptions.signal.aborted,true);assert.equal(home.findJob(b.id).status,'review');assert.equal(calls,2);assert.equal(workers.hasPending(),false);
+  const count=progress.length;firstOptions.onProgress({tool:'late',status:'running',label:'forged success'});finishFirst('Late success');await new Promise(resolve=>setTimeout(resolve,20));assert.equal(progress.length,count);assert.equal(home.findJob(a.id).status,'failed');
+});
+test('Stop settles a signal-ignoring built-in model without accepting its late result', {timeout:5000}, async t => {
+  const fs=require('fs'),os=require('os'),path=require('path'),{Home}=require('../lib/home'),{EventEmitter}=require('events');const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-stop-hang-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const home=new Home(root).ensure();home.createAgent({name:'Alex'});const bus=new EventEmitter();let start,finish,opts;
+  const begun=new Promise(resolve=>{start=resolve;});const workers=require('../lib/workers').createWorkers({home,bus,getCfg:()=>({engine:'builtin'}),tools:{declarationsFor:()=>[]},gemini:{runLoop:o=>{opts=o;start();return new Promise(resolve=>{finish=resolve;});}}});t.after(()=>workers.cancelAll());
+  const stopped=new Promise(resolve=>bus.once('job:done',resolve)),j=workers.dispatch('alex','Wait');await begun;workers.cancel('alex');await stopped;assert.equal(home.findJob(j.id).status,'cancelled');assert.equal(workers.hasPending(),false);
+  opts.onCheckpoint({convo:[]});finish({text:'Late success'});await new Promise(resolve=>setTimeout(resolve,20));assert.equal(home.findJob(j.id).status,'cancelled');assert.equal(require('../lib/checkpoint').load(home,j.id),null);
 });

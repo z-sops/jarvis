@@ -22,7 +22,7 @@ function rig() {
   const home = new Home(path.join(dir, 'BridgeHome')).ensure();
   // Crew default: builtin (so a worker with no override never touches OpenCode by accident).
   const cfg = { aiName: 'Nova', engine: 'builtin', opencodePath: bin, workerProvider: 'custom', workerModel: 'crew-default-model', workerApiKey: 'crew-key', workerBaseUrl: 'http://127.0.0.1:1/v1' };
-  const opencode = new OpenCodeEngine({ home, getCfg: () => cfg });
+  const opencode = new OpenCodeEngine({ requireContainment: false, home, getCfg: () => cfg });
   const bus = new EventEmitter();
   const workers = createWorkers({ home, getCfg: () => cfg, gemini: { runLoop: async ({ contents }) => ({ text: 'builtin: ' + contents[0].parts[0].text }) }, tools: { declarationsFor: () => [], exec: async () => ({}) }, bus, opencode });
   return { home, cfg, workers, bus };
@@ -34,7 +34,7 @@ test('an agent with no override uses the crew default engine (builtin)', async (
   const job = home.createJob(agent.id, 'hello');
   await workers.run(agent, job);
   const got = home.findJob(job.id);
-  assert.equal(got.status, 'done', got.error);
+  assert.equal(got.status, 'review', got.error);
   assert.match(got.result, /^builtin: hello/);
 });
 
@@ -51,8 +51,8 @@ test('two agents run two different OpenCode models at the same time, each scoped
   await Promise.all([workers.run(alexAgent, jobAlex), workers.run(bobAgent, jobBob)]);
 
   const resAlex = home.findJob(jobAlex.id), resBob = home.findJob(jobBob.id);
-  assert.equal(resAlex.status, 'done', resAlex.error);
-  assert.equal(resBob.status, 'done', resBob.error);
+  assert.equal(resAlex.status, 'review', resAlex.error);
+  assert.equal(resBob.status, 'review', resBob.error);
   assert.equal(resAlex.engine, 'opencode'); assert.equal(resBob.engine, 'opencode');
   assert.match(resAlex.result, /model custom\/kimi-k2/);
   assert.match(resBob.result, /model custom\/deepseek-v4-pro/);
@@ -79,4 +79,14 @@ test('home.updateAgent rejects an unknown agent', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bridge-upd2-'));
   const home = new Home(path.join(dir, 'BridgeHome')).ensure();
   assert.throws(() => home.updateAgent('no-such-agent', { engine: 'opencode' }), /Unknown agent/);
+});
+
+test('explicit built-in workers honor separate Gemini keys/models without mutating commander defaults', async t => {
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-builtin-model-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const home=new Home(root).ensure(),bus=new EventEmitter(),seen=[];
+  const shared={engine:'hermes',apiKey:'COMMANDER_FIXTURE',textModel:'commander-model'};
+  for(const name of ['Alex','Bob']){home.createAgent({name});home.updateAgent(name.toLowerCase(),{engine:'builtin',workerProvider:'gemini',workerModel:name+'-model',workerApiKey:name+'-key'});}
+  const workers=createWorkers({home,bus,getCfg:()=>shared,tools:{declarationsFor:()=>[]},gemini:{runLoop:async o=>{seen.push({actor:o.agentId,key:o.cfg.apiKey,model:o.cfg.textModel});return {text:'Review report'};}}});t.after(()=>workers.cancelAll());
+  await Promise.all(home.listAgents().map(a=>workers.run(a,home.createJob(a.id,'Inspect'))));
+  assert.deepEqual(seen.sort((a,b)=>a.actor.localeCompare(b.actor)),[{actor:'alex',key:'Alex-key',model:'Alex-model'},{actor:'bob',key:'Bob-key',model:'Bob-model'}]);assert.equal(shared.apiKey,'COMMANDER_FIXTURE');assert.equal(shared.textModel,'commander-model');
+  const a=home.updateAgent('alex',{workerProvider:'custom'}),j=home.createJob('alex','Unsupported provider');await workers.run(a,j);assert.equal(home.findJob(j.id).status,'failed');assert.match(home.findJob(j.id).error,/Gemini only/);assert.equal(seen.length,2);
 });

@@ -8,7 +8,7 @@ const path = require('path');
 
 const args = process.argv.slice(2);
 
-if (args[0] === '--version') { console.log('OpenCode 9.9.9 (fake)'); process.exit(0); }
+if (args[0] === '--version') { console.log('OpenCode 1.99.9 (fake)'); process.exit(0); }
 
 if (args[0] === 'run') {
   const task = args[1] || '';

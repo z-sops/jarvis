@@ -12,7 +12,7 @@ test('the OpenCode child never waits for input: its stdin is closed from the sta
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ocstdin-'));
   const fake = path.join(dir, 'fake-opencode.js');
   fs.writeFileSync(fake, "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log('pong'));process.stdin.resume();");
-  const eng = new OpenCodeEngine({ home: { root: dir }, getCfg: () => ({ opencodePath: 'node' }) });
+  const eng = new OpenCodeEngine({ requireContainment: false, home: { root: dir }, getCfg: () => ({ opencodePath: 'node' }) });
   const out = await new Promise(resolve => {
     const p = eng._spawn([fake], { cwd: dir });
     let so = ''; p.stdout.on('data', d => { so += d; });

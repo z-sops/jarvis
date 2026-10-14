@@ -105,11 +105,35 @@ if (distMode) {
   if (!fs.existsSync(asarFile)) fail(`no built app at ${rel(asarFile)}: run npm run dist:dir (or npm run dist) first`);
   else {
     let asar = null; for (const n of ['@electron/asar', 'asar']) { try { asar = require(require.resolve(n, { paths: [root] })); break; } catch {} }
-    if (!asar) warn('the asar tool is not installed, so the inside of the built app was not listed');
+    if (!asar) fail('the asar tool is not installed; built package cannot be verified');
     else {
       const list = asar.listPackage(asarFile).map(s => s.replace(/\\/g, '/').replace(/^\//, ''));
       const bad = list.filter(f => BAD_NAME.test(f) || /^(test|profile|docs|scripts)\//.test(f));
       bad.slice(0, 20).forEach(f => fail(`inside the built app: ${f}`)); if (!bad.length) ok(`built app holds ${list.length} entries and none of the forbidden ones`);
+      // Every shipped first-party file must match the reviewed source, not merely exist.
+      let mismatches=0;
+      for(const f of files){const name=rel(f);try{
+        // @electron/asar traverses directories with the host path separator.
+        // Keep report/manifest names portable, normalize only reader arguments.
+        const archiveName=path.normalize(name);
+        const entry=asar.statFile(asarFile,archiveName);
+        const actual=entry.unpacked ? fs.readFileSync(path.join(asarFile+'.unpacked',archiveName)) : asar.extractFile(asarFile,archiveName);
+        const source=fs.readFileSync(f);
+        if(name==='package.json'){
+          // Builder strips build/dev scripts and reformats metadata. Runtime fields
+          // must still match; arbitrary extra metadata is not accepted.
+          const original=JSON.parse(source),cleaned=structuredClone(original);
+          for(const key of ['build','scripts','keywords','devDependencies'])delete cleaned[key];
+          const parsed=JSON.parse(actual),equal=require('util').isDeepStrictEqual;
+          if(!equal(parsed,original)&&!equal(parsed,cleaned))throw Error('manifest mismatch');
+        }else if(!actual.equals(source))throw Error('mismatch');
+      }catch{fail(`built file missing or differs from source: ${name}`);mismatches++;}}
+      if(!mismatches)ok('first-party bytes and sanitized runtime manifest match reviewed source');
+      for(const name of ['node_modules/@modelcontextprotocol/sdk/package.json','node_modules/js-yaml/package.json','node_modules/pdfjs-dist/legacy/build/pdf.mjs']){
+        if(!list.includes(name))fail(`required runtime dependency absent: ${name}`);
+      }
+      try{if(!asar.statFile(asarFile,path.normalize('lib/native-container-runner.js')).unpacked)fail('Docker runtime helper must be unpacked to an actual host file');}
+      catch{fail('Docker runtime helper absent from built package');}
     }
   }
 }

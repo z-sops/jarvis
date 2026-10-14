@@ -70,6 +70,7 @@
   // ---------- text ----------
   let pendingAttach = null;
   async function sendText(text) {
+    const latencyStart=performance.now();
     text = text.trim();
     if (pendingAttach) {
       text = (text || 'Please take a look at this file.') + `
@@ -82,7 +83,9 @@
     if (live.connected) { live.sendText(sent); return; }
     if (!cfg.apiKey) { addMsg('ai', `My uplink is offline, ${who()}. Add your Gemini key in Settings.`); return; }
     presence.setState('thinking'); $('#hud-status').textContent = 'Thinking'; $('#send').disabled = true;
+    const feedbackMs=performance.now()-latencyStart;
     const r = await bridge.chat.send(sent); addMsg('ai', r.text); $('#send').disabled = false; paintState();
+    if(r.latencyTraceId)bridge.latency?.rendered(r.latencyTraceId,{feedbackMs,replyDomMs:performance.now()-latencyStart}).catch(()=>{});
   }
   async function onReport({ text, agent, ok, secs }) {
     const took = secs != null && window.__chat ? ` in ${__chat.fmtMs(secs * 1000)}` : '';
@@ -137,7 +140,7 @@
     const st = agentsList.find(a => a.id === id) || {};
     const engineRow = id === 'jarvis' ? null : (() => {
       const eng = h('select', {}, [['', 'Crew default'], ['builtin', 'Built-in'], ['hermes', 'Hermes Agent'], ['opencode', 'OpenCode']].map(([v, t]) => h('option', { value: v, selected: v === (r.agent.engine || '') }, t)));
-      const prov = h('input', { value: r.agent.workerProvider || '', placeholder: 'gemini / openrouter / anthropic / openai / custom' });
+      const prov = h('input', { value: r.agent.workerProvider || '', placeholder: 'gemini / opencode / anthropic / openai / custom' });
       const model = h('input', { value: r.agent.workerModel || '', placeholder: 'blank = crew model' });
       const key = h('input', { type: 'password', autocomplete: 'off', value: r.agent.workerApiKey || '', placeholder: 'blank = crew key' });
       const base = h('input', { value: r.agent.workerBaseUrl || '', placeholder: 'https://.../v1 (custom only)' });
@@ -179,6 +182,121 @@
     const m = modal('Permission needed', body, [deny, h('button', { class: 'btn primary', onclick: () => answer('once') }, 'Allow once'), p.allowSession ? h('button', { class: 'btn primary alt', onclick: () => answer('session') }, (p.sessionLabel || 'Allow this folder for the session')) : null], { role: 'alertdialog', cls: 'perm', attrs: { 'data-perm': p.id } });
     m.back.addEventListener('keydown', e => { if (e.key === 'Escape') answer('deny'); }); deny.focus();
   }
+  async function openCrewConfig() {
+    let token = null, revision = null, unresolved = [], generation = 0;
+    const text = h('textarea', { rows: 16, spellcheck: 'false', 'aria-label': 'Crew YAML', maxlength: 65536 });
+    const status = h('p', { role: 'status' }), diff = h('pre', { class: 'perm-detail', 'aria-label': 'Configuration diff' });
+    const history = h('pre', { class: 'perm-detail', 'aria-label': 'Incomplete import history' });
+    const recoverySummary = h('div', { 'aria-label': 'Import recovery summary' });
+    const inspected = h('input', { type: 'checkbox' });
+    const ackLabel = h('label', { class: 'check inline', hidden: true }, inspected, h('span', {}, 'I inspected the current configuration and incomplete import history'));
+    const apply = h('button', { class: 'btn primary', disabled: true, onclick: async () => {
+      const selected = token; invalidate(false); text.disabled = true;
+      try {
+        const r = await bridge.crewConfig.apply(selected); if (!r.ok) throw new Error(r.error);
+        await refreshAgents(); await reload(); status.textContent = `${r.operation === 'rollback' ? 'Rollback applied' : 'Applied'} and verified ${r.changed} field change(s).`;
+      } catch (e) { status.textContent = errText(e); }
+      finally { text.disabled = false; }
+    } }, 'Apply reviewed changes');
+    const ack = h('button', { class: 'btn ghost', hidden: true, disabled: true, onclick: async () => {
+      ack.disabled = true;
+      try {
+        const r = await bridge.crewConfig.acknowledge({ revision, receiptIds: unresolved.map(e => e.id) });
+        if (!r.ok) throw new Error(r.error); await reload(); status.textContent = 'Inspection recorded. Preview a new import to make further changes.';
+      } catch (e) { status.textContent = errText(e); }
+    } }, 'Record inspection');
+    function invalidate(cancel = true) { const old = token; generation++; token = null; apply.disabled = true; apply.textContent = 'Apply reviewed changes'; diff.textContent = ''; if (old && cancel !== false) bridge.crewConfig.cancel(old).catch(() => {}); }
+    text.addEventListener('input', invalidate);
+    inspected.addEventListener('change', () => { ack.disabled = !inspected.checked; });
+    async function reload() {
+      invalidate(); const n = generation;
+      const r = await bridge.crewConfig.export(); if (!r.ok) throw new Error(r.error);
+      if (n !== generation) return;
+      text.value = r.text; revision = r.revision; unresolved = r.unresolved;
+      history.textContent = unresolved.length ? JSON.stringify(unresolved, null, 2) : '';
+      const labels = { matches_requested: 'Requested settings match', unchanged: 'Unchanged', partial: 'Partially changed', drifted: 'Configuration drift', missing: 'Worker missing', unknown: 'Unknown' };
+      recoverySummary.replaceChildren(...unresolved.flatMap(e => {
+        const r = e.reconciliation;
+        return [h('h3', {}, 'Interrupted import reconciliation'),
+          h('p', {}, `Base revision: ${r.baseRevision || 'Unavailable'}`),
+          h('p', {}, `Current revision: ${r.currentRevision}`),
+          h('p', {}, `Requested document: ${r.requestedDocumentHash || 'Unavailable'}`),
+          h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Worker'), h('th', {}, 'Persisted configuration'), h('th', {}, 'Progress recorded'))),
+            h('tbody', {}, r.workers.map(w => h('tr', {}, h('td', {}, w.id), h('td', {}, labels[w.status] || 'Unknown'), h('td', {}, w.progressRecorded ? 'Yes' : 'No'))))),
+          r.legacyIntentWithoutWorkerHashes ? h('p', {}, 'Older intent lacks per-worker hashes. Worker outcomes cannot be inferred.') : null,
+          h('p', {}, 'Full-state rollback safety has not been established. Automatic rollback is unavailable. Public settings may be reversed only after reviewing the diff.'),
+          h('button', { class: 'btn ghost', disabled: unresolved.length !== 1 || e.operation === 'rollback', onclick: async () => {
+            invalidate(); const n = generation;
+            try {
+              const result = await bridge.crewConfig.previewRollback({ revision, receiptId: e.id });
+              if (!result.ok) throw new Error(result.error);
+              if (n !== generation) { bridge.crewConfig.cancel(result.token).catch(() => {}); return; }
+              token = result.token; diff.textContent = result.changes.length ? JSON.stringify(result.changes, null, 2) : 'No settings need rollback. Record inspection instead.';
+              apply.disabled = !result.changes.length; apply.textContent = 'Apply reviewed rollback';
+              status.textContent = 'Review this reverse diff. Only public worker settings and Library assignments will be restored; drift and active jobs block rollback.';
+            } catch (error) { if (n === generation) status.textContent = errText(error); }
+          } }, 'Preview settings rollback')].filter(Boolean);
+      }));
+      ackLabel.hidden = ack.hidden = !unresolved.length; inspected.checked = false; ack.disabled = true;
+      status.textContent = unresolved.length ? 'Incomplete import: inspect the current export and history. No automatic replay occurred.' : 'Current stored configuration. Edit or load YAML, then preview the changes.';
+    }
+    const file = h('input', { type: 'file', accept: '.yaml,.yml', 'aria-label': 'Load crew YAML' });
+    file.addEventListener('change', async () => {
+      invalidate(); const n = generation, f = file.files[0]; if (!f) return;
+      if (f.size > 65536) { status.textContent = 'File is larger than 64 KiB.'; return; }
+      try { const value = await f.text(); if (n === generation) { text.value = value; status.textContent = 'File loaded for preview. Nothing has been applied.'; } }
+      catch { status.textContent = 'File could not be read.'; }
+    });
+    const body = h('div', { class: 'crew-config-body' }, h('p', {}, 'Versioned configuration for existing workers: engine, provider, model, context and shared Library assignments. Create workers through Add crew. Credentials, permissions, jobs and runtime status stay outside YAML.'),
+      h('label', { class: 'field' }, h('span', {}, 'Load YAML file'), file), text, status, diff, recoverySummary, history, ackLabel, ack);
+    const m = modal('Crew configuration', body, [h('button', { class: 'btn ghost', onclick: async () => { try { await reload(); } catch (e) { status.textContent = errText(e); } } }, 'Reload from Orbit'),
+      h('button', { class: 'btn ghost', onclick: async () => {
+        try {
+          const r = await bridge.crewConfig.export(); if (!r.ok) throw new Error(r.error);
+          const url = URL.createObjectURL(new Blob([r.text], { type: 'application/yaml' }));
+          const a = h('a', { href: url, download: 'orbit-crew.yaml' }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch (e) { status.textContent = errText(e); }
+      } }, 'Export stored YAML'), h('button', { class: 'btn ghost', onclick: async () => {
+        invalidate(); const n = generation, value = text.value;
+        try {
+          const r = await bridge.crewConfig.preview(value); if (!r.ok) throw new Error(r.error);
+          if (n !== generation || value !== text.value) return;
+          token = r.token; diff.textContent = r.changes.length ? JSON.stringify(r.changes, null, 2) : 'No changes.';
+          apply.disabled = !r.changes.length; status.textContent = 'Preview only. Apply explicitly within five minutes; queued or running jobs block changes.';
+        } catch (e) { if (n === generation) status.textContent = errText(e); }
+      } }, 'Preview changes'), apply, h('button', { class: 'btn ghost', onclick: () => { invalidate(); m.close(); } }, 'Close')], { cls: 'settings crew-config' });
+    try { await reload(); } catch (e) { status.textContent = errText(e); }
+  }
+  async function openTeamWorkspace(){
+    const select=h('select',{'aria-label':'Project'}),view=h('div',{'aria-label':'Team state'}),status=h('p',{role:'status'}),tokens=h('input',{type:'number',min:0,max:100000000,'aria-label':'Team token limit'}),usd=h('input',{type:'number',min:0,max:10000,step:'0.01','aria-label':'Team USD limit'});
+    const provider=h('select',{'aria-label':'Discussion destination'},...['chatgpt','claude','kimi','qwen','deepseek'].map(x=>h('option',{value:x},x))),question=h('textarea',{'aria-label':'Discussion question',maxLength:4000}),ids=h('input',{'aria-label':'Selected report job IDs',placeholder:'Up to five job IDs, separated by commas'}),draftText=h('textarea',{'aria-label':'Scoped discussion draft',readonly:true}),reply=h('textarea',{'aria-label':'External reply',maxLength:8000});
+    let current=null,token=null,draft=null,closed=false,timer;
+    const refresh=async()=>{if(!select.value)return;const r=await bridge.teams.inspect(select.value);if(closed)return;if(!r.ok)throw Error(r.error);current=r.team;view.replaceChildren(h('p',{},'Leader: '+(current.leader||'none')+' · coordinator: '+(current.coordinatorJobId||'none')),h('p',{},'Usage: '+current.usage.tokens+' tokens / $'+current.usage.usd.toFixed(6)+' · unknown reservations: '+current.usage.unknownReservations),h('p',{},'Ready steps: '+current.readySteps.join(', ')+' · blocked: '+current.blockedSteps.join(', ')),...current.workers.map(j=>h('p',{},j.actor+' · '+j.id+' · '+j.status+' → '+j.expected)),h('p',{},'Observation only. No automatic restart, ownership transfer or artifact acceptance.'));
+    };
+    const close=async()=>{closed=true;clearInterval(timer);if(token)await bridge.teams.cancel(token);m.close();};
+    const budgetPreview=h('button',{class:'btn ghost',onclick:async()=>{try{if(token)await bridge.teams.cancel(token);const r=await bridge.teams.preview(select.value,current.revision,{tokens:Number(tokens.value),usd:Number(usd.value)});if(!r.ok)throw Error(r.error);token=r.token;status.textContent='Preview shared team limit: '+r.limit.tokens+' tokens / $'+r.limit.usd+'. Existing usage remains charged. Stop team jobs before applying.';budgetApply.disabled=false;}catch(e){status.textContent=errText(e);}}},'Preview team budget');
+    const budgetApply=h('button',{class:'btn',disabled:true,onclick:async()=>{try{const t=token;token=null;budgetApply.disabled=true;const r=await bridge.teams.apply(t);if(!r.ok)throw Error(r.error);status.textContent='Shared team budget saved.';await refresh();}catch(e){status.textContent=errText(e);}}},'Apply previewed team budget');
+    const makeDraft=h('button',{class:'btn ghost',onclick:async()=>{try{const r=await bridge.teams.draft(select.value,provider.value,question.value,ids.value.split(',').map(x=>x.trim()).filter(Boolean));if(!r.ok)throw Error(r.error);draft=r.discussion;draftText.value=JSON.stringify({destination:draft.provider,question:draft.question,scope:draft.scope},null,2);status.textContent=r.note;}catch(e){status.textContent=errText(e);}}},'Prepare local discussion draft');
+    const record=h('button',{class:'btn ghost',onclick:async()=>{try{if(!draft)throw Error('Prepare and review a scoped draft first.');const r=await bridge.teams.reply(draft.scope.projectId,draft.id,draft.scopeHash,reply.value);if(!r.ok)throw Error(r.error);status.textContent=r.note||'Reply already recorded as unverified text.';}catch(e){status.textContent=errText(e);}}},'Record unverified external reply');
+    const m=modal('Team Workspace',h('div',{class:'team-workspace'},select,view,h('h3',{},'Shared budget'),h('label',{},'Team token limit',tokens),h('label',{},'Team USD limit',usd),budgetPreview,budgetApply,h('h3',{},'External discussion'),h('p',{},'Manual scoped collaboration. Review the exact draft for secrets before sharing. Nothing is sent automatically; replies never authorize actions.'),h('label',{},'Destination',provider),h('label',{},'Question',question),h('label',{},'Report job IDs (optional)',ids),makeDraft,h('label',{},'Exact draft for manual sharing',draftText),h('label',{},'External reply (unverified)',reply),record,status),[h('button',{class:'btn ghost',onclick:async()=>{try{await refresh();}catch(e){status.textContent=errText(e);}}},'Refresh team state'),h('button',{class:'btn ghost',onclick:close},'Close team workspace')]);
+    select.onchange=async()=>{if(token)await bridge.teams.cancel(token);token=null;budgetApply.disabled=true;draft=null;draftText.value='';reply.value='';try{await refresh();}catch(e){status.textContent=errText(e);}};
+    try{const r=await bridge.teams.list();if(!r.ok)throw Error(r.error);select.replaceChildren(...r.projects.map(p=>h('option',{value:p.id},p.goal+' · '+p.id)));if(!r.projects.length)status.textContent='Create a structured project with Laila first.';await refresh();timer=setInterval(()=>{if(!closed)refresh().catch(e=>{status.textContent=errText(e);});},5000);}catch(e){status.textContent=errText(e);}
+  }
+  async function openStorageGuardian() {
+    let token=null; const selected=new Set(),status=h('p',{role:'status'}),rows=h('div'),summary=h('p');
+    const take=async promise=>{const r=await promise;if(!r.ok)throw Error(r.error);return r.result;};
+    const invalidate=async()=>{if(token){const old=token;token=null;await take(bridge.storage.cancel(old));}apply.disabled=true;};
+    const reload=async()=>{await invalidate();selected.clear();const r=await take(bridge.storage.inspect());summary.textContent=`Native recovery protected for ${r.keepDays} days. No automatic deletion. ${r.rows.length} recovery records. Home ${r.usage.logicalBytes} logical bytes; free disk ${r.usage.freeBytes??'unknown'} bytes. Categories: ${Object.entries(r.usage.totals).map(([k,v])=>k+': '+v.bytes).join(', ')}. Coverage ${r.usage.coverage.complete?'complete':'incomplete'}.`;
+      rows.replaceChildren(...r.rows.map(row=>{const input=h('input',{type:'checkbox',disabled:!row.eligible,'aria-label':'Select recovery '+row.id});input.addEventListener('change',async()=>{try{await invalidate();input.checked?selected.add(row.id):selected.delete(row.id);}catch(e){status.textContent=errText(e);}});
+        const pin=h('button',{class:'btn ghost',disabled:row.interruptedRelease,onclick:async()=>{try{await take(bridge.storage.pin(row.id,!row.pinned));await reload();}catch(e){status.textContent=errText(e);}}},row.pinned?'Unpin recovery':'Pin recovery');
+        return h('div',{},h('label',{},input,`${row.actor} / ${row.id}: ${row.status}; ${row.eligible?(row.bytes+' logical bytes eligible'):row.blocked}`),pin); }));};
+    const apply=h('button',{class:'btn danger',disabled:true,onclick:async()=>{try{const current=token;token=null;apply.disabled=true;const r=await take(bridge.storage.apply(current));await reload();status.textContent=`Removed ${r.removedLogicalBytes} logical bytes; measured net Home reduction ${r.netManagedLogicalReclaimedBytes} bytes (includes receipts). Allocated reduction ${r.allocatedReclaimedBytes??'unknown'} bytes. Shared free-disk change ${r.observedFreeBytesDelta} bytes is not attributed savings.`;}catch(e){status.textContent=errText(e);}}},'Release previewed native recovery');
+    const preview=h('button',{class:'btn ghost',onclick:async()=>{try{await invalidate();const r=await take(bridge.storage.preview([...selected]));token=r.token;status.textContent=r.warning+' Selected: '+r.jobs.map(j=>j.actor+'/'+j.id+' ('+j.bytes+' bytes)').join(', ');apply.disabled=false;}catch(e){status.textContent=errText(e);}}},'Preview selected release');
+    const close=async()=>{try{await invalidate();m.close();}catch(e){status.textContent=errText(e);}};
+    const m=modal('Storage Guardian',h('div',{},summary,h('p',{},'Active, interrupted, failed, pinned and linked recovery stays protected. An interrupted release needs fresh inspection. Docker images/cache are not removed.'),rows,status),[h('button',{class:'btn ghost',onclick:async()=>{try{await reload();}catch(e){status.textContent=errText(e);}}},'Refresh'),preview,apply,h('button',{class:'btn ghost',onclick:close},'Cancel')]);
+    m.back.addEventListener('keydown',e=>{if(e.key==='Escape')close();});
+    try{await reload();}catch(e){status.textContent=errText(e);}
+  }
   function openSettings() {
     const d = { ...cfg }; const f = (label, el, note) => h('label', { class: 'field' }, h('span', {}, label), el, note ? h('small', {}, note) : null);
     const inp = (k, opts = {}) => { const i = h('input', { value: d[k] ?? '', ...opts }); i.addEventListener('input', () => (d[k] = i.value.trim())); return i; };
@@ -186,6 +304,11 @@
     const voiceSel = h('select'); const fillVoices = () => { voiceSel.replaceChildren(...cfg.voices[d.gender].map(v => h('option', { value: v.id, selected: v.id === d.voice }, `${v.id} · ${v.note}`))); if (!cfg.voices[d.gender].some(v => v.id === d.voice)) d.voice = cfg.voices[d.gender][0].id; }; fillVoices(); voiceSel.addEventListener('change', () => (d.voice = voiceSel.value));
     const chk = (k, label) => { const i = h('input', { type: 'checkbox', checked: !!d[k] }); i.addEventListener('change', () => (d[k] = i.checked)); return h('label', { class: 'check inline' }, i, h('span', {}, label)); };
     const err = h('p', { class: 'ob-err', role: 'alert' }); const testOut = h('div', { class: 'steps' });
+    const routes = h('textarea', {rows:3}); routes.value = JSON.stringify(d.workerRoutes || []);
+    d.workerRouteCredentials = {...(d.workerRouteCredentials || {})};
+    const routeKey = provider => {const i=h('input',{type:'password',autocomplete:'off',value:d.workerRouteCredentials[provider]||''});i.addEventListener('input',()=>{d.workerRouteCredentials[provider]=i.value.trim();});return i;};
+    const rates = h('textarea', { rows: 3 }); rates.value = JSON.stringify(d.workerModelRates || {});
+    const models = h('input', { value: (d.workerAllowedModels || []).join(', ') });
     const body = h('div', { class: 'set-grid' },
       f('AI name', inp('aiName', { maxlength: 24 })), f('Gender', sel('gender', [['female', 'Female'], ['male', 'Male']], fillVoices)), f('Voice', voiceSel), f('Language', sel('lang', [['mix', 'Roman Urdu + English'], ['en', 'English'], ['ur', 'اردو']])),
       f('How I talk', sel('style', [['formal', 'Formal and polite'], ['casual', 'Casual, like a friend'], ['yaar', 'Full yaar mode: playful banter']])), f('Emotion', sel('emotion', [['calm', 'Calm'], ['expressive', 'Expressive'], ['dramatic', 'Very animated']])),
@@ -194,24 +317,47 @@
       f('Thinking model', inp('textModel'), 'Used for typed chat and crew agents.'), f('Voice model', inp('liveModel'), 'Model names change often. If voice is refused, check Google’s current Live model name.'),
       f('Close voice after', sel('idleMinutes', [[5, '5 minutes of quiet'], [10, '10 minutes of quiet'], [30, '30 minutes of quiet'], [0, 'Never']].map(([a, b]) => [+a, b]), () => (d.idleMinutes = +d.idleMinutes))),
       h('h3', { class: 'set-h' }, 'Crew engine'),
-      f('Engine', sel('engine', [['builtin', 'Built-in (light, Gemini only)'], ['hermes', 'Hermes Agent (real coding tools)'], ['opencode', 'OpenCode (open-source coding agent)']]), 'Hermes and OpenCode agents can write code, run commands and use the browser. Each needs its own CLI installed.'),
-      f('Hermes command', inp('hermesPath', { placeholder: 'hermes' }), 'Leave as "hermes" if that command works in PowerShell. Otherwise paste the full path to hermes.exe. Only used when Engine is Hermes Agent.'),
-      f('OpenCode command', inp('opencodePath', { placeholder: 'opencode' }), 'Leave as "opencode" if that command works in PowerShell. Otherwise paste the full path to opencode.exe. Only used when Engine is OpenCode.'),
-      f('Crew provider', sel('workerProvider', [['gemini', 'Google Gemini'], ['openrouter', 'OpenRouter'], ['anthropic', 'Anthropic'], ['openai', 'OpenAI'], ['custom', 'Custom endpoint']])),
+      h('div', { class: 'set-h' }, h('button', { class: 'btn ghost', onclick: () => { m.close(); openCrewConfig(); } }, 'Crew configuration (YAML)')),
+      h('div', {class:'set-h'},h('button',{class:'btn ghost',onclick:()=>{m.close();openStorageGuardian();}},'Storage Guardian')),
+      h('div',{class:'set-h'},h('button',{class:'btn ghost',onclick:()=>{m.close();openTeamWorkspace();}},'Team Workspace')),
+      f('Managed Home quota (MiB)',inp('storageQuotaMiB',{type:'number',min:512,max:1048576,step:1}),'Admission and native snapshot guard; Docker, external databases and unrestricted host writes are separate.'),
+      f('Emergency disk headroom (MiB)',inp('storageReserveMiB',{type:'number',min:128,step:1}),'Kept outside job reservations; does not guarantee writes during physical disk failure.'),
+      f('Per-job storage reservation (MiB)',inp('storageJobReserveMiB',{type:'number',min:320,max:4096,step:1}),'Durable queued/running reservations protect bounded native snapshot/input staging. Conservative accounting can refuse early.'),
+      f('Recovery protection (days)',inp('storageKeepDays',{type:'number',min:30,max:3650,step:1}),'After this period only human-accepted, unlinked, unpinned recovery is eligible for explicit review; never automatic deletion.'),
+      f('Engine', sel('engine', [['builtin', 'Built-in (light, Gemini only)'], ['hermes', 'Hermes Agent (real coding tools)'], ['opencode', 'OpenCode (open-source coding agent)']]), 'Native crew jobs require the approved Docker Linux image below. Direct internet, host folders and unrestricted integrations are blocked.'),
+      f('Hermes command', inp('hermesPath', { placeholder: 'hermes' }), 'Host command for Hermes communication services. Native crew jobs use Hermes installed inside the approved image.'),
+      f('OpenCode command', inp('opencodePath', { placeholder: 'opencode' }), 'Legacy host command. Native crew jobs use OpenCode installed inside the approved image.'),
+      f('Crew provider', sel('workerProvider', [['gemini', 'Google Gemini'], ['opencode', 'OpenCode gateway'], ['openrouter', 'OpenRouter'], ['anthropic', 'Anthropic'], ['openai', 'OpenAI'], ['custom', 'Custom endpoint']])),
       f('Crew model', inp('workerModel', { placeholder: 'blank = the Gemini thinking model' }), 'Use a strong tool-calling model for coding.'),
+      f('Native runtime image ID', inp('nativeContainerImage', { placeholder: 'sha256: followed by the installed image ID' }), 'Hermes/OpenCode jobs run inside this approved Linux image. It must include Node 20+ and the selected CLI. Orbit never downloads it automatically.'),
+      f('Worker model requests per job', inp('workerMaxRequests', { type: 'number', min: 1, max: 500, step: 1 }), 'Counts built-in and broker-mediated native submissions. Legacy native routes, commander chat and voice are outside this limit.'),
+      f('OpenCode transport', sel('opencodeTransport', [['run','Existing JSON run'], ['acp','ACP sessions (preview)']]), 'ACP creates or loads the original session inside the existing Docker boundary. Requires pinned OpenCode 1.18.35. No host filesystem/terminal services or automatic transport fallback. Existing run checkpoints cannot silently switch to ACP; start fresh reviewed work.'),
+      f('Native worker model selection', sel('workerModelSelection', [['pinned', 'Pinned: selected provider/model'], ['auto', 'Auto: configured routes']]), 'Auto selects eligible configured routes before generation and can switch on a count-endpoint HTTP refusal before the first generation. It does not replay unknown submissions or promise uninterrupted mid-task failover.'),
+      f('OpenCode gateway execution', sel('workerGatewayMode', [['exact', 'Strict: exact token count required'], ['requests', 'Request-limited: reported usage afterward']]), 'Explicit opt-in for your selected OpenCode or OpenRouter model. Request-limited mode caps submissions and requested output, but cannot guarantee a token or USD ceiling or free pricing. Job/team token or USD budgets still block this mode. Other providers retain exact accounting. Auto routing uses only your explicitly configured routes.'),
+      f('Worker deadline (seconds)', inp('workerTimeoutSeconds', { type: 'number', min: 1, max: 86400, step: 1 }), 'Stops Orbit waiting after this execution limit. Inspect prior effects before retrying; external process termination depends on the engine.'),
+      f('Worker token budget per job', inp('workerTokenBudget', { type: 'number', min: 0, max: 100000000, step: 1 }), '0 disables. Reserves input plus maximum output before built-in or supported native generation; unsupported native providers are refused.'),
+      f('Worker token cost budget (USD)', inp('workerCostBudgetUsd', { type: 'number', min: 0, max: 10000, step: 0.01 }), '0 disables. Requires explicit model prices below; this covers mediated token charges, not all provider fees or OS-level bypasses.'),
+      f('Reserved output tokens per request', inp('workerMaxOutputTokens', { type: 'number', min: 1, max: 65536, step: 1 }), 'Requested maximum output/thinking tokens. Gateway overrun stops further work and retains actual usage; this is not an OS-enforced generation limit.'),
+      f('Native model routes (JSON)', routes, 'Optional explicit Gemini/OpenAI/Anthropic candidates: provider, model, contextTokens, capabilities [text, tools]. Catalog availability and entered prices rank routes. Saves authorize history transfer to these providers; unknown generation failures never automatically replay.'),
+      ...['gemini','openai','anthropic'].map(p => f('Router ' + p + ' key', routeKey(p), 'Optional protected routing credential; blank can reuse the current provider key.')),
+      f('Worker model allowlist', models, 'Comma-separated model IDs. Enforced for built-in and supported native broker requests. Unsupported native providers are refused when configured.'),
+      f('Model token prices (USD per million)', rates, 'JSON: {"model-id":{"input":0.3,"output":2.5}}. Enter verified prices; Orbit does not guess them.'),
       f('Crew API key', inp('workerApiKey', { type: 'password', autocomplete: 'off', placeholder: 'blank = reuse Gemini key' })),
       f('Custom base URL', inp('workerBaseUrl', { placeholder: 'https://.../v1' }), 'Only for the custom provider.'),
       h('div', { class: 'set-test' }, h('button', { class: 'btn ghost', onclick: async () => {
         testOut.textContent = 'Saving and testing. This can take up to a minute…';
         try { cfg = await bridge.config.save(d); const r = await (d.engine === 'opencode' ? bridge.opencode.check({ smoke: true }) : bridge.hermes.check({ smoke: true }));
           testOut.replaceChildren(...r.steps.map(x => h('div', { class: 'step ' + (x.ok ? 'ok' : 'bad') }, h('b', {}, (x.ok ? '✓ ' : '✗ ') + x.name), h('small', {}, x.detail))));
-        } catch (e) { testOut.textContent = errText(e); } } }, 'Test engine'), testOut),
-      h('div', { class: 'checks' }, chk('autostart', 'Start when I sign in'), chk('sfx', 'Ship sounds'), chk('autoWake', 'Open voice automatically on start'), chk('launchOnStart', 'Launch from the pad at every start'), chk('launchFilmFull', 'Long launch film (about 18 seconds)'), chk('shutdownSequence', 'Power-down sequence when I quit'), chk('classicLook', 'Classic cockpit look (game style) instead of the holographic one'), chk('safeMode', 'Safe Mode (confirm every file write, even inside my own workspace)'), chk('modelDecision', 'Model decision (a small model classifies each message; can add a few seconds)'), chk('smartRoute', 'Smart routing (use the lighter model for simple chat)')), err);
+        } catch (e) { testOut.textContent = errText(e); } } }, 'Check runtime'), testOut),
+      h('div', { class: 'checks' }, chk('nativeContinuity', 'Preserve protected native history and pinned Hermes/OpenCode session databases (explicit retry; fresh permissions)'), chk('autostart', 'Start when I sign in'), chk('sfx', 'Ship sounds'), chk('autoWake', 'Open voice automatically on start'), chk('launchOnStart', 'Launch from the pad at every start'), chk('launchFilmFull', 'Long launch film (about 18 seconds)'), chk('shutdownSequence', 'Power-down sequence when I quit'), chk('classicLook', 'Classic cockpit look (game style) instead of the holographic one'), chk('safeMode', 'Safe Mode (confirm every file write, even inside my own workspace)'), chk('modelDecision', 'Model decision (a small model classifies each message; can add a few seconds)'), chk('smartRoute', 'Smart routing (use the lighter model for simple chat)')), err);
     const recommission = h('button', { class: 'btn ghost danger', onclick: async () => { if (recommission.dataset.sure) { await bridge.config.reset(); location.reload(); } else { recommission.dataset.sure = '1'; recommission.textContent = 'Click again to confirm'; } } }, 'Recommission from scratch');
     const m = modal('Settings', body, [recommission, h('span', { class: 'grow' }), h('button', { class: 'btn ghost', onclick: () => m.close() }, 'Cancel'), h('button', { class: 'btn primary', onclick: async () => {
       try {
         const voiceChanged = ['aiName', 'gender', 'voice', 'lang', 'userName', 'userTitle', 'liveModel', 'apiKey', 'style', 'emotion'].some(k => d[k] !== cfg[k]);
         if (!d.aiName || !d.userName) throw new Error('Both names are required');
+        d.workerModelRates = JSON.parse(rates.value);
+        d.workerRoutes = JSON.parse(routes.value);
+        d.workerAllowedModels = models.value.split(',').map(s => s.trim()).filter(Boolean);
         cfg = await bridge.config.save(d); window.__holo && __holo.apply(cfg); SFX.enable(cfg.sfx); cfg.sfx ? SFX.hum(true) : SFX.hum(false); $('#hud-name').textContent = cfg.aiName; town.setCommander({ name: cfg.aiName });
         if (voiceChanged && live.want) { live.stop(); addMsg('sys', 'Settings saved. Wake voice again to apply the new voice settings.'); } else addMsg('sys', 'Settings saved.');
         paintState(); m.close();
@@ -322,7 +468,7 @@
   // ---------- start ----------
   async function main() {
     if (bridge.startup) bridge.startup.mark('page script starts'); cfg = await bridge.config.get(); SFX.enable(cfg.sfx);
-    scene = new Scene($('#scene')); presence = new Presence($('#presence')); if (bridge.startup) bridge.startup.mark('3D scene and orb created'); window.__ui = { openComms, get scene() { return scene; }, get town() { return town; }, get presence() { return presence; }, addMsg, logActivity, showPermission, openSettings, onTool, refreshAgents, cue };
+    scene = new Scene($('#scene')); presence = new Presence($('#presence')); if (bridge.startup) bridge.startup.mark('3D scene and orb created'); window.__ui = { openComms, get scene() { return scene; }, get town() { return town; }, get presence() { return presence; }, addMsg, logActivity, showPermission, openSettings, openCrewConfig, onTool, refreshAgents, cue };
     $('#w-min').onclick = () => bridge.win.minimize(); $('#w-max').onclick = () => bridge.win.maximize(); $('#w-hide').onclick = () => bridge.win.hide(); $('#w-quit').onclick = () => (window.__shutdown ? __shutdown.begin() : bridge.win.quit());
     addEventListener('keydown', e => { if (e.key === 'F11') bridge.win.fullscreen(); });
     bindBus();

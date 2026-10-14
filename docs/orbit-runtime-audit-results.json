@@ -1,0 +1,62 @@
+{
+  "scope": "Offline real Orbit code with synthetic credentials/provider replies; no live provider or native CLI proof",
+  "probes": [
+    {
+      "id": "AUTO_CREW_DEFAULT",
+      "configured": [
+        "primary",
+        "backup"
+      ],
+      "deliveredToBroker": [
+        "primary",
+        "backup"
+      ]
+    },
+    {
+      "id": "AUTO_WORKER_OVERRIDE",
+      "configured": [
+        "primary",
+        "backup"
+      ],
+      "deliveredToBroker": [
+        "primary"
+      ]
+    },
+    {
+      "id": "PROVIDER_REQUEST_REBUILD",
+      "incomingClientMetadata": [
+        "User-Agent",
+        "x-opencode-session",
+        "x-opencode-request",
+        "x-opencode-client"
+      ],
+      "upstreamHeaderNames": [
+        "Authorization",
+        "Content-Type"
+      ],
+      "incomingStream": true,
+      "upstreamStream": false,
+      "toolNames": [
+        "read"
+      ]
+    },
+    {
+      "id": "ACP_MODEL_ID",
+      "model": "plain-model",
+      "registryAccepts": true,
+      "methodsSent": [
+        "initialize",
+        "session/new",
+        "session/set_model"
+      ],
+      "error": null
+    },
+    {
+      "id": "ACP_MODEL_ID",
+      "model": "nvidia/nemotron-fixture:free",
+      "registryAccepts": true,
+      "methodsSent": [],
+      "error": "ACP session scope invalid."
+    }
+  ]
+}

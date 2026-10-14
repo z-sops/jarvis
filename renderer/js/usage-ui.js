@@ -17,18 +17,18 @@
     const reset = h('span', { class: 'ph-note', id: 'u-reset' });
     const line1 = h('div', { class: 'u-line' }), line2 = h('div', { class: 'u-line dim' }), line3 = null, fill = h('i'), gauge = h('div', { class: 'u-gauge', role: 'img' }, fill), line4 = h('div', { class: 'u-line dim' });
     card = { line1, line2, line4, fill, gauge, reset, box: h('div', { class: 'usage' }, line1, line2, gauge, line4) };
-    sys.insertBefore(h('div', { class: 'ph sub' }, h('h3', {}, 'Usage'), reset), activity); sys.insertBefore(card.box, activity);
+    sys.insertBefore(h('div', { class: 'ph sub' }, h('h3', {}, 'Recorded usage'), reset), activity); sys.insertBefore(card.box, activity);
   }
   function paint(s) {
     if (!card || !s) return; const t = s.total, m = s.minute, pct = Math.min(100, (m.inTok / TPM) * 100);
     card.line1.textContent = ''; card.line1.append(...[h('b', {}, String(t.req)), ' requests \u00B7 ', h('b', {}, fmt(t.inTok)), ' in \u00B7 ', h('b', {}, fmt(t.outTok)), ' out', t.fail ? h('span', { class: 'bad' }, ` \u00B7 ${t.fail} failed`) : ''].filter(Boolean));
     const crew = t.runs ? ` \u00B7 ${t.runs} crew run${t.runs === 1 ? '' : 's'}` : '';
-    card.line2.textContent = (t.inTok + t.outTok === 0 ? 'About $0.00 if paid' : `About ${money(t.cost)} if paid${t.unpriced ? ' (+ unpriced models)' : ''}`) + crew;
+    card.line2.textContent = (t.inTok + t.outTok === 0 ? 'Token cost unavailable (no tokens recorded)' : `About ${money(t.cost)} if paid${t.unpriced ? ' (+ unpriced models)' : ''}`) + crew;
     card.fill.style.width = pct + '%'; card.gauge.className = 'u-gauge' + (pct >= 90 ? ' hot' : pct >= 70 ? ' warm' : ''); card.gauge.setAttribute('aria-label', `Input tokens in the last minute: ${m.inTok} of ${TPM}`);
     card.line4.textContent = `Last minute: ${fmt(m.inTok)} of ${fmt(TPM)} input tokens`;
     const at = new Date(Date.now() + s.resetsInMs), left = Math.round(s.resetsInMs / 60000);
     card.reset.textContent = `resets in ${Math.floor(left / 60)}h ${left % 60}m \u00B7 ${at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-    card.box.title = 'Counted since Google\u2019s quota day began (midnight Pacific time; the time shown is when it resets on your clock).\nRequests: typed chat, web search, screen looks and the built-in crew engine.\nCrew agents on Hermes: tokens only, because Hermes makes many requests inside one run.\nThe 250,000 tokens a minute limit is what Google reported for your free key; paid tiers are much higher.\nThe dollar figure is an estimate from Google\u2019s price list, not a bill.';
+    card.box.title = 'Partial recorded usage, not a complete bill. Requests cover Orbit Gemini calls (chat, search, screen and built-in workers). Legacy Hermes contributes available final run tokens; native OpenCode/Hermes broker budgets and unknown charges remain in their job records. Voice and missing provider usage are not included. Zero recorded tokens does not mean zero consumption or zero cost. The quota day follows midnight Pacific; entered price estimates are not invoices.';
   }
   const poll = () => bridge.usage.get().then(paint).catch(() => {});
   bridge.onBus(({ type, payload }) => { if (type === 'usage') paint(payload); });

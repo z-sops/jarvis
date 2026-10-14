@@ -22,12 +22,12 @@ test('the report names the job, the steps, the files and the last words', () => 
   assert.match(r, /Alex\*\* stopped after 2 min/); assert.match(r, /site\/index\.html/); assert.match(r, /read file \[done\]/); assert.match(r, /about to write the footer/); assert.doesNotMatch(r, /make a site/);
 });
 
-test('the saved note is short and the resume task carries only the note, not the old conversation', () => {
+test('the saved note preserves the full goal and bounds recent history without the old conversation', () => {
   const tr = jr.makeTrail(() => 0); const big = { id: 'j', task: 'T'.repeat(5000) }; tr.begin('a', big);
   for (let i = 0; i < 40; i++) tr.add('a', big, { label: 'step ' + i }); tr.text('a', big, 'y'.repeat(1500));
   const cp = jr.checkpoint(tr.snapshot('a'), { files: ['a.txt'] });
-  assert.ok(cp.task.length <= 1500); assert.equal(cp.steps.length, 12); assert.ok(cp.tail.length <= 600);
-  const task = jr.resumeTask(cp, 'use blue'); assert.ok(task.length < 4000); assert.match(task, /Do NOT start over/); assert.match(task, /step 39/); assert.doesNotMatch(task, /step 0\b/); assert.match(task, /use blue/);
+  assert.equal(cp.task, big.task); assert.equal(cp.steps.length, 12); assert.ok(cp.tail.length <= 600);
+  const task = jr.resumeTask(cp, 'use blue'); assert.ok(task.length < big.task.length + 2500); assert.match(task, /Do NOT start over/); assert.match(task, /step 39/); assert.doesNotMatch(task, /step 0\b/); assert.match(task, /use blue/);
 });
 
 test('the note is saved to disk, read back, and cleared', () => {
@@ -65,12 +65,12 @@ test('the meter shows bytes, speed, silence and what it means', () => {
   let n = 0; const tr = jr.makeTrail(() => n); n = 1000; tr.begin('b', job);
   assert.match(jr.meter(tr.snapshot('b'), 6000), /nothing received yet/);
   for (let i = 0; i < 11; i++) { n = 1000 + i * 1000; tr.data('b', job, 2048); }          // 22 KB in 10 s
-  const live = jr.meter(tr.snapshot('b'), 12000); assert.match(live, /22\.0 KB so far/); assert.match(live, /2\.0 KB\/s/); assert.match(live, /streaming/);
-  assert.match(jr.meter(tr.snapshot('b'), 50000), /quiet/); assert.match(jr.meter(tr.snapshot('b'), 200000), /stalled/);
+  const live = jr.meter(tr.snapshot('b'), 12000); assert.match(live, /22\.0 KB so far/); assert.match(live, /2\.0 KB\/s/); assert.match(live, /recent output/);
+  assert.match(jr.meter(tr.snapshot('b'), 50000), /quiet/); assert.match(jr.meter(tr.snapshot('b'), 200000), /worker state unknown/);
 });
 
-test('text from Hermes counts as data too, only what is new', () => {
-  let n = 0; const tr = jr.makeTrail(() => n); tr.begin('a', job); tr.text('a', job, 'hello'); tr.text('a', job, 'hello world'); assert.equal(tr.snapshot('a').bytes, 11);
+test('rendered text does not fabricate transport bytes', () => {
+  let n = 0; const tr = jr.makeTrail(() => n); tr.begin('a', job); tr.text('a', job, 'hello'); tr.text('a', job, 'hello world'); assert.equal(tr.snapshot('a').bytes, 0); assert.equal(tr.snapshot('a').textBytes, 11);
 });
 
 test('PROGRESS.md gives the plan: done, still to do, and a warning when it is old', () => {
@@ -104,4 +104,11 @@ test('a job for several files does not claim the total from a per-file number; a
   assert.match(r, /100 words per file/); assert.doesNotMatch(r, /nothing by the numbers/); assert.doesNotMatch(r, /more words/);
   assert.match(r, /- write a\.txt \u2014 file already exists \(107 words\)/); assert.match(r, /- write b\.txt\n/);
   const one = { id: 'n', task: 'write 100 words about rome' }; tr.begin('c', one); assert.match(jr.format(tr.snapshot('c'), { name: 'Bob', files }), /nothing by the numbers/);
+});
+
+test('completion notification preserves the report tail and labels omitted evidence and review',()=>{
+  const {completionReport}=require('../lib/jobreport');
+  const r=completionReport({name:'Bob'},{id:'j1',status:'review',task:'Website',result:'a'.repeat(5000)+' RISK: all business copy is placeholder; real device checks pending.'});
+  assert.equal(r.reviewReady,true);assert.equal(r.reportTruncated,true);
+  assert.match(r.text,/RISK: all business copy is placeholder/);assert.match(r.text,/get_job/);assert.match(r.text,/unaccepted report/);assert.match(r.text,/do not announce verified completion/);
 });
