@@ -346,3 +346,5 @@ Native broker failures now include bounded fixed rejection codes and broker-owne
 Fresh native OpenCode-provider ACP now validates and forwards scoped reasoning_effort values. This fixes the owner-confirmed first request rejection; hosted-provider and later payload/response acceptance remain pending.
 
 Native message-validation failures now include bounded sanitized findings and distinguish the rejected request from earlier continuity requests/tool effects. This diagnostic change does not resolve or replay pending actions.
+
+Fresh native OpenCode ACP strips bounded assistant reasoning_content before protected broker history and upstream submission. Safe count/length buckets are observable; other contracts stay strict and pending actions are not replayed. Real file-tool acceptance remains pending.
