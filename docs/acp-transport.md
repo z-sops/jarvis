@@ -120,3 +120,9 @@ Owner Windows job670f4c59 confirmed reasoning_content/string on assistant messag
 The broker does not forward or journal this CLI-added digest-unbound field. Normalization copies messages without mutating the caller, and canonical history comparisons remain unchanged. nativeRequestDiagnostics.strippedReasoning records the latest normalization count and maximum byte-length bucket (0,1-256,257-4096,>4096); failure diagnostics include the same safe metadata. This is no proof of tool execution. Existing response reasoning/opaque-stream support is unchanged; no new reasoning capture protocol was added.
 
 A provider requiring reasoning round-trip may still reject the stripped request; HTTP failure stays visible and its uncertain intent/count remains protected. No automatic re-add, fallback/replay, old pending-outcome resolution or permission weakening. Fresh owner tool/file and subsequent coding/restart acceptance remain required.
+# History conflict diagnostics
+
+History rejection retains its original matching rules and error text. Safe detail identifies prefix_mismatch, resume_diverged, resume_no_verified_prefix, unresolved_tool_actions or history_bound. Prefix comparisons report the first differing index and at most ten entries from the first ten protected messages, with fixed field names, known roles and content kinds/UTF-8 length buckets. Text, IDs, function names and arguments are never diagnostic values. null and empty content remain distinct; no null/empty equivalence repair is enabled.
+
+nativeFailure reasoningScope=rejected_request describes the failing request. nativeRequestDiagnostics reasoningScope=last_saved_request describes the normalization present at the last durable broker save; it does not claim acceptance or successful submission. Existing scalar summaries remain available for compatibility. Old records have no retroactive scope.
+
