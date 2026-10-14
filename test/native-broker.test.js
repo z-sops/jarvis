@@ -190,3 +190,38 @@ test('structured auth refusal retains only a fixed reason without response body 
 test('free-tier native-client policy refusal is distinguished from an invalid key and never bypassed',async t=>{
  const r=rig(t),x=await start(t,r,gatewayConfig(),async()=>new Response(JSON.stringify({error:{type:'FreeTierError',message:"Error from provider: OpenCode's free tier can only be used from within OpenCode PRIVATE_BODY"}}),{status:403}));assert.equal((await gatewayCall(x)).status,400);assert.equal(x.b.failureDiagnostic().reason,'free_tier_native_client_required');assert.equal(x.b.failureDiagnostic().code,'provider_policy_refused');assert.doesNotMatch(JSON.stringify(x.b.failureDiagnostic()),/PRIVATE_BODY/);const j=r.storage.open(r.home.findJob(x.job.id).nativeBridge);assert.equal(j.requests,1);assert.ok(j.pending);
 });
+
+test('broker records fixed pre-submission rejection and never persists arbitrary field names or contents',async t=>{
+ const r=rig(t);let upstream=0;const x=await start(t,r,config(),async()=>{upstream++;return response({});});
+ const res=await x.call([{role:'user',content:'SENTINEL_PRIVATE_PROMPT'}],{SENTINEL_PRIVATE_FIELD:'SENTINEL_PRIVATE_TOKEN'});
+ assert.equal(res.status,400);assert.equal(upstream,0);
+ const d=x.b.failureDiagnostic();assert.equal(d.rejectCode,'unsupported_request_field');assert.equal(d.submissionPhase,'before_submission');assert.equal(d.validationPhase,'request_validate');assert.deepEqual(d.rejectDetail,{field:'unknown_field'});
+ const stored=JSON.stringify(r.home.findJob(x.job.id));assert.doesNotMatch(stored,/SENTINEL_PRIVATE/);assert.equal(r.home.findJob(x.job.id).nativeBridge,undefined);
+});
+test('native validator diagnoses unsupported shapes with the same refusal text and bounded safe details',()=>{
+ const base={model:'fixture',messages:[{role:'user',content:'Goal'}]};
+ const cases=[
+  [{messages:[]},'invalid_message_list'],[{n:2},'unsupported_n'],
+  [{messages:[{role:'alien',content:'x'}]},'unsupported_message_role'],
+  [{messages:[{role:'user',content:[{type:'text',text:'PRIVATE'}]}]},'non_string_content'],
+  [{messages:[{role:'user',content:'x',PRIVATE_FIELD:'secret'}]},'unsupported_message_field'],
+  [{messages:[{role:'assistant',tool_calls:[{type:'function',function:{name:'read',arguments:'{}'}}]}]},'invalid_function_call'],
+  [{tools:[{type:'provider_secret'}]},'unsupported_tool_shape'],[{tool_choice:{type:'function',function:{name:'PRIVATE'}}},'unsupported_tool_choice'],
+  [{max_tokens:0},'invalid_output_limit'],[{temperature:Infinity},'invalid_sampling_option']
+ ];
+ for(const [extra,code]of cases)assert.throws(()=>adapter.validate({...base,...extra}),e=>{assert.equal(e.rejectCode,code);assert.doesNotMatch(JSON.stringify(e.rejectDetail),/PRIVATE|secret|alien|provider_secret/);return true;});
+ const {Reject,diagnostic}=require('../lib/native-rejection');assert.deepEqual(diagnostic(new Reject('non_string_content','PRIVATE',{field:'PRIVATE',contentKind:'array',password:'SECRET',count:Infinity}),''),{rejectCode:'non_string_content',rejectDetail:{contentKind:'array'}});
+});
+test('model mismatch and invalid JSON identify the check without printing model/request values',async t=>{
+ for(const mode of ['trim','case','json']){const r=rig(t),x=await start(t,r);const res=await fetch(x.b.override.workerBaseUrl+'/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+x.b.override.workerApiKey},body:mode==='json'?'not JSON':JSON.stringify({model:mode==='trim'?'fixture ':'FIXTURE',messages:[{role:'user',content:'Goal'}]})});assert.equal(res.status,400);const d=x.b.failureDiagnostic();assert.equal(d.submissionPhase,'before_submission');assert.equal(d.rejectCode,mode==='json'?'invalid_json':'model_id_mismatch');if(mode==='trim')assert.equal(d.rejectDetail.sameWhenTrimmed,true);if(mode==='case')assert.equal(d.rejectDetail.sameWhenLowercased,true);}
+});
+test('oversize refusal is distinct from a large valid request',async t=>{
+ for(const large of [false,true]){const r=rig(t),x=await start(t,r);const res=await x.call([{role:'user',content:'x'.repeat(large?1048576:900000)}]);assert.equal(res.status,large?400:200);if(large){assert.equal(x.b.failureDiagnostic().rejectCode,'request_too_large');assert.equal(x.b.failureDiagnostic().submissionPhase,'before_submission');}else assert.equal(x.b.failureDiagnostic(),null);}
+});
+test('reservation-save failure remains reserved and transport/decode failures preserve submission phase',async t=>{
+ for(const mode of ['save','network','decode']){const r=rig(t);let generation=0;const x=await start(t,r,config({workerProvider:'opencode',workerModel:'fixture',workerApiKey:'FAKE',workerGatewayMode:'requests',workerTokenBudget:0,workerCostBudgetUsd:0}),async()=>{generation++;if(mode==='network')throw Error('private transport');return response({});});
+ if(mode==='save'){const original=r.home.updateJob.bind(r.home);r.home.updateJob=(...args)=>{if(args[3]?.event==='native_model_state')throw Error('private disk path');return original(...args);};}
+ assert.equal((await x.call()).status,400);const d=x.b.failureDiagnostic();assert.equal(d.submissionPhase,{save:'submission_reserved',network:'submitted_outcome_unknown',decode:'response_received'}[mode]);assert.equal(generation,mode==='save'?0:1);if(mode==='save')assert.equal(d.rejectCode,'state_save_failed');else assert.ok(r.storage.open(r.home.findJob(x.job.id).nativeBridge).pending);assert.doesNotMatch(JSON.stringify(d),/private/);
+ }
+});
+test('later faulted requests cannot overwrite the original diagnostic rejection',async t=>{const r=rig(t),x=await start(t,r);await x.call([{role:'user',content:[]}]);const first=x.b.failureDiagnostic();await x.call();assert.deepEqual(x.b.failureDiagnostic(),first);});
