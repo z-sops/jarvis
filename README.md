@@ -344,3 +344,5 @@ Fresh **OpenCode engine + OpenCode provider + ACP transport** jobs preserve nati
 Native broker failures now include bounded fixed rejection codes and broker-owned submission phases; this is diagnostic evidence, not live provider acceptance. See docs/acp-transport.md.
 
 Fresh native OpenCode-provider ACP now validates and forwards scoped reasoning_effort values. This fixes the owner-confirmed first request rejection; hosted-provider and later payload/response acceptance remain pending.
+
+Native message-validation failures now include bounded sanitized findings and distinguish the rejected request from earlier continuity requests/tool effects. This diagnostic change does not resolve or replay pending actions.
