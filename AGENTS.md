@@ -914,3 +914,6 @@ Model ID validation accepts bounded namespaced IDs consistently. Per-worker Auto
 
 ## Fixed native rejection diagnostics — 2026-10-14
 Preserve strict payload/model/history/usage validation. native-rejection owns fixed code/detail vocabularies; never record arbitrary field names, model values, prompts, headers, raw exceptions or provider bodies. submissionPhase is broker-owned, never inferred from zero activity bytes. before_submission means no generation submission in this attempt, not safe replay of prior attempts. submission_reserved must remain conservative if persistence fails. Keep first fault diagnostics stable. No automatic replay, refunds, pending resets or validation relaxation. See project-update.md for measured validation and Windows acceptance boundaries.
+
+### Scoped native reasoning effort — 2026-10-14
+Owner identified reasoning_effort as unsupported top-level field. Only existing nativeClient OpenCode-provider ACP contract accepts local six-value enum and forwards it explicitly. Legacy/other-provider adapters remain strict. Preserve actual prepared request digest/effort in protected pending intent, unknown charges, output accounting, no implicit strip/replay and all containment/approval gates. Passing protocol fixtures are not Windows gateway acceptance; opaque reasoning stream support remains unchanged.
