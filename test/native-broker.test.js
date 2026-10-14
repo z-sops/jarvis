@@ -188,5 +188,5 @@ test('structured auth refusal retains only a fixed reason without response body 
 
 
 test('free-tier native-client policy refusal is distinguished from an invalid key and never bypassed',async t=>{
- const r=rig(t),x=await start(t,r,gatewayConfig(),async()=>new Response(JSON.stringify({error:{type:'FreeTierError',message:"Error from provider: OpenCode's free tier can only be used from within OpenCode PRIVATE_BODY"}}),{status:403}));assert.equal((await gatewayCall(x)).status,400);assert.equal(x.b.failureDiagnostic().reason,'free_tier_native_client_required');assert.doesNotMatch(JSON.stringify(x.b.failureDiagnostic()),/PRIVATE_BODY/);const j=r.storage.open(r.home.findJob(x.job.id).nativeBridge);assert.equal(j.requests,1);assert.ok(j.pending);
+ const r=rig(t),x=await start(t,r,gatewayConfig(),async()=>new Response(JSON.stringify({error:{type:'FreeTierError',message:"Error from provider: OpenCode's free tier can only be used from within OpenCode PRIVATE_BODY"}}),{status:403}));assert.equal((await gatewayCall(x)).status,400);assert.equal(x.b.failureDiagnostic().reason,'free_tier_native_client_required');assert.equal(x.b.failureDiagnostic().code,'provider_policy_refused');assert.doesNotMatch(JSON.stringify(x.b.failureDiagnostic()),/PRIVATE_BODY/);const j=r.storage.open(r.home.findJob(x.job.id).nativeBridge);assert.equal(j.requests,1);assert.ok(j.pending);
 });

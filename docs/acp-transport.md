@@ -11,7 +11,7 @@ The existing Home/job/project records remain authoritative. ACP is the conversat
 | Initialize/capability negotiation | Bounded newline JSON-RPC v1 client, protocol compatibility required |
 | New native conversation | `session/new` with fixed `/workspace`, original native ID acknowledged before prompting |
 | Existing native conversation | Capability-gated `session/load`, exact original ID, no fresh-session fallback |
-| Worker model selection | Fixed custom broker model and pinned OpenCode `session/set_model`; other providers disabled |
+| Worker model selection | One mediated provider/model; fresh OpenCode-provider ACP uses native provider identity, other routes retain custom alias; no automatic model fallback |
 | Streaming response | ACP text chunks append correctly to the existing OpenCode collector and UI callbacks |
 | Tool progress | Native tool IDs/statuses project into existing job progress; raw inputs/outputs/names stay private |
 | Native plan updates | Observational thinking status; cannot replace a Laila project card or authorize dispatch |
@@ -28,13 +28,13 @@ Settings → **OpenCode transport**:
 - **Existing JSON run** is the unchanged default for existing installations and checkpoints.
 - **ACP sessions (preview)** selects `opencode acp` inside the same Docker container. Adapter is pinned to OpenCode **1.18.35**, whose source was independently inspected. Other versions refuse; no host or alternate-transport fallback.
 
-This is separate from **OpenCode gateway execution**. ACP does not add tokens, multiply account quotas, make billing free or remove request/token/USD controls. Gemini/OpenAI/Anthropic exact-count routes retain existing accounting. The explicitly configured OpenCode Space Bunny request-only route retains its existing no-token/USD-budget limitation and unknown cost. No provider call or key authentication was made during development.
+This is separate from **OpenCode gateway execution**. ACP does not add tokens, multiply account quotas, make billing free or remove request/token/USD controls. Gemini/OpenAI/Anthropic exact-count routes retain existing accounting. The explicitly configured OpenCode/OpenRouter request-only route retains its existing no-token/USD-budget limitation and unknown cost. No provider call or key authentication was made during development.
 
 Transport is included in hash-verified checkpoint metadata. Legacy checkpoints imply `run`. A changed transport refuses before workspace restoration and container creation. To evaluate ACP, use a fresh reviewed job; do not reinterpret an older run checkpoint as ACP history. Changing provider/model/image also retains existing recovery binding checks.
 
 ## Security boundary
 
-The ACP client advertises **no host filesystem or terminal capability**. Unsupported peer requests return method-not-found. ACP permission requests are cancelled and fail the turn; they cannot synthesize human consent or resurrect old grants. Existing broker permission receipts, Guardian and MCP permission enforcement remain in place. Arbitrary native shell operations remain denied by the existing OpenCode configuration.
+The ACP client advertises **no host filesystem or terminal capability**. Unsupported peer requests return method-not-found. Fresh native permission requests use the existing human approval UI, acknowledged session and current actor/job/run. Only an original `allow_once` option and a fresh main-window receipt can return authorization, after durable argument-hash recording. Unknown kinds, external/private paths, reviewer writes/shell, Guardian hard denial, duplicate IDs, cancelled/expired runs and failed persistence refuse. Historical replay never prompts or restores a grant. Fresh OpenCode-provider ACP enables native bash with `ask`, not `allow`; other modes retain bash denial. Execution remains inside the existing no-network Docker container. Broker tool-result approvals remain a separate gate; a native action can require a second fresh approval.
 
 MCP is configured once in the isolated OpenCode config, not registered a second time through `session/new`. The ACP session therefore sends an empty `mcpServers` list, matching the existing configured owning-actor gateway. Native config, credentials, queues and plugin code are not recovered from arbitrary homes.
 
@@ -72,3 +72,13 @@ This is not universal ACP implementation or full ZCode feature parity. Rich imag
 ## Owner Windows acceptance result (2026-10-12)
 
 On draft head8f97cf5 and installed image018544b25065..., owner ran the documented --private-continuity --acp command on Docker Linux29.5.3. OpenCode explicitly reported acp and all10task/MCP/checkpoint/private-history checks passed; Hermes unchanged transport passed10/10. OpenCode resumed6messages including prior marker/tool history; no duplicate fixture call. Single fresh-container recovery7.04s (Hermes13.06s); total fixture15.54s/30.83s includes original execution AND restart, not one-job/project latency. This is owner-supplied real native offline evidence, not an assistant rerun or real provider/power-loss/plugin/production approval/billing proof. Earlier unverified-native-ACP statements are superseded only for this pinned fixture. Installed app/live website acceptance remains pending.
+
+## Combined native-provider repair (2026-10-14)
+
+Fresh jobs selecting OpenCode engine, OpenCode provider and ACP transport now use the actual native `opencode` provider identity with the same loopback endpoint and ephemeral broker token. Real upstream credentials remain on the host. The original CLI-generated, bounded session/request/client/version metadata is forwarded through both relay boundaries only to the fixed generation endpoint. Nothing fabricates a client header, tool, approval or provider identity for a non-OpenCode worker. MCP/actor credentials are not forwarded as model metadata.
+
+The request-limited broker records this native wire contract in protected execution policy. Existing saved journals without it keep the previous contract; retry does not silently migrate a native session. Reviewed conversion to another provider retires the native contract only in the fresh target and preserves the protected source archive. Existing image/model/provider/transport/private-state and uncertain-outcome guards remain. Use a fresh job to evaluate the new contract.
+
+Native requests preserve upstream streaming and request usage metadata. A bounded Chat Completions SSE assembler requires complete finish, usage, candidate and tool-ID evidence; truncated, opaque/unsupported reasoning, malformed, oversized and late data refuse without refund/replay. Upstream streaming is currently buffered before downstream delivery so tool approvals, usage settlement and protected response publication precede execution. This is not first-token UI streaming or universal protocol compatibility.
+
+ACP accepts the same bounded namespaced model characters as the host registry, including OpenRouter IDs. Per-worker Auto no longer discards authorized backup routes before the broker; Pinned still filters exact selection. These changes do not add mid-generation automatic failover. Free-tier policy refusal has its own `provider_policy_refused` category and retains original unknown accounting. Actual hosted-provider acceptance of this native request/permission configuration still requires the owner Windows test. Earlier private-continuity fixture PASS does not prove this new native provider route.
