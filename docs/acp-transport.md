@@ -126,3 +126,5 @@ History rejections retain their original error text; the scoped compatibility ru
 
 nativeFailure reasoningScope=rejected_request describes the failing request. nativeRequestDiagnostics reasoningScope=last_saved_request describes the normalization present at the last durable broker save; it does not claim acceptance or successful submission. Existing scalar summaries remain available for compatibility. Old records have no retroactive scope.
 
+
+Protected-prefix follow-up: nativeClient canonical-equivalent prefixes are retained verbatim, including original null content and original argument strings; only the new incoming tail is appended. The handler also restores the current durable journal prefix before provider preparation. Legacy contracts retain prior behavior. canonical() is comparison-only, with no stored canonical digest or journal migration. Three-request mock exchange plus shortened-history refusal verifies this, not actual native file execution.

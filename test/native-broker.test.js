@@ -312,9 +312,20 @@ test('history bound failure records its site without changing the existing bound
 
 test('native ACP tool-call history equates only null and empty assistant content symmetrically',()=>{
  const a={role:'assistant',content:null,tool_calls:[{id:'call',type:'function',function:{name:'write_file',arguments:'{"path":"fixture.txt"}'}}]},b={...a,content:''},u={role:'user',content:'Goal'};
- for(const [left,right] of [[a,b],[b,a]])assert.deepEqual(broker.mergeHistory([u,left],[u,right],true,true),[u,right]);
+ for(const [left,right] of [[a,b],[b,a]])assert.deepEqual(broker.mergeHistory([u,left],[u,right],true,true),[u,left]);
  assert.throws(()=>broker.mergeHistory([u,a],[u,b],true,false),/diverges/);
  assert.throws(()=>broker.mergeHistory([u,{role:'assistant',content:null}],[u,{role:'assistant',content:''}],true,true),/diverges/);
  assert.throws(()=>broker.mergeHistory([{role:'user',content:null},a],[{role:'user',content:''},a],true,true),e=>e.rejectDetail.historySite==='resume_no_verified_prefix');
  for(const changed of [{...b,content:' '},{...b,content:'changed'},{...b,role:'tool'},{...b,tool_calls:[]},...['id','type','name','arguments'].map(key=>({...b,tool_calls:[{...a.tool_calls[0],...(key==='id'||key==='type'?{[key]:'changed'}:{function:{...a.tool_calls[0].function,[key]:key==='arguments'?'{"path":"other.txt"}':'changed'}})}]}))])assert.throws(()=>broker.mergeHistory([u,a],[u,changed],true,true),/diverges/);
+});
+
+test('three native ACP requests preserve protected prefix verbatim and append only the new tail',async t=>{
+ const r=rig(t);let generations=0;const originalArgs='{ "path": "fixture.txt", "text": "ORBIT_FILE_OK" }';
+ const cfg=config({engine:'opencode',opencodeTransport:'acp',workerProvider:'opencode',workerModel:'fixture',workerApiKey:'FAKE',workerGatewayMode:'requests',workerTokenBudget:0,workerCostBudgetUsd:0});
+ const x=await start(t,r,cfg,async(_url,o)=>{const b=JSON.parse(o.body);generations++;if(generations>1){assert.equal(b.messages[1].content,null);assert.equal(b.messages[1].tool_calls[0].function.arguments,originalArgs);assert.equal(b.messages[1].reasoning_content,undefined);}return response({choices:[{finish_reason:generations===1?'tool_calls':'stop',message:generations===1?{role:'assistant',content:null,tool_calls:[{id:'call',type:'function',function:{name:'write_file',arguments:originalArgs}}]}:{role:'assistant',content:generations===2?'File result recorded':'Third response'}}],usage:{prompt_tokens:1,completion_tokens:2}});});
+ const post=messages=>fetch(x.b.override.workerBaseUrl+'/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+x.b.override.workerApiKey,'user-agent':'opencode/1.18.35','x-opencode-session':'ses_fixture','x-opencode-request':'req_fixture'},body:JSON.stringify({model:'fixture',messages})});
+ const u={role:'user',content:'Goal'},first=await post([u]);assert.equal(first.status,200);const a=(await first.json()).choices[0].message;
+ const incoming={...a,content:'',reasoning_content:'',tool_calls:[{...a.tool_calls[0],function:{...a.tool_calls[0].function,arguments:'{"text":"ORBIT_FILE_OK","path":"fixture.txt"}'}}]},tool={role:'tool',tool_call_id:'call',content:'done'};
+ const second=await post([u,incoming,tool]);assert.equal(second.status,200);const b=(await second.json()).choices[0].message;
+ const third=await post([u,incoming,tool,b,{role:'user',content:'Continue'}]);assert.equal(third.status,200);assert.equal(generations,3);const j=r.home.findJob(x.job.id),journal=r.storage.open(j.nativeBridge);assert.equal(journal.messages[1].content,null);assert.equal(journal.messages[1].tool_calls[0].function.arguments,originalArgs);assert.equal(j.nativeContinuity.reportedUsage.responses,3);assert.equal(j.nativeContinuity.pendingTools.length,0);assert.equal((await post([u])).status,400);assert.equal(generations,3);assert.equal(x.b.failureDiagnostic().rejectDetail.historySite,'prefix_mismatch');
 });
